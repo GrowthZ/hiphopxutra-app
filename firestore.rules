@@ -1,0 +1,48 @@
+rules_version = '2';
+
+// Phase 1 rules. Admins: Google accounts listed in events/{eventId}/admins/{email}.
+// Judges: any signed-in session (anonymous for now) may write scores/votes only;
+// phase 3 replaces this with per-judge accounts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /events/{eventId} {
+      function isAdmin() {
+        return request.auth != null
+          && request.auth.token.email_verified == true
+          && exists(/databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower()));
+      }
+
+      function prelimLocked(lockField) {
+        return get(/databases/$(database)/documents/events/$(eventId)/meta/current).data.get(lockField, false);
+      }
+
+      function onlyScoresChanged() {
+        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prelimScores']);
+      }
+
+      // Admin whitelist: each admin can see their own entry; edit it in the Firebase Console.
+      match /admins/{email} {
+        allow read: if request.auth != null && request.auth.token.email.lower() == email;
+        allow write: if isAdmin();
+      }
+
+      // Tournament data is public to read (results pages, LED), admin-only to write.
+      match /{collection}/{docId} {
+        allow read: if collection != 'admins';
+        allow write: if isAdmin();
+      }
+
+      match /newbieDancers/{dancerId} {
+        allow update: if request.auth != null && onlyScoresChanged() && !prelimLocked('isNewbieTop32Locked');
+      }
+
+      match /proDancers/{dancerId} {
+        allow update: if request.auth != null && onlyScoresChanged() && !prelimLocked('isProTop32Locked');
+      }
+
+      match /votes/{matchId} {
+        allow create, update: if request.auth != null;
+      }
+    }
+  }
+}

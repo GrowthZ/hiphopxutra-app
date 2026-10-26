@@ -1,7 +1,29 @@
 # Hướng dẫn chạy Localhost & Production
 
 App là một **SPA tĩnh** (React + Vite): build ra thư mục `dist/` gồm HTML/JS/CSS, không cần server backend.
-Đăng nhập Google và đồng bộ Google Sheets chạy qua Firebase Auth ngay trên trình duyệt (cấu hình trong `firebase-applet-config.json`).
+Dữ liệu giải (thí sinh, điểm, đội, trận, phiếu) lưu trên **Cloud Firestore** và đồng bộ realtime giữa mọi thiết bị.
+Đăng nhập chạy qua **Firebase Auth** (cấu hình trong `firebase-applet-config.json`, project `gen-lang-client-0810099059`).
+
+## 0. Cài đặt Firebase (làm 1 lần, bắt buộc)
+
+Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ **"Lỗi đồng bộ dữ liệu"** và không vào được `/admin`.
+
+1. **Bật Firestore:** [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0810099059/firestore)
+   → **Create database** → chọn vị trí `asia-southeast1` (Singapore) → chế độ **Production**.
+2. **Bật đăng nhập:** Authentication → **Sign-in method** → bật **Google** và **Anonymous** (giám khảo dùng Anonymous ở giai đoạn này).
+3. **Đẩy rules bảo mật** (file `firestore.rules`):
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase deploy --only firestore:rules
+   ```
+4. **Thêm admin đầu tiên:** Firestore → **Start collection** theo đường dẫn
+   `events` / `hiphopxutra-2026` / `admins` / `<email-google-viết-thường>` (document để trống hoặc thêm field `name`).
+   Admin sau có thể thêm admin khác theo cùng cách.
+5. Mở `/admin`, đăng nhập Google bằng email vừa thêm. Lần đầu admin vào, dữ liệu đang có trên trình duyệt đó
+   (dữ liệu cũ trong localStorage, hoặc dữ liệu mẫu) sẽ được **tự động đẩy lên Firestore**.
+
+> Muốn **làm lại từ đầu**: xoá collection `events/hiphopxutra-2026/*` (trừ `admins`) trong Console, rồi admin tải lại trang.
 
 ## Yêu cầu
 
@@ -26,14 +48,16 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 
 ### Link nhanh cho từng màn hình
 
-| Màn hình | URL |
-|---|---|
-| Bàn điều hành (mặc định) | `http://localhost:3000` |
-| Màn LED sân khấu | `http://localhost:3000/#stage` |
-| Cổng giám khảo | `http://localhost:3000/#judge` |
-| Khán giả xem Prelim | `http://localhost:3000/#guest` |
-| Bảng kết quả Prelim | `http://localhost:3000/#prelim_results` |
+| Màn hình | URL | Đăng nhập |
+|---|---|---|
+| Khán giả xem Prelim (trang chủ) | `http://localhost:3000/` hoặc `/ket-qua/prelim` | Không |
+| Bảng xếp hạng Prelim | `/ket-qua/bang-xep-hang` | Không |
+| Màn LED sân khấu | `/led` | Không |
+| Cổng giám khảo | `/giam-khao` | Tự động (ẩn danh) |
+| Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
+| Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |
 
+Link cũ (`#stage`, `#judge`, `#guest`, `#khach`, `#prelim_results`, `?view=...`) vẫn dùng được, tự chuyển sang URL mới.
 Với production, thay `http://localhost:3000` bằng domain thật.
 
 ### Kiểm tra trước khi commit
@@ -60,18 +84,12 @@ Chọn **một** trong các cách sau.
 
 #### Cách A — Firebase Hosting (khuyên dùng, cùng project Firebase với app)
 
-```bash
-npm install -g firebase-tools
-firebase login
-firebase init hosting
-#   - Use an existing project → gen-lang-client-0810099059
-#   - Public directory: dist
-#   - Single-page app: Yes
-#   - Overwrite dist/index.html: No
-firebase deploy --only hosting
-```
+Repo đã có sẵn `firebase.json` (thư mục `dist`, rewrite mọi URL về `index.html`) và `.firebaserc`:
 
-Lần sau chỉ cần: `bun run build && firebase deploy --only hosting`.
+```bash
+bun run build
+firebase deploy --only hosting,firestore:rules
+```
 Domain mặc định: `https://gen-lang-client-0810099059.web.app` (Auth tự nhận domain này).
 
 #### Cách B — Hosting tĩnh khác (Vercel, Netlify, Cloudflare Pages…)
@@ -79,10 +97,13 @@ Domain mặc định: `https://gen-lang-client-0810099059.web.app` (Auth tự nh
 - Install command: `bun install` (hoặc `npm install`)
 - Build command: `bun run build` (hoặc `npm run build`)
 - Output directory: `dist`
+- **Bắt buộc:** cấu hình rewrite mọi đường dẫn về `/index.html` (Vercel: `vercel.json` rewrites; Netlify/Cloudflare:
+  file `public/_redirects` với dòng `/* /index.html 200`). Thiếu bước này, mở thẳng `/led` hay `/admin` sẽ bị 404.
 
 #### Cách C — Google AI Studio
 
-App được tạo từ AI Studio; bấm **Deploy** trong AI Studio để đẩy lên Cloud Run. Không cần làm gì thêm.
+App được tạo từ AI Studio; bấm **Deploy** trong AI Studio để đẩy lên Cloud Run.
+Sau khi deploy, mở thử thẳng `/led` và `/admin` để chắc chắn server trả về app (không 404).
 
 ### Bước 3 — Cho phép domain đăng nhập Google (bắt buộc với Cách B và domain riêng)
 
@@ -102,7 +123,13 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 
 | Lỗi | Cách xử lý |
 |---|---|
-| `bun: command not found` | `npm install -g bun`, hoặc dùng `npx bun ...` || Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
+| `bun: command not found` | `npm install -g bun`, hoặc dùng `npx bun ...` |
+| Banner đỏ "Cloud Firestore API has not been used… or it is disabled" | Chưa bật Firestore — làm mục 0, bước 1 |
+| Banner đỏ `Missing or insufficient permissions` | Chưa deploy `firestore.rules`, hoặc email chưa có trong `admins` |
+| `/admin` báo "chưa có quyền admin" | Thêm email (viết thường) vào `events/hiphopxutra-2026/admins` |
+| Giám khảo báo "Không đăng nhập ẩn danh được" | Bật **Anonymous** trong Authentication → Sign-in method |
+| Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
+| Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |
 | `auth/unauthorized-domain` | Thêm domain vào Authorized domains (Bước 3) |
 | Popup đăng nhập bị chặn | Cho phép popup cho domain trong trình duyệt |

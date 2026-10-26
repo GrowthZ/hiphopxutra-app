@@ -4,6 +4,7 @@ Operating system for a U16 Breaking tournament: 9-judge scoring, Prelims Top 32,
 random 2vs2 team draw, battle bracket, and the LED stage display.
 
 Read `rules.md` before changing code. Project skills live in `.claude/skills/`.
+Product design (roles, user stories, URLs, LED control hooks): `docs/user-stories.md`.
 
 ## Stack
 
@@ -26,10 +27,13 @@ Read `rules.md` before changing code. Project skills live in `.claude/skills/`.
 
 ```
 src/
-  App.tsx                    view router (switches on activeView)
+  App.tsx                    renders the view for activeView; gates /admin/* behind AdminLoginGate
+  routes.ts                  view <-> URL path map, legacy #hash redirects
   context/TournamentContext  single source of truth for all tournament state
+  context/tournamentModel.ts ranking, vote counting, state <-> Firestore document mapping
+  hooks/useSyncedCollection  mirrors a state array to events/{EVENT_ID}/{collection} (realtime, diffed writes)
   components/                one file per view or modal (*View.tsx, *Modal.tsx)
-  services/                  firebase, googleSheets, storageService, soundEffects
+  services/                  firebase, firestore, googleSheets, storageService, soundEffects
   types/tournament.ts        all shared domain types
   data/mockData.ts           seed dancers/judges for local dev
   utils/placeholderAssets.ts fallback avatars and team images
@@ -46,6 +50,16 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   `bracket`, `battle`, `stage`, `judge`, `dancers`, `sheets`, `storage`.
 - **Stage display**: full-screen LED output for the venue — read from a distance, no admin chrome.
 - **Judge portal**: used by judges on phones/tablets during live battles.
+
+## Data & sync
+
+- Firestore tree `events/hiphopxutra-2026/`: `newbieDancers`, `proDancers`, `teams`, `matches`, `judges`,
+  `meta/current` (activeMatchId, Top 32 locks), `votes/{matchId}`, `admins/{email}`. Rules: `firestore.rules`.
+- Admin clients write through `useSyncedCollection` (only changed fields). Judges never write those collections:
+  scores go through `writePrelimScore` (one field), battle votes through `writeBattleVote` (`votes` doc).
+- Teams/matches store dancer **ids**, not copies; `hydrateMatch`/`hydrateTeam` rebuild full objects for the UI.
+- `BroadcastChannel` now carries only same-machine audio/animation cues, never data.
+- URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here
 

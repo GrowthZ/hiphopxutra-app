@@ -14,17 +14,38 @@ import { DancersListView } from './components/DancersListView';
 import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { StorageConfigModal } from './components/StorageConfigModal';
 import { JudgeConfigModal } from './components/JudgeConfigModal';
-import { ArrowLeft, LayoutDashboard, Tv } from 'lucide-react';
+import { AdminLoginGate } from './components/AdminLoginGate';
+import { isAdminView } from './routes';
+import { ArrowLeft, LayoutDashboard, Tv, CloudOff } from 'lucide-react';
+
+const SyncErrorBanner: React.FC = () => {
+  const { syncError } = useTournament();
+  if (!syncError) return null;
+  return (
+    <div
+      role="alert"
+      className="fixed bottom-3 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 max-w-[calc(100%-2rem)] rounded bg-red-600 px-3 py-2 text-xs font-bold text-white shadow-lg"
+    >
+      <CloudOff className="w-4 h-4 shrink-0" />
+      <span>Lỗi đồng bộ dữ liệu: {syncError}</span>
+    </div>
+  );
+};
 
 const MainContent: React.FC = () => {
   const {
     activeView,
     setActiveView,
+    isAdmin,
     isStorageModalOpen,
     setIsStorageModalOpen,
     isJudgeConfigModalOpen,
     setIsJudgeConfigModalOpen,
   } = useTournament();
+
+  if (isAdminView(activeView) && !isAdmin) {
+    return <AdminLoginGate />;
+  }
 
   // Dedicated Guest / Spectator Prelim View
   if (activeView === 'prelim_guest') {
@@ -146,6 +167,7 @@ export default function App() {
   return (
     <TournamentProvider>
       <MainContent />
+      <SyncErrorBanner />
     </TournamentProvider>
   );
 }

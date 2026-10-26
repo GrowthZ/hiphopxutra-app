@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useTournament } from '../context/TournamentContext';
 import { Dancer } from '../types/tournament';
+import { VIEW_PATHS } from '../routes';
 import {
   Trophy,
   Medal,
@@ -114,7 +115,7 @@ export const PrelimGuestView: React.FC = () => {
   const top3 = sortedDancers[2];
 
   const shareUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}${window.location.pathname}#prelim_guest`
+    ? `${window.location.origin}${VIEW_PATHS.prelim_guest}`
     : '';
 
   const handleCopyLink = async () => {

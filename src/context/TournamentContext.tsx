@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   CategoryType,
   ActiveViewType,
@@ -27,8 +27,29 @@ import {
 import { soundFX } from '../services/soundEffects';
 import { syncAllTournamentData, createTournamentSpreadsheet } from '../services/googleSheets';
 import { getSavedStorageConfig, saveStorageConfig } from '../services/storageService';
-import { initAuth, googleSignIn, logout as firebaseLogout, setCachedAccessToken } from '../services/firebase';
-import { User } from 'firebase/auth';
+import { auth, initAuth, googleSignIn, logout as firebaseLogout, setCachedAccessToken } from '../services/firebase';
+import { checkIsAdmin, clearVotes, writeBattleVote, writePrelimScore } from '../services/firestore';
+import { useSyncedCollection } from '../hooks/useSyncedCollection';
+import {
+  PRELIM_JUDGE_IDS,
+  MatchVotes,
+  Votes,
+  recalculateDancers,
+  dancerToDoc,
+  teamToDoc,
+  teamFromDoc,
+  sortTeams,
+  matchToDoc,
+  matchFromDoc,
+  sortMatches,
+  applyVotes,
+  hydrateMatch,
+  hydrateTeam,
+  matchVotesFromDoc,
+  sortJudges,
+} from './tournamentModel';
+import { VIEW_PATHS, viewFromLocation } from '../routes';
+import { User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import confetti from 'canvas-confetti';
 
 interface TournamentContextType {
@@ -108,9 +129,15 @@ interface TournamentContextType {
   syncWithGoogleSheet: () => Promise<{ success: boolean; message: string }>;
   setSheetId: (id: string) => void;
 
-  // Navigation views
+  // Navigation views (each view has its own URL, see src/routes.ts)
   activeView: ActiveViewType;
   setActiveView: (view: ActiveViewType) => void;
+
+  // Auth & Firestore sync
+  authUser: User | null;
+  authReady: boolean;
+  isAdmin: boolean;
+  syncError: string | null;
 
   // Reset/Seed
   resetAllData: () => void;
@@ -118,10 +145,9 @@ interface TournamentContextType {
 
 const TournamentContext = createContext<TournamentContextType | null>(null);
 
+// localStorage is only read once, to migrate pre-Firestore data into Firestore on an admin's first load.
 const STORAGE_KEY = 'hiphop_xu_tra_tournament_v1';
 const BROADCAST_NAME = 'hiphop_xu_tra_broadcast';
-
-const PRELIM_JUDGE_IDS = ['gk-1', 'gk-2', 'gk-3', 'gk-4'];
 
 function sanitizeDancersList(rawList: unknown, fallback: Dancer[]): Dancer[] {
   if (!Array.isArray(rawList) || rawList.length === 0) return fallback;
@@ -184,31 +210,50 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [voiceAnnounceEnabled, setVoiceAnnounceEnabledState] = useState<boolean>(true);
 
   const [activeCategory, setActiveCategory] = useState<CategoryType>('pro_2v2');
-  const [activeView, setActiveView] = useState<ActiveViewType>(() => {
-    if (typeof window !== 'undefined') {
-      const hash = window.location.hash.toLowerCase();
-      const search = window.location.search.toLowerCase();
-      if (
-        hash === '#guest' ||
-        hash === '#prelim_guest' ||
-        hash === '#khach' ||
-        search.includes('view=prelim_guest') ||
-        search.includes('view=guest')
-      ) {
-        return 'prelim_guest';
-      }
-      if (hash === '#stage' || search.includes('view=stage')) {
-        return 'stage';
-      }
-      if (hash === '#judge' || search.includes('view=judge')) {
-        return 'judge';
-      }
-      if (hash === '#prelim_results' || search.includes('view=prelim_results')) {
-        return 'prelim_results';
-      }
+  const [activeView, setActiveViewState] = useState<ActiveViewType>(viewFromLocation);
+
+  const setActiveView = useCallback((view: ActiveViewType) => {
+    if (window.location.pathname !== VIEW_PATHS[view]) {
+      window.history.pushState(null, '', VIEW_PATHS[view]);
     }
-    return 'prelim';
-  });
+    setActiveViewState(view);
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => setActiveViewState(viewFromLocation());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // Auth: admins sign in with Google (whitelisted in Firestore), judges get an anonymous session.
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      onAuthStateChanged(auth, async (user) => {
+        setAuthUser(user);
+        let admin = false;
+        if (user?.email) {
+          try {
+            admin = await checkIsAdmin(user.email);
+          } catch (err) {
+            setActionError(`Không kết nối được Firestore: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }
+        setIsAdmin(admin);
+        setAuthReady(true);
+      }),
+    []
+  );
+
+  useEffect(() => {
+    if (authReady && !authUser && activeView === 'judge') {
+      signInAnonymously(auth).catch((err: Error) => setActionError(`Không đăng nhập ẩn danh được: ${err.message}`));
+    }
+  }, [authReady, authUser, activeView]);
   const [storageConfig, setStorageConfigState] = useState<StorageConfig>(getSavedStorageConfig);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState<boolean>(false);
   const [isJudgeConfigModalOpen, setIsJudgeConfigModalOpen] = useState<boolean>(false);
@@ -218,7 +263,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     saveStorageConfig(cfg);
   };
 
-  const [newbieDancers, setNewbieDancers] = useState<Dancer[]>(() => {
+  const [newbieBase, setNewbieDancers] = useState<Dancer[]>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_newbie`);
       if (saved) {
@@ -230,7 +275,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return INITIAL_NEWBIE_DANCERS;
   });
 
-  const [proDancers, setProDancers] = useState<Dancer[]>(() => {
+  const [proBase, setProDancers] = useState<Dancer[]>(() => {
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_pro`);
       if (saved) {
@@ -250,12 +295,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return localStorage.getItem(`${STORAGE_KEY}_locked_pro`) === 'true';
   });
 
-  const [proTeams, setProTeams] = useState<Team2v2[]>(() => {
+  const [teamsBase, setProTeams] = useState<Team2v2[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_teams`);
     return saved ? JSON.parse(saved) : INITIAL_PRO_TEAMS;
   });
 
-  const [matches, setMatches] = useState<BattleMatch[]>(() => {
+  const [matchesBase, setMatchesBase] = useState<BattleMatch[]>(() => {
     const saved = localStorage.getItem(`${STORAGE_KEY}_matches`);
     return saved ? JSON.parse(saved) : buildInitialMatches();
   });
@@ -264,6 +309,79 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const saved = localStorage.getItem(`${STORAGE_KEY}_activeMatchId`);
     return saved || 'match-pro_2v2-top16-1';
   });
+
+  const [votes, setVotes] = useState<Record<string, Votes>>({});
+  const votesRef = useRef(votes);
+  useEffect(() => {
+    votesRef.current = votes;
+  }, [votes]);
+
+  // Updaters see matches with the latest judge votes applied (votes live in their own collection).
+  const setMatches = useCallback((next: BattleMatch[] | ((prev: BattleMatch[]) => BattleMatch[])) => {
+    setMatchesBase((prev) =>
+      typeof next === 'function' ? next(prev.map((m) => applyVotes(m, votesRef.current[m.id]))) : next
+    );
+  }, []);
+
+  // ---------- Derived views exposed to components ----------
+  const newbieDancers = useMemo(() => recalculateDancers(newbieBase), [newbieBase]);
+  const proDancers = useMemo(() => recalculateDancers(proBase), [proBase]);
+  const dancersById = useMemo(
+    () => new Map([...newbieDancers, ...proDancers].map((d) => [d.id, d])),
+    [newbieDancers, proDancers]
+  );
+  const proTeams = useMemo(() => teamsBase.map((t) => hydrateTeam(t, dancersById)), [teamsBase, dancersById]);
+  const matches = useMemo(() => {
+    const teamsById = new Map(proTeams.map((t) => [t.id, t]));
+    return matchesBase.map((m) => hydrateMatch(applyVotes(m, votes[m.id]), dancersById, teamsById));
+  }, [matchesBase, votes, dancersById, proTeams]);
+
+  // ---------- Firestore sync (events/{EVENT_ID}/...) ----------
+  const meta = useMemo(
+    () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked }],
+    [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
+  );
+  const syncStates = [
+    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite: isAdmin, toDoc: dancerToDoc }),
+    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite: isAdmin, toDoc: dancerToDoc }),
+    useSyncedCollection('teams', teamsBase, applyRemoteTeams, {
+      canWrite: isAdmin,
+      toDoc: teamToDoc,
+      fromDoc: teamFromDoc,
+    }),
+    useSyncedCollection('matches', matchesBase, applyRemoteMatches, {
+      canWrite: isAdmin,
+      toDoc: matchToDoc,
+      fromDoc: matchFromDoc,
+    }),
+    useSyncedCollection('judges', judges, applyRemoteJudges, { canWrite: isAdmin }),
+    useSyncedCollection('meta', meta, applyRemoteMeta, { canWrite: isAdmin }),
+    useSyncedCollection('votes', [] as MatchVotes[], applyRemoteVotes, {
+      canWrite: false,
+      fromDoc: matchVotesFromDoc,
+      keepLocalWhenEmpty: false,
+    }),
+  ];
+  const syncError = actionError ?? syncStates.find((s) => s.error)?.error ?? null;
+
+  function applyRemoteTeams(list: Team2v2[]) {
+    setProTeams(sortTeams(list));
+  }
+  function applyRemoteMatches(list: BattleMatch[]) {
+    setMatchesBase(sortMatches(list));
+  }
+  function applyRemoteJudges(list: Judge[]) {
+    setJudges(sortJudges(list));
+  }
+  function applyRemoteMeta([m]: typeof meta) {
+    if (!m) return;
+    setActiveMatchId(m.activeMatchId);
+    setIsNewbieTop32Locked(Boolean(m.isNewbieTop32Locked));
+    setIsProTop32Locked(Boolean(m.isProTop32Locked));
+  }
+  function applyRemoteVotes(list: MatchVotes[]) {
+    setVotes(Object.fromEntries(list.map((v) => [v.id, v.rounds])));
+  }
 
   // Google Auth & Sheets Config
   const [googleUser, setGoogleUser] = useState<User | null>(null);
@@ -338,42 +456,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   }, []);
 
-  // Save to localStorage
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_newbie`, JSON.stringify(newbieDancers));
-  }, [newbieDancers]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_pro`, JSON.stringify(proDancers));
-  }, [proDancers]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_locked_newbie`, String(isNewbieTop32Locked));
-  }, [isNewbieTop32Locked]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_locked_pro`, String(isProTop32Locked));
-  }, [isProTop32Locked]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_teams`, JSON.stringify(proTeams));
-  }, [proTeams]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_matches`, JSON.stringify(matches));
-  }, [matches]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_activeMatchId`, activeMatchId);
-  }, [activeMatchId]);
-
+  // Sheet config is per-device, so it stays in localStorage
   useEffect(() => {
     localStorage.setItem(`${STORAGE_KEY}_sheetConfig`, JSON.stringify(sheetConfig));
   }, [sheetConfig]);
-
-  useEffect(() => {
-    localStorage.setItem(`${STORAGE_KEY}_judges_v2`, JSON.stringify(judges));
-  }, [judges]);
 
   // Auth state listener on load
   useEffect(() => {
@@ -396,26 +482,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     if (!('BroadcastChannel' in window)) return;
     const bc = new BroadcastChannel(BROADCAST_NAME);
     bc.onmessage = (event) => {
+      // Data arrives through Firestore; the channel only carries same-machine audio/animation cues.
       const { type, payload } = event.data;
-      if (type === 'STATE_UPDATED') {
-        const savedNewbie = localStorage.getItem(`${STORAGE_KEY}_newbie`);
-        const savedPro = localStorage.getItem(`${STORAGE_KEY}_pro`);
-        const savedMatches = localStorage.getItem(`${STORAGE_KEY}_matches`);
-        const savedTeams = localStorage.getItem(`${STORAGE_KEY}_teams`);
-        const savedActiveId = localStorage.getItem(`${STORAGE_KEY}_activeMatchId`);
-        const savedJudges = localStorage.getItem(`${STORAGE_KEY}_judges_v2`);
-
-        if (savedNewbie) setNewbieDancers(sanitizeDancersList(JSON.parse(savedNewbie), INITIAL_NEWBIE_DANCERS));
-        if (savedPro) setProDancers(sanitizeDancersList(JSON.parse(savedPro), INITIAL_PRO_DANCERS));
-        if (savedMatches) setMatches(JSON.parse(savedMatches));
-        if (savedTeams) setProTeams(JSON.parse(savedTeams));
-        if (savedActiveId) setActiveMatchId(savedActiveId);
-        if (savedJudges) setJudges(JSON.parse(savedJudges));
-      }
-
-      if (type === 'JUDGES_UPDATED' && Array.isArray(payload)) {
-        setJudges(payload as Judge[]);
-      }
 
       // Remote Audio Trigger for Stage / Speaker Tab
       if (type === 'REMOTE_AUDIO') {
@@ -475,8 +543,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       judgeId: string,
       photos: { avatar?: string; fullPhotoUrl?: string; name?: string; judgeName?: string }
     ) => {
-      setJudges((prev) => {
-        const updated = prev.map((j) => {
+      setJudges((prev) =>
+        prev.map((j) => {
           if (j.id === judgeId) {
             return {
               ...j,
@@ -487,51 +555,17 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             };
           }
           return j;
-        });
-        try {
-          localStorage.setItem(`${STORAGE_KEY}_judges_v2`, JSON.stringify(updated));
-        } catch {
-          // ignore
-        }
-        broadcastSync('JUDGES_UPDATED', updated);
-        return updated;
-      });
+        })
+      );
     },
-    [broadcastSync]
+    []
   );
 
   const activeMatch = useMemo(() => {
     return matches.find((m) => m.id === activeMatchId);
   }, [matches, activeMatchId]);
 
-  // Recalculate dancer ranks and scores (Strictly 4 Prelim Judges, Max 400 points)
-  const recalculateDancers = (list: Dancer[]) => {
-    const updated = list.map((d) => {
-      const total = PRELIM_JUDGE_IDS.reduce((acc, jId) => acc + (d.prelimScores[jId] ?? 0), 0);
-      const avg = Math.round(total / PRELIM_JUDGE_IDS.length);
-      return {
-        ...d,
-        prelimScoreTotal: Math.min(400, Math.round(total)),
-        prelimScoreAvg: avg,
-      };
-    });
-
-    // Sort descending by total score, secondary sort by SBD
-    updated.sort((a, b) => {
-      if (b.prelimScoreTotal !== a.prelimScoreTotal) {
-        return b.prelimScoreTotal - a.prelimScoreTotal;
-      }
-      return a.sbd.localeCompare(b.sbd);
-    });
-
-    // Assign rank and top 32 flag
-    return updated.map((d, idx) => ({
-      ...d,
-      prelimRank: idx + 1,
-      isQualifiedTop32: idx < 32,
-    }));
-  };
-
+  // Written straight to Firestore (single field); the snapshot updates every screen, including this one.
   const updatePrelimScore = (
     category: CategoryType,
     dancerId: string,
@@ -539,38 +573,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     score: number
   ) => {
     const validScore = Math.min(100, Math.max(0, Math.round(score)));
+    writePrelimScore(category, dancerId, judgeId, validScore).catch((err: Error) =>
+      setActionError(`Không lưu được điểm: ${err.message}`)
+    );
+  };
 
-    if (category === 'newbie_1v1') {
-      setNewbieDancers((prev) => {
-        const next = prev.map((d) => {
-          if (d.id === dancerId) {
-            return {
-              ...d,
-              prelimScores: { ...d.prelimScores, [judgeId]: validScore },
-            };
-          }
-          return d;
-        });
-        const recalculated = recalculateDancers(next);
-        broadcastSync('STATE_UPDATED');
-        return recalculated;
-      });
-    } else {
-      setProDancers((prev) => {
-        const next = prev.map((d) => {
-          if (d.id === dancerId) {
-            return {
-              ...d,
-              prelimScores: { ...d.prelimScores, [judgeId]: validScore },
-            };
-          }
-          return d;
-        });
-        const recalculated = recalculateDancers(next);
-        broadcastSync('STATE_UPDATED');
-        return recalculated;
-      });
-    }
+  // Regenerated matches reuse ids like `match-pro_2v2-top16-1`, so votes from the previous draw must go.
+  const clearOldVotes = (newMatches: BattleMatch[]) => {
+    clearVotes(newMatches.map((m) => m.id).filter((id) => votes[id])).catch((err: Error) =>
+      setActionError(`Không xoá được phiếu cũ: ${err.message}`)
+    );
   };
 
   // Lock Top 32
@@ -593,13 +605,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         );
       }
       setMatches((prev) => [...prev.filter((m) => m.category !== 'newbie_1v1'), ...newMatches]);
+      clearOldVotes(newMatches);
     } else {
       setIsProTop32Locked(true);
       shuffleProTeams();
     }
     soundFX.playRoundWinner();
     confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    broadcastSync('STATE_UPDATED');
   };
 
   // Shuffle Pro Top 32 into 16 teams
@@ -634,8 +646,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
 
     setMatches((prev) => [...prev.filter((m) => m.category !== 'pro_2v2'), ...newMatches]);
+    clearOldVotes(newMatches);
     setActiveMatchId(newMatches[0]?.id || '');
-    broadcastSync('STATE_UPDATED');
   };
 
   // Media / Photo Updates (Avatar & Half-body for Dancers, Team photo for 2vs2, Gender, Placeholders)
@@ -695,7 +707,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
     );
 
-    broadcastSync('MEDIA_UPDATED');
   };
 
   const updateDancerGender = (category: CategoryType, dancerId: string, gender: 'male' | 'female') => {
@@ -724,7 +735,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
     );
 
-    broadcastSync('MEDIA_UPDATED');
   };
 
   const updatePlaceholder = (key: keyof PlaceholderConfig, url: string) => {
@@ -737,7 +747,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     setStorageConfig(updated);
     saveStorageConfig(updated);
-    broadcastSync('MEDIA_UPDATED');
   };
 
   const resetPlaceholders = () => {
@@ -753,7 +762,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     };
     setStorageConfig(updated);
     saveStorageConfig(updated);
-    broadcastSync('MEDIA_UPDATED');
   };
 
   // Judge vote submission with enhanced Audio Feedback
@@ -763,38 +771,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     judgeId: string,
     side: 'red' | 'blue'
   ) => {
-    let isAllVotedNow = false;
+    const roundVotes = { ...votes[matchId]?.[`r${roundNumber}`], [judgeId]: side };
+    const isAllVotedNow = Object.keys(roundVotes).length === judges.length;
 
-    setMatches((prev) => {
-      const updated = prev.map((m) => {
-        if (m.id !== matchId) return m;
-
-        const rounds = m.rounds.map((r) => {
-          if (r.roundNumber !== roundNumber) return r;
-          const newVotes = { ...r.votes, [judgeId]: side };
-          let redCount = 0;
-          let blueCount = 0;
-          Object.values(newVotes).forEach((v) => {
-            if (v === 'red') redCount++;
-            if (v === 'blue') blueCount++;
-          });
-
-          if (Object.keys(newVotes).length === judges.length) {
-            isAllVotedNow = true;
-          }
-
-          return {
-            ...r,
-            votes: newVotes,
-            redVotesCount: redCount,
-            blueVotesCount: blueCount,
-          };
-        });
-
-        return { ...m, rounds, status: 'ongoing' as const };
-      });
-      return updated;
-    });
+    writeBattleVote(matchId, roundNumber, judgeId, side).catch((err: Error) =>
+      setActionError(`Không gửi được phiếu: ${err.message}`)
+    );
 
     // Audio Feedback for Judge
     soundFX.playVoteConfirmed();
@@ -814,7 +796,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       broadcastSync('REMOTE_AUDIO', { effect: 'VOTE_SUBMITTED' });
     }
 
-    broadcastSync('STATE_UPDATED');
   };
 
   // Confirm Round Result with dramatic suspense audio & announcement
@@ -971,7 +952,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
     );
 
-    broadcastSync('STATE_UPDATED');
   };
 
   // Admin công bố toàn bộ các round đã chấm (ví dụ cả 2 round)
@@ -1102,7 +1082,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       })
     );
 
-    broadcastSync('STATE_UPDATED');
   };
 
   // Admin trực tiếp chỉ định người chiến thắng từ BattleOperatorView
@@ -1151,7 +1130,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         detail: { matchId, side, winnerName: matchWinnerName, timestamp: now },
       })
     );
-    broadcastSync('STATE_UPDATED');
   };
 
   // Kích hoạt / Phát lệnh phát lại hiệu ứng Winner trên Màn LED
@@ -1202,7 +1180,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         detail: { matchId, side, winnerName: matchWinnerName, timestamp: now },
       })
     );
-    broadcastSync('STATE_UPDATED');
   };
 
   // Admin kích hoạt hiệu ứng 2 team ra sân trên màn LED (từ 2 bên ngoài lướt vào)
@@ -1216,7 +1193,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     window.dispatchEvent(
       new CustomEvent('TEAM_ENTRANCE_DISPLAY_TRIGGER', { detail: { matchId, timestamp: now } })
     );
-    broadcastSync('STATE_UPDATED');
   };
 
   const advanceToNextRound = (matchId: string) => {
@@ -1230,7 +1206,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
     });
     soundFX.playVoteClick();
-    broadcastSync('STATE_UPDATED');
   };
 
   const addTieBreakRound = (matchId: string) => {
@@ -1259,7 +1234,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
     });
     soundFX.playVoteClick();
-    broadcastSync('STATE_UPDATED');
   };
 
   const resetMatch = (matchId: string) => {
@@ -1289,7 +1263,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         };
       });
     });
-    broadcastSync('STATE_UPDATED');
+    clearVotes([matchId]).catch((err: Error) => setActionError(`Không xoá được phiếu: ${err.message}`));
   };
 
   // Google Login / Logout
@@ -1400,7 +1374,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const m = buildInitialMatches();
     setMatches(m);
     setActiveMatchId(m[0]?.id || '');
-    broadcastSync('STATE_UPDATED');
+    clearVotes(Object.keys(votes)).catch((err: Error) => setActionError(`Không xoá được phiếu: ${err.message}`));
   };
 
   return (
@@ -1463,6 +1437,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setSheetId,
         activeView,
         setActiveView,
+        authUser,
+        authReady,
+        isAdmin,
+        syncError,
         resetAllData,
       }}
     >
