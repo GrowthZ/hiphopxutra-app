@@ -23,8 +23,8 @@ service cloud.firestore {
         return request.auth.token.email.split('@')[0];
       }
 
-      function eventData(path) {
-        return get(/databases/$(database)/documents/events/$(eventId)/$(path)).data;
+      function eventData(collection, id) {
+        return get(/databases/$(database)/documents/events/$(eventId)/$(collection)/$(id)).data;
       }
 
       // Prelim: only the 4 prelim judges, only their own score, 0-100, while Top 32 isn't locked.
@@ -37,25 +37,33 @@ service cloud.firestore {
           && after.diff(before).affectedKeys().hasOnly([judgeId()])
           && after[judgeId()] is number
           && after[judgeId()] >= 0 && after[judgeId()] <= 100
-          && eventData('meta/current').get(lockField, false) == false;
+          && eventData('meta', 'current').get(lockField, false) == false;
       }
 
       // Battle: votes/{matchId} = { r1: { gk-1: 'red', ... }, ... }. A judge changes one round,
       // only their own key, only while that round isn't announced and the match isn't finished.
+      // Rules have no loops and a Set can't be indexed, so each possible round key (r1-r5) is checked on its own.
+      function validRoundVote(key, before, battle) {
+        let afterRound = request.resource.data[key];
+        let round = battle.rounds[int(key.replace('r', '')) - 1];
+        return afterRound.diff(before.get(key, {})).affectedKeys().hasOnly([judgeId()])
+          && afterRound[judgeId()] in ['red', 'blue']
+          && round.get('isConfirmed', false) == false;
+      }
+
       function validOwnVote(matchId) {
         let before = resource == null ? {} : resource.data;
         let changed = request.resource.data.diff(before).affectedKeys();
-        let roundKey = changed.toList()[0];
-        let afterRound = request.resource.data[roundKey];
-        let beforeRound = before.get(roundKey, {});
-        let match = eventData('matches/' + matchId);
-        let round = match.rounds[int(roundKey.replace('r', '')) - 1];
+        let battle = eventData('matches', matchId);
         return isJudge()
           && changed.size() == 1
-          && afterRound.diff(beforeRound).affectedKeys().hasOnly([judgeId()])
-          && afterRound[judgeId()] in ['red', 'blue']
-          && match.status != 'finished'
-          && round.get('isConfirmed', false) == false;
+          && changed.hasOnly(['r1', 'r2', 'r3', 'r4', 'r5'])
+          && battle.status != 'finished'
+          && (!changed.hasAny(['r1']) || validRoundVote('r1', before, battle))
+          && (!changed.hasAny(['r2']) || validRoundVote('r2', before, battle))
+          && (!changed.hasAny(['r3']) || validRoundVote('r3', before, battle))
+          && (!changed.hasAny(['r4']) || validRoundVote('r4', before, battle))
+          && (!changed.hasAny(['r5']) || validRoundVote('r5', before, battle));
       }
 
       // Admin whitelist: each admin can see their own entry.
