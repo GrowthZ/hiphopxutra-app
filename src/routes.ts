@@ -13,6 +13,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   sheets: '/admin/cai-dat/google-sheets',
   storage: '/admin/cai-dat/luu-tru',
   stage_control: '/admin/led',
+  checkin: '/admin/check-in',
 };
 
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */

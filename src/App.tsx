@@ -8,6 +8,7 @@ import { BracketView } from './components/BracketView';
 import { BattleOperatorView } from './components/BattleOperatorView';
 import { LedScreen } from './components/LedScreen';
 import { StageControlView } from './components/StageControlView';
+import { CheckInView } from './components/CheckInView';
 import { JudgePortalView } from './components/JudgePortalView';
 import { PrelimResultsView } from './components/PrelimResultsView';
 import { PrelimGuestView } from './components/PrelimGuestView';
@@ -130,6 +131,7 @@ const MainContent: React.FC = () => {
           {activeView === 'sheets' && <GoogleSheetSyncModal />}
           {activeView === 'storage' && <DancersListView />}
           {activeView === 'stage_control' && <StageControlView />}
+          {activeView === 'checkin' && <CheckInView />}
         </main>
       </div>
 

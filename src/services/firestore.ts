@@ -8,6 +8,8 @@ import {
   setDoc,
   updateDoc,
   writeBatch,
+  runTransaction,
+  deleteField,
   FieldPath,
 } from 'firebase/firestore';
 import { app } from './firebase';
@@ -30,7 +32,8 @@ export type SyncedCollection =
   | 'meta'
   | 'votes'
   | 'screens'
-  | 'presence';
+  | 'presence'
+  | 'counters';
 
 export const eventCollection = (name: SyncedCollection) => collection(db, 'events', EVENT_ID, name);
 export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', EVENT_ID, name, id);
@@ -63,6 +66,41 @@ export const writePrelimScore = (category: CategoryType, dancerId: string, judge
 
 export const writeBattleVote = (matchId: string, roundNumber: number, judgeId: string, side: 'red' | 'blue') =>
   setDoc(eventDoc('votes', matchId), { [`r${roundNumber}`]: { [judgeId]: side } }, { merge: true });
+
+export const sbdPrefixOf = (category: CategoryType) => (category === 'newbie_1v1' ? 'N' : 'P');
+export const isIssuedSbd = (category: CategoryType, sbd: string) => new RegExp(`^${sbdPrefixOf(category)}\\d{3,}$`).test(sbd);
+
+/**
+ * Check a dancer in and return their SBD. Numbers come from a counter in a transaction, so two desks
+ * checking in at once never get the same number. A dancer who already had a number keeps it.
+ * `highestIssued` covers a missing/reset counter when numbers were already handed out.
+ */
+export async function checkInDancer(category: CategoryType, dancerId: string, highestIssued: number): Promise<string> {
+  const prefix = sbdPrefixOf(category);
+  const counterRef = eventDoc('counters', 'sbd');
+  const dancerRef = eventDoc(dancersCollectionOf(category), dancerId);
+
+  return runTransaction(db, async (tx) => {
+    const counter = await tx.get(counterRef);
+    const dancer = await tx.get(dancerRef);
+    if (!dancer.exists()) throw new Error('Không tìm thấy thí sinh trên Firestore');
+
+    const currentSbd = String(dancer.data().sbd ?? '');
+    if (isIssuedSbd(category, currentSbd)) {
+      tx.update(dancerRef, { checkedInAt: Date.now() });
+      return currentSbd;
+    }
+
+    const next = Math.max(Number(counter.data()?.[prefix] ?? 0), highestIssued) + 1;
+    const sbd = `${prefix}${String(next).padStart(3, '0')}`;
+    tx.set(counterRef, { [prefix]: next }, { merge: true });
+    tx.update(dancerRef, { sbd, checkedInAt: Date.now() });
+    return sbd;
+  });
+}
+
+export const undoCheckIn = (category: CategoryType, dancerId: string) =>
+  updateDoc(eventDoc(dancersCollectionOf(category), dancerId), { checkedInAt: deleteField() });
 
 export async function clearVotes(matchIds: string[]) {
   if (matchIds.length === 0) return;

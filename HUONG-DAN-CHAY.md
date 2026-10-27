@@ -56,6 +56,7 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 | Điều khiển màn LED | `/admin/led` | Google (admin) |
 | Cổng giám khảo | `/giam-khao` | Tự động (ẩn danh) |
 | Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
+| Check-in thí sinh (cấp SBD N001… / P001…) | `/admin/check-in` | Google (admin) |
 | Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |
 
 Link cũ (`#stage`, `#judge`, `#guest`, `#khach`, `#prelim_results`, `?view=...`) vẫn dùng được, tự chuyển sang URL mới.

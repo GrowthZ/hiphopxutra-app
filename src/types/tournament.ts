@@ -12,7 +12,8 @@ export type ActiveViewType =
   | 'dancers'
   | 'sheets'
   | 'storage'
-  | 'stage_control';
+  | 'stage_control'
+  | 'checkin';
 
 // What the LED screen shows; written by admins at /admin/led, read by /led.
 export type StageSceneType = 'idle' | 'battle' | 'prelim_leaderboard';
@@ -41,7 +42,8 @@ export interface Judge {
 
 export interface Dancer {
   id: string;
-  sbd: string; // Số báo danh: '001', '017', etc.
+  sbd: string; // Số báo danh, cấp khi check-in: 'N001' (Newbie), 'P001' (Pro)
+  checkedInAt?: number; // Thời điểm check-in tại bàn BTC
   name: string; // e.g., 'BBOY T-REX'
   realName?: string;
   gender: 'male' | 'female'; // 'male' (Nam) hoặc 'female' (Nữ)
