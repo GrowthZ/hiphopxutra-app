@@ -151,8 +151,8 @@ Firebase Console → **Authentication → Settings → Authorized domains** → 
 
 ## Biến môi trường
 
-Biến duy nhất app đọc: **`VITE_MEDIA_URL`** (link Worker ảnh R2, mục 0b). `GEMINI_API_KEY`, `APP_URL` trong `.env.example` là mẫu của AI Studio,
-không dùng. Nếu sau này thêm biến dùng ở trình duyệt, đặt tên bắt đầu bằng `VITE_`
+Biến duy nhất app đọc: **`VITE_MEDIA_URL`** (link Worker ảnh R2, mục 0b).
+Nếu sau này thêm biến dùng ở trình duyệt, đặt tên bắt đầu bằng `VITE_`
 và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ lộ ra trong bundle, **không** dùng cho khoá bí mật.
 
 ## Lỗi thường gặp
