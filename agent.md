@@ -20,23 +20,34 @@ Product design (roles, user stories, URLs, LED control hooks): `docs/user-storie
 | Install | `bun install` |
 | Dev server (port 3000) | `bun run dev` |
 | Type check | `bun run lint` |
+| Unit tests (`src/**/*.test.ts`) | `bun run test` |
 | Production build | `bun run build` |
 | Full pre-commit check | `bash scripts/check.sh` |
 
 ## Layout
 
+Dependencies point down only: `features → state → services → domain`. `domain/` imports nothing from React or Firebase.
+
 ```
 src/
   App.tsx                    renders the view for activeView; gates /admin/* behind AdminLoginGate
-  routes.ts                  view <-> URL path map, legacy #hash redirects
-  context/TournamentContext  single source of truth for all tournament state
-  context/tournamentModel.ts ranking, vote counting, state <-> Firestore document mapping
-  hooks/useSyncedCollection  mirrors a state array to events/{EVENT_ID}/{collection} (realtime, diffed writes)
-  components/                one file per view or modal (*View.tsx, *Modal.tsx)
-  services/                  firebase, firestore, googleSheets, storageService, soundEffects
-  types/tournament.ts        all shared domain types
-  data/mockData.ts           seed dancers/judges for local dev
-  utils/placeholderAssets.ts fallback avatars and team images
+  app/routes.ts              view <-> URL path map, legacy #hash redirects
+  domain/                    pure tournament logic (unit-tested with `bun test`)
+    types.ts                 all shared domain types
+    model.ts                 ranking, vote counting, hydration, state <-> Firestore document mapping, public copies
+    battle.ts                round/match transitions (confirm, reveal, tie-break, reset) and bracket seeding
+    seed.ts                  default judges, sample dancers/teams/matches
+  services/                  all I/O: firebase (+ firebase.config.json), firestore, judgeAccounts, media (R2),
+                             googleSheets, storageService, soundEffects, stageCues (sound/confetti/LED cues)
+  state/
+    TournamentContext.tsx    single source of truth; composes the hooks below and exposes useTournament()
+    useSyncedCollection.ts   mirrors a state array to events/{EVENT_ID}/{collection} (realtime, diffed writes)
+    useNavigation / useAuthSession / useSoundSettings / useGoogleSheets   slices of the context
+    legacyStorage.ts         one-time read of pre-Firestore localStorage data
+    useStage / useJudgePresence   LED screen state and judge heartbeats
+  features/<area>/           one file per view or modal: admin, prelim, dancers, teams, battle, stage, judge,
+                             guest, settings
+  shared/placeholderAssets.ts fallback avatars and team images
 scripts/                     dev/maintenance scripts (see scripts/README.md)
 worker/                      Cloudflare Worker in front of the R2 photo bucket (admin-only upload, cached public GET)
 ```
@@ -63,12 +74,14 @@ worker/                      Cloudflare Worker in front of the R2 photo bucket (
   Auth instance). `firestore.rules` derives the judge id from that email, so keep the format in sync.
   PINs live in admin-only `judgeSecrets`; `judgeSessions` enforces one device per judge; `judgePresence` = heartbeat.
 - Teams/matches store dancer **ids**, not copies; `hydrateMatch`/`hydrateTeam` rebuild full objects for the UI.
-- `BroadcastChannel` now carries only same-machine audio/animation cues, never data.
+- `services/stageCues.ts` plays sound/confetti and sends LED animation cues; its `BroadcastChannel` only reaches
+  tabs on the same machine and never carries data. Battle actions in the context call `domain/battle.ts` for the
+  new match state and `stageCues` for the effects.
 - LED: `/admin/led` (`StageControlView`, `useStageController`) writes `screens/san-khau-chinh` (scene, theme,
   blackout); `/led` (`LedScreen`, `useStageState`) renders it in kiosk mode (`.kiosk` hides buttons, blocks clicks)
   and heartbeats `presence/san-khau-chinh`. Effects (entrance, round reveal, victory) ride on match data, not screens.
   `/led?preview=1` is the admin preview iframe: no heartbeat, no sound, no writes.
-- Public pages (`/ket-qua/*`, `/led`, `IS_PUBLIC_SOURCE` in `routes.ts`) read only `publicDancers` (prelim scores
+- Public pages (`/ket-qua/*`, `/led`, `IS_PUBLIC_SOURCE` in `app/routes.ts`) read only `publicDancers` (prelim scores
   once all 4 prelim judges scored or Top 32 is locked; no real name or age) and `publicVotes` (sides masked as
   `hidden` until the round is revealed/confirmed) plus the public-safe `teams`, `matches`, `judges`, `meta`.
   Judges read the same copies plus their own `judgeBallots/{judgeId}` (GK-09), overlaid in `TournamentContext`.
@@ -79,11 +92,12 @@ worker/                      Cloudflare Worker in front of the R2 photo bucket (
   `VITE_MEDIA_URL/upload/{folder}/{name}-{sha256}.webp` with the admin's Firebase ID token; the Worker checks the
   `admins` doc with that token. Content-hashed names = immutable caching. Dancers upload one half-body photo; the
   avatar is a crop of it (`avatarCrop`, % of the photo, editable later). `MediaStoragePanel` migrates old base64 photos.
-- URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
+- URLs: see `src/app/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here
 
-1. Find the relevant view in `src/components/` and the state it reads in `TournamentContext`.
-2. New shared types go in `src/types/tournament.ts`; don't redeclare them locally.
+1. Find the relevant view in `src/features/<area>/` and the state it reads in `state/TournamentContext.tsx`.
+   Rules of the game belong in `src/domain/` as pure functions with a test next to them.
+2. New shared types go in `src/domain/types.ts`; don't redeclare them locally.
 3. UI work: load the `tailwind` and `ui-ux` skills.
 4. Run `bash scripts/check.sh` before saying a change is done.

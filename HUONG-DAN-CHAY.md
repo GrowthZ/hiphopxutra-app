@@ -2,7 +2,7 @@
 
 App là một **SPA tĩnh** (React + Vite): build ra thư mục `dist/` gồm HTML/JS/CSS, không cần server backend.
 Dữ liệu giải (thí sinh, điểm, đội, trận, phiếu) lưu trên **Cloud Firestore** và đồng bộ realtime giữa mọi thiết bị.
-Đăng nhập chạy qua **Firebase Auth** (cấu hình trong `firebase-applet-config.json`, project `gen-lang-client-0810099059`).
+Đăng nhập chạy qua **Firebase Auth** (cấu hình trong `src/services/firebase.config.json`, project `gen-lang-client-0810099059`).
 
 ## 0. Cài đặt Firebase (làm 1 lần, bắt buộc)
 

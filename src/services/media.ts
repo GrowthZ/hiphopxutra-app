@@ -63,17 +63,6 @@ export function renderWebp(
   );
 }
 
-/** Square crop centred horizontally, near the top (where the face usually is in a half-body shot). */
-export function defaultAvatarCrop(img: HTMLImageElement): CropArea {
-  const side = Math.min(img.naturalWidth, img.naturalHeight * 0.6);
-  return {
-    x: ((img.naturalWidth - side) / 2 / img.naturalWidth) * 100,
-    y: 5,
-    width: (side / img.naturalWidth) * 100,
-    height: (side / img.naturalHeight) * 100,
-  };
-}
-
 async function contentHash(blob: Blob) {
   const digest = await crypto.subtle.digest('SHA-256', await blob.arrayBuffer());
   return [...new Uint8Array(digest).slice(0, 12)].map((b) => b.toString(16).padStart(2, '0')).join('');

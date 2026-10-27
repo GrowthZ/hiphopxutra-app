@@ -13,7 +13,7 @@ import {
   FieldPath,
 } from 'firebase/firestore';
 import { app } from './firebase';
-import { CategoryType } from '../types/tournament';
+import { CategoryType } from '../domain/types';
 
 // One Firestore tree per tournament: events/{EVENT_ID}/...
 export const EVENT_ID = 'hiphopxutra-2026';

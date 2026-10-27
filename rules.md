@@ -4,7 +4,8 @@ Hard rules for anyone (human or agent) changing this codebase.
 
 ## Code
 
-- TypeScript everywhere; no `any` in new code. Domain types come from `src/types/tournament.ts`.
+- TypeScript everywhere; no `any` in new code. Domain types come from `src/domain/types.ts`.
+- Layers: `features → state → services → domain`. `src/domain/` stays pure: no runtime import of React, Firebase, DOM or sound (type-only imports are fine).
 - Tournament state lives in `TournamentContext`. Components read it with `useTournament()`;
   don't fork state into local copies that can drift.
 - Services (`src/services/*`) hold all I/O (Firebase, Sheets, storage, audio). Components never
@@ -24,13 +25,14 @@ Hard rules for anyone (human or agent) changing this codebase.
 
 - Scores, timers, and rankings use `tabular-nums`. Never round scores for storage — only for display.
 - Any change to scoring, ranking or bracket progression needs a manual walkthrough with mock data
-  (`src/data/mockData.ts`) covering ties and a full bracket to the final.
-- Never commit real dancer personal data or photos of minors outside `public/assets/` placeholders.
+  (`src/domain/seed.ts`) covering ties and a full bracket to the final, plus a `bun test` case in
+  `src/domain/*.test.ts`.
+- Never commit real dancer personal data or photos of minors in the repo; placeholders are generated SVGs (`src/shared/placeholderAssets.ts`).
 
 ## Secrets
 
 - Keys live in `.env` (gitignored). Only `.env.example` is committed, with placeholder values.
-- `firebase-applet-config.json` holds public client config only — never service-account keys.
+- `src/services/firebase.config.json` holds public client config only — never service-account keys.
 
 ## UI copy
 

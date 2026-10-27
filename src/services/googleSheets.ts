@@ -1,5 +1,5 @@
 import { getAccessToken } from './firebase';
-import { Dancer, Judge, Team2v2, BattleMatch } from '../types/tournament';
+import { Dancer, Judge, Team2v2, BattleMatch } from '../domain/types';
 
 export interface SyncResult {
   success: boolean;

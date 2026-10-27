@@ -1,4 +1,4 @@
-import { StorageConfig } from '../types/tournament';
+import { StorageConfig } from '../domain/types';
 
 // Per-browser settings for placeholder images. Uploading photos lives in ./media.ts (Cloudflare R2).
 
