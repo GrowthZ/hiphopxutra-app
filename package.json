@@ -9,7 +9,12 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "test": "bun test src"
+    "test": "bun test src",
+    "test:e2e": "bun scripts/emulators.ts exec \"playwright test\"",
+    "emulators": "bun scripts/emulators.ts start",
+    "db": "bun scripts/db.ts",
+    "deploy": "bun run build && firebase deploy --only hosting,firestore:rules",
+    "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {
     "canvas-confetti": "^1.9.4",
@@ -29,6 +34,8 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
+    "firebase-admin": "^14.5.0",
+    "firebase-tools": "^15.34.1",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.3.0"

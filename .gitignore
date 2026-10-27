@@ -7,3 +7,8 @@ coverage/
 .env*
 !.env.example
 .aistudio/
+secrets/
+backups/
+test-results/
+playwright-report/
+*-debug.log
