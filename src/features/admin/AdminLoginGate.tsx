@@ -1,12 +1,17 @@
 import React, { useState } from 'react';
 import { LogIn, LogOut, ShieldAlert, Loader2 } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 import { EVENT_ID } from '../../services/firestore';
+import { auth } from '../../services/firebase';
 
 /** Shown instead of /admin/* until a whitelisted Google account is signed in. */
 export const AdminLoginGate: React.FC = () => {
   const { authReady, authUser, syncError, handleGoogleLogin, handleGoogleLogout } = useTournament();
   const [error, setError] = useState<string | null>(null);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
 
   const signIn = async () => {
     setError(null);
@@ -14,6 +19,27 @@ export const AdminLoginGate: React.FC = () => {
       await handleGoogleLogin();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Đăng nhập thất bại');
+    }
+  };
+
+  // Organizer accounts (BTC): email/password, created by an admin and whitelisted like Google admins.
+  const signInWithPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      await signInWithEmailAndPassword(auth, email.trim(), password);
+    } catch (err) {
+      const code = (err as { code?: string }).code ?? '';
+      setError(
+        code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found'
+          ? 'Sai email hoặc mật khẩu.'
+          : code === 'auth/too-many-requests'
+            ? 'Thử sai quá nhiều lần. Đợi một lúc rồi thử lại.'
+            : err instanceof Error ? err.message : 'Đăng nhập thất bại'
+      );
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -54,13 +80,48 @@ export const AdminLoginGate: React.FC = () => {
             </button>
           </div>
         ) : (
-          <button
-            onClick={signIn}
-            className="w-full flex items-center justify-center gap-2 rounded bg-amber-500 px-4 py-3 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
-          >
-            <LogIn className="w-4 h-4" />
-            Đăng nhập bằng Google
-          </button>
+          <div className="space-y-4">
+            <form onSubmit={signInWithPassword} className="space-y-2">
+              <input
+                type="email"
+                autoComplete="username"
+                placeholder="Email BTC"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+              />
+              <input
+                type="password"
+                autoComplete="current-password"
+                placeholder="Mật khẩu"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+              />
+              <button
+                type="submit"
+                disabled={busy}
+                className="w-full flex items-center justify-center gap-2 rounded bg-amber-500 px-4 py-3 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
+              >
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+                Đăng nhập
+              </button>
+            </form>
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
+              <span className="h-px flex-1 bg-zinc-800" />
+              hoặc
+              <span className="h-px flex-1 bg-zinc-800" />
+            </div>
+            <button
+              onClick={signIn}
+              className="w-full flex items-center justify-center gap-2 rounded bg-zinc-800 px-4 py-3 text-sm font-bold hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-amber-400 transition-colors cursor-pointer"
+            >
+              <LogIn className="w-4 h-4" />
+              Đăng nhập bằng Google
+            </button>
+          </div>
         )}
 
         {error && <p className="text-sm text-red-300">{error}</p>}
