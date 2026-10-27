@@ -1,26 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import Cropper, { Area, Point } from 'react-easy-crop';
 import { Dancer, CategoryType } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
-import {
-  Upload,
-  User,
-  Image as ImageIcon,
-  CheckCircle2,
-  X,
-  Link as LinkIcon,
-  Cloud,
-  HardDrive,
-  Trash2,
-  Sliders,
-} from 'lucide-react';
-import {
-  uploadTournamentMedia,
-  convertGoogleDriveUrl,
-} from '../services/storageService';
-import {
-  getDancerAvatarUrl,
-  getDancerHalfBodyUrl,
-} from '../utils/placeholderAssets';
+import { CheckCircle2, Image as ImageIcon, Trash2, Upload, X, ZoomIn } from 'lucide-react';
+import { CropArea, isInlineImage, MEDIA_URL, uploadDancerPhotos } from '../services/media';
+import { getDancerAvatarUrl } from '../utils/placeholderAssets';
 
 interface DancerPhotoUploadModalProps {
   dancer: Dancer | null;
@@ -29,355 +13,230 @@ interface DancerPhotoUploadModalProps {
   onClose: () => void;
 }
 
-export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({
-  dancer,
-  category,
-  isOpen,
-  onClose,
-}) => {
-  const { updateDancerMedia, storageConfig, setIsStorageModalOpen } = useTournament();
+// One upload per dancer: the half-body photo. The avatar is cropped from it here (drag / zoom the circle),
+// and both are resized to WebP in the browser and stored in R2. Firestore keeps only the URLs and the crop.
+export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ dancer, category, isOpen, onClose }) => {
+  const { updateDancerMedia, storageConfig } = useTournament();
 
   const [gender, setGender] = useState<'male' | 'female'>('male');
-  const [avatarPreview, setAvatarPreview] = useState<string>('');
-  const [halfBodyPreview, setHalfBodyPreview] = useState<string>('');
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [isUploadingHalfBody, setIsUploadingHalfBody] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [cleared, setCleared] = useState(false);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [area, setArea] = useState<CropArea | null>(null);
+  const [cropTouched, setCropTouched] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // Sync initial state when dancer changes
-  React.useEffect(() => {
-    if (dancer) {
-      setGender(dancer.gender || 'male');
-      setAvatarPreview(dancer.avatarUrl || '');
-      setHalfBodyPreview(dancer.halfBodyUrl || '');
-      setErrorMessage(null);
-    }
+  useEffect(() => {
+    if (!dancer) return;
+    setGender(dancer.gender || 'male');
+    setFile(null);
+    setCleared(false);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setArea(null);
+    setCropTouched(false);
+    setErrorMessage(null);
   }, [dancer]);
+
+  const fileUrl = useMemo(() => (file ? URL.createObjectURL(file) : ''), [file]);
+  useEffect(() => () => {
+    if (fileUrl) URL.revokeObjectURL(fileUrl);
+  }, [fileUrl]);
 
   if (!isOpen || !dancer) return null;
 
-  // Handle file upload for Avatar
-  const handleAvatarFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const existingHalfBody = cleared ? '' : dancer.halfBodyUrl || '';
+  const source = fileUrl || existingHalfBody;
 
-    setIsUploadingAvatar(true);
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = e.target.files?.[0];
+    e.target.value = '';
+    if (!picked) return;
+    if (!picked.type.startsWith('image/')) return setErrorMessage('Vui lòng chọn file ảnh (JPG, PNG, WEBP, HEIC…).');
     setErrorMessage(null);
+    setFile(picked);
+    setCleared(false);
+    setCrop({ x: 0, y: 0 });
+    setZoom(1);
+    setCropTouched(true);
+  };
+
+  const handleSave = async () => {
+    setErrorMessage(null);
+    if (cleared) {
+      updateDancerMedia(category, dancer.id, { avatarUrl: '', halfBodyUrl: '', avatarCrop: undefined, gender });
+      return onClose();
+    }
+    if (!source || !area || !cropTouched) {
+      updateDancerMedia(category, dancer.id, { gender });
+      return onClose();
+    }
+
+    setIsSaving(true);
     try {
-      const result = await uploadTournamentMedia(
-        file,
-        `dancer_${dancer.sbd}_avatar`,
-        storageConfig
-      );
-      if (result.success && result.url) {
-        setAvatarPreview(result.url);
-      } else {
-        setErrorMessage(result.error || 'Tải ảnh avatar thất bại');
-      }
-    } catch (err: unknown) {
+      // A new file, or an old photo still embedded in Firestore, uploads the half-body too; else only the avatar.
+      const withHalfBody = Boolean(file) || isInlineImage(source);
+      const urls = await uploadDancerPhotos(file ?? source, dancer.id, area, withHalfBody);
+      updateDancerMedia(category, dancer.id, {
+        avatarUrl: urls.avatarUrl,
+        ...(urls.halfBodyUrl && { halfBodyUrl: urls.halfBodyUrl }),
+        avatarCrop: area,
+        gender,
+      });
+      onClose();
+    } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
     } finally {
-      setIsUploadingAvatar(false);
+      setIsSaving(false);
     }
   };
 
-  // Handle file upload for Half-Body
-  const handleHalfBodyFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploadingHalfBody(true);
-    setErrorMessage(null);
-    try {
-      const result = await uploadTournamentMedia(
-        file,
-        `dancer_${dancer.sbd}_halfbody`,
-        storageConfig
-      );
-      if (result.success && result.url) {
-        setHalfBodyPreview(result.url);
-      } else {
-        setErrorMessage(result.error || 'Tải ảnh nửa người thất bại');
-      }
-    } catch (err: unknown) {
-      setErrorMessage(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsUploadingHalfBody(false);
-    }
-  };
-
-  const handleSave = () => {
-    updateDancerMedia(category, dancer.id, {
-      avatarUrl: avatarPreview.trim() || undefined,
-      halfBodyUrl: halfBodyPreview.trim() || undefined,
-      gender,
-    });
-    onClose();
-  };
-
-  const providerLabel =
-    storageConfig.provider === 'r2'
-      ? 'Cloudflare R2'
-      : storageConfig.provider === 'drive'
-      ? 'Google Drive'
-      : 'Bộ nhớ cục bộ';
-
-  // Resolved placeholders if no custom photo is provided
-  const effectiveAvatar = getDancerAvatarUrl(
-    { gender, avatarUrl: avatarPreview },
-    storageConfig.placeholders
-  );
-
-  const effectiveHalfBody = getDancerHalfBodyUrl(
-    { gender, halfBodyUrl: halfBodyPreview },
-    storageConfig.placeholders
+  const genderButton = (value: 'male' | 'female', label: string) => (
+    <button
+      type="button"
+      onClick={() => setGender(value)}
+      className={`flex-1 rounded border px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
+        gender === value
+          ? 'border-amber-500 bg-amber-500/15 text-amber-400'
+          : 'border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-300'
+      }`}
+    >
+      {label}
+    </button>
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 select-none">
-      <div className="bg-zinc-950 border border-zinc-800 text-white w-full max-w-2xl rounded p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-          <div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 select-none">
+      <div className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-zinc-800 pb-3">
+          <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-                SBD {dancer.sbd}
-              </span>
-              <h2 className="font-condensed font-black text-xl tracking-tight text-white uppercase">
-                Hồ Sơ & Ảnh Thí Sinh: {dancer.name}
-              </h2>
+              {dancer.sbd && (
+                <span className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 font-mono text-xs font-bold text-zinc-300">
+                  SBD {dancer.sbd}
+                </span>
+              )}
+              <h2 className="truncate font-condensed text-xl font-black uppercase tracking-tight">{dancer.name}</h2>
             </div>
-            <p className="text-xs text-zinc-400 mt-0.5">
-              Cập nhật giới tính, ảnh Avatar và ảnh nửa người cho vòng Prelim và màn LED Battle
+            <p className="mt-0.5 text-xs text-zinc-400">
+              Tải 1 ảnh nửa người, rồi kéo / phóng to vòng tròn để chọn khuôn mặt làm avatar.
             </p>
           </div>
-
           <button
             onClick={onClose}
-            className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            aria-label="Đóng"
+            className="rounded bg-zinc-900 p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white cursor-pointer"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Gender Selection & Storage Target */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {/* Gender Selector */}
-          <div className="p-3 rounded bg-zinc-900 border border-zinc-800 space-y-1.5">
-            <label className="text-[11px] font-bold text-zinc-300 uppercase tracking-wider block">
-              Giới tính thí sinh:
-            </label>
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => setGender('male')}
-                className={`py-2 px-3 rounded border transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                  gender === 'male'
-                    ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-xs'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <span>♂</span>
-                <span>Nam (BBOY)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setGender('female')}
-                className={`py-2 px-3 rounded border transition-colors flex items-center justify-center gap-1.5 cursor-pointer ${
-                  gender === 'female'
-                    ? 'bg-pink-600/20 border-pink-500 text-pink-400 shadow-xs'
-                    : 'bg-zinc-950 border-zinc-800 text-zinc-500 hover:text-zinc-300'
-                }`}
-              >
-                <span>♀</span>
-                <span>Nữ (BGIRL)</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Storage Provider Banner */}
-          <div className="p-3 rounded bg-zinc-900 border border-zinc-800 flex flex-col justify-between text-xs">
-            <div className="flex items-center gap-2">
-              {storageConfig.provider === 'r2' ? (
-                <Cloud className="w-4 h-4 text-amber-400" />
-              ) : storageConfig.provider === 'drive' ? (
-                <HardDrive className="w-4 h-4 text-emerald-400" />
-              ) : (
-                <Upload className="w-4 h-4 text-blue-400" />
-              )}
-              <span className="text-zinc-400">Lưu trữ qua:</span>
-              <span className="font-bold text-white uppercase">{providerLabel}</span>
-            </div>
-
-            <button
-              onClick={() => setIsStorageModalOpen(true)}
-              className="text-[11px] text-zinc-300 hover:text-white font-bold flex items-center gap-1 cursor-pointer underline mt-2"
-            >
-              <Sliders className="w-3 h-3" />
-              <span>Đổi nơi lưu / Quản lý ảnh mẫu Placeholder</span>
-            </button>
-          </div>
+        <div className="flex gap-2">
+          {genderButton('male', '♂ Nam (BBOY)')}
+          {genderButton('female', '♀ Nữ (BGIRL)')}
         </div>
 
+        {!MEDIA_URL && (
+          <div className="rounded border border-amber-700 bg-amber-950/40 p-2.5 text-xs text-amber-300">
+            Chưa cấu hình kho ảnh R2 (biến <code>VITE_MEDIA_URL</code>), nên chưa tải ảnh lên được. Xem HUONG-DAN-CHAY.md.
+          </div>
+        )}
         {errorMessage && (
-          <div className="p-2.5 rounded bg-red-950/50 border border-red-800 text-red-300 text-xs font-semibold">
-            {errorMessage}
+          <div className="rounded border border-red-800 bg-red-950/50 p-2.5 text-xs font-semibold text-red-300">{errorMessage}</div>
+        )}
+
+        {source ? (
+          <div className="space-y-2">
+            <div className="relative h-80 overflow-hidden rounded border border-zinc-800 bg-zinc-900 sm:h-96">
+              <Cropper
+                image={source}
+                crop={crop}
+                zoom={zoom}
+                aspect={1}
+                cropShape="round"
+                showGrid={false}
+                initialCroppedAreaPercentages={!file && dancer.avatarCrop ? dancer.avatarCrop : undefined}
+                onCropChange={setCrop}
+                onZoomChange={setZoom}
+                onInteractionStart={() => setCropTouched(true)}
+                onCropComplete={(percent: Area) => setArea(percent)}
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs text-zinc-400">
+              <ZoomIn className="h-4 w-4 shrink-0" />
+              <input
+                type="range"
+                min={1}
+                max={4}
+                step={0.05}
+                value={zoom}
+                onChange={(e) => {
+                  setZoom(Number(e.target.value));
+                  setCropTouched(true);
+                }}
+                className="w-full accent-amber-500"
+                aria-label="Phóng to avatar"
+              />
+            </label>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2 rounded border border-dashed border-zinc-700 bg-zinc-900 p-6 text-center">
+            <img
+              src={getDancerAvatarUrl(cleared ? { gender } : { gender, avatarUrl: dancer.avatarUrl }, storageConfig.placeholders)}
+              alt=""
+              className="h-20 w-20 rounded-full border-2 border-zinc-700 object-cover"
+            />
+            <span className="text-xs text-zinc-500">
+              {cleared ? 'Sẽ dùng ảnh mẫu theo giới tính' : 'Chưa có ảnh nửa người'}
+            </span>
           </div>
         )}
 
-        {/* 2 Upload Sections: Avatar (1:1) and Half-body (3:4) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Section 1: Avatar (Ảnh Cận Mặt) */}
-          <div className="p-3.5 rounded bg-zinc-900 border border-zinc-800 space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <span className="font-bold text-xs uppercase tracking-wider text-zinc-200 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-zinc-400" />
-                <span>1. Ảnh Avatar Cận Mặt (1:1)</span>
-              </span>
-              {avatarPreview && (
-                <button
-                  onClick={() => setAvatarPreview('')}
-                  className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer"
-                  title="Xóa avatar và dùng lại ảnh mẫu placeholder"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Preview Box with placeholder fallback */}
-            <div className="flex flex-col items-center justify-center p-3 bg-zinc-950 rounded border border-zinc-800 min-h-[140px]">
-              <div className="relative group text-center">
-                <img
-                  src={effectiveAvatar}
-                  alt={dancer.name}
-                  className="w-24 h-24 rounded-full object-cover border-2 border-zinc-700 shadow-md mx-auto"
-                />
-                <div className="text-[10px] text-zinc-400 text-center mt-1.5 font-medium">
-                  {avatarPreview ? (
-                    <span className="text-emerald-400 font-bold">✓ Ảnh đã tải lên</span>
-                  ) : (
-                    <span className="text-zinc-500">Đang dùng ảnh mẫu {gender === 'female' ? 'Nữ' : 'Nam'}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* File Upload Button */}
-            <div>
-              <label className="block w-full text-center py-2 px-3 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs cursor-pointer border border-zinc-700 transition-colors uppercase">
-                {isUploadingAvatar ? 'Đang tải lên...' : 'Chọn file từ thiết bị'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarFileChange}
-                  disabled={isUploadingAvatar}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Direct URL input */}
-            <div className="space-y-1">
-              <label className="text-[10px] text-zinc-400 font-semibold block flex items-center gap-1">
-                <LinkIcon className="w-3 h-3" /> Hoặc dán link ảnh (Drive / R2):
-              </label>
-              <input
-                type="text"
-                value={avatarPreview}
-                placeholder="https://drive.google.com/file/d/... hoặc link ảnh"
-                onChange={(e) => setAvatarPreview(convertGoogleDriveUrl(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white text-xs font-mono outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Section 2: Half-Body (Ảnh Nửa Người Chiến Đấu) */}
-          <div className="p-3.5 rounded bg-zinc-900 border border-zinc-800 space-y-3">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <span className="font-bold text-xs uppercase tracking-wider text-zinc-200 flex items-center gap-1.5">
-                <ImageIcon className="w-4 h-4 text-zinc-400" />
-                <span>2. Ảnh Nửa Người (Battle Pose 3:4)</span>
-              </span>
-              {halfBodyPreview && (
-                <button
-                  onClick={() => setHalfBodyPreview('')}
-                  className="text-zinc-500 hover:text-red-400 p-1 cursor-pointer"
-                  title="Xóa ảnh nửa người và dùng lại ảnh mẫu placeholder"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-
-            {/* Preview Box with placeholder fallback */}
-            <div className="flex flex-col items-center justify-center p-3 bg-zinc-950 rounded border border-zinc-800 min-h-[140px]">
-              <div className="relative text-center">
-                <img
-                  src={effectiveHalfBody}
-                  alt={dancer.name}
-                  className="h-32 w-auto object-contain rounded border border-zinc-700 shadow-md mx-auto"
-                />
-                <div className="text-[10px] text-center mt-1.5 font-medium">
-                  {halfBodyPreview ? (
-                    <span className="text-emerald-400 font-bold">✓ Ảnh đã tải lên (LED 16:9)</span>
-                  ) : (
-                    <span className="text-zinc-500">Ảnh mẫu {gender === 'female' ? 'Nữ' : 'Nam'} trên LED</span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* File Upload Button */}
-            <div>
-              <label className="block w-full text-center py-2 px-3 rounded bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs cursor-pointer border border-zinc-700 transition-colors uppercase">
-                {isUploadingHalfBody ? 'Đang tải lên...' : 'Chọn file từ thiết bị'}
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleHalfBodyFileChange}
-                  disabled={isUploadingHalfBody}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            {/* Direct URL input */}
-            <div className="space-y-1">
-              <label className="text-[10px] text-zinc-400 font-semibold block flex items-center gap-1">
-                <LinkIcon className="w-3 h-3" /> Hoặc dán link ảnh (Drive / R2):
-              </label>
-              <input
-                type="text"
-                value={halfBodyPreview}
-                placeholder="https://drive.google.com/file/d/... hoặc link ảnh"
-                onChange={(e) => setHalfBodyPreview(convertGoogleDriveUrl(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white text-xs font-mono outline-none"
-              />
-            </div>
-          </div>
+        <div className="flex flex-wrap gap-2">
+          <label
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-bold uppercase transition-colors hover:bg-zinc-700 cursor-pointer ${
+              MEDIA_URL ? '' : 'pointer-events-none opacity-50'
+            }`}
+          >
+            <Upload className="h-4 w-4" />
+            {source ? 'Đổi ảnh nửa người' : 'Chọn ảnh nửa người'}
+            <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
+          </label>
+          {(source || dancer.avatarUrl) && !cleared && (
+            <button
+              onClick={() => {
+                setFile(null);
+                setCleared(true);
+              }}
+              className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-400 transition-colors hover:text-red-400 cursor-pointer"
+            >
+              <Trash2 className="h-4 w-4" />
+              Xoá ảnh
+            </button>
+          )}
         </div>
 
-        {/* Guidance */}
-        <div className="text-[11px] text-zinc-400 bg-zinc-900/60 p-3 rounded border border-zinc-800 leading-relaxed">
-          📌 <strong>Chế độ Ảnh Mẫu (Placeholder):</strong> Khi thí sinh chưa tải ảnh cá nhân, hệ thống sẽ tự động áp dụng ảnh mẫu chuẩn WDSF phù hợp với giới tính ({gender === 'female' ? 'Nữ' : 'Nam'}) đã chọn ở trên.
-        </div>
+        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
+          <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          Ảnh được thu nhỏ (nửa người tối đa 1080×1440, avatar 320×320) và nén WebP trên máy này trước khi tải lên R2.
+        </p>
 
-        {/* Footer */}
-        <div className="pt-2 border-t border-zinc-800 flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 border-t border-zinc-800 pt-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 font-bold text-xs cursor-pointer"
+            className="rounded border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-800 cursor-pointer"
           >
-            Hủy
+            Huỷ
           </button>
           <button
             onClick={handleSave}
-            className="px-5 py-2 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 cursor-pointer"
+            disabled={isSaving}
+            className="flex items-center gap-1.5 rounded bg-emerald-600 px-5 py-2 text-xs font-bold uppercase tracking-wider text-white hover:bg-emerald-700 disabled:opacity-60 cursor-pointer"
           >
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Lưu Thông Tin Thí Sinh</span>
+            <CheckCircle2 className="h-4 w-4" />
+            {isSaving ? 'Đang tải lên…' : 'Lưu'}
           </button>
         </div>
       </div>

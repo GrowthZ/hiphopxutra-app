@@ -1,21 +1,9 @@
 import React, { useState } from 'react';
 import { Team2v2 } from '../types/tournament';
 import { useTournament } from '../context/TournamentContext';
-import {
-  Upload,
-  Users,
-  CheckCircle2,
-  X,
-  Link as LinkIcon,
-  Cloud,
-  HardDrive,
-  Trash2,
-  Sliders,
-} from 'lucide-react';
-import {
-  uploadTournamentMedia,
-  convertGoogleDriveUrl,
-} from '../services/storageService';
+import { CheckCircle2, X, Link as LinkIcon, Cloud, Trash2 } from 'lucide-react';
+import { convertGoogleDriveUrl } from '../services/storageService';
+import { MEDIA_URL, uploadPhoto } from '../services/media';
 import { getTeamPhotoUrl } from '../utils/placeholderAssets';
 
 interface TeamPhotoUploadModalProps {
@@ -29,7 +17,7 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { updateTeamPhoto, storageConfig, setIsStorageModalOpen } = useTournament();
+  const { updateTeamPhoto, storageConfig } = useTournament();
 
   const [teamPhotoPreview, setTeamPhotoPreview] = useState<string>(team?.teamPhotoUrl || '');
   const [isUploading, setIsUploading] = useState(false);
@@ -51,16 +39,7 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
     setIsUploading(true);
     setErrorMessage(null);
     try {
-      const result = await uploadTournamentMedia(
-        file,
-        `team_${team.teamNumber}_photo`,
-        storageConfig
-      );
-      if (result.success && result.url) {
-        setTeamPhotoPreview(result.url);
-      } else {
-        setErrorMessage(result.error || 'Tải ảnh đội thất bại');
-      }
+      setTeamPhotoPreview(await uploadPhoto(file, 'teams', `team-${team.teamNumber}`));
     } catch (err: unknown) {
       setErrorMessage(err instanceof Error ? err.message : String(err));
     } finally {
@@ -72,13 +51,6 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
     updateTeamPhoto(team.id, teamPhotoPreview.trim());
     onClose();
   };
-
-  const providerLabel =
-    storageConfig.provider === 'r2'
-      ? 'Cloudflare R2'
-      : storageConfig.provider === 'drive'
-      ? 'Google Drive'
-      : 'Bộ nhớ cục bộ';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 select-none">
@@ -107,27 +79,11 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
           </button>
         </div>
 
-        {/* Storage Target Banner */}
-        <div className="flex items-center justify-between p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs">
-          <div className="flex items-center gap-2">
-            {storageConfig.provider === 'r2' ? (
-              <Cloud className="w-4 h-4 text-amber-400" />
-            ) : storageConfig.provider === 'drive' ? (
-              <HardDrive className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Upload className="w-4 h-4 text-blue-400" />
-            )}
-            <span className="text-zinc-400">Đang lưu trữ qua:</span>
-            <span className="font-bold text-white uppercase">{providerLabel}</span>
-          </div>
-
-          <button
-            onClick={() => setIsStorageModalOpen(true)}
-            className="text-[11px] text-zinc-300 hover:text-white font-bold flex items-center gap-1 cursor-pointer underline"
-          >
-            <Sliders className="w-3 h-3" />
-            <span>Đổi nơi lưu</span>
-          </button>
+        <div className="flex items-center gap-2 p-2.5 rounded bg-zinc-900 border border-zinc-800 text-xs text-zinc-400">
+          <Cloud className="w-4 h-4 text-amber-400" />
+          {MEDIA_URL
+            ? 'Ảnh được thu nhỏ, nén WebP và lưu trên Cloudflare R2.'
+            : 'Chưa cấu hình kho ảnh R2 (VITE_MEDIA_URL): chỉ dán link ảnh được.'}
         </div>
 
         {errorMessage && (

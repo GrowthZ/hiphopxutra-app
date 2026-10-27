@@ -10,7 +10,7 @@ Product design (roles, user stories, URLs, LED control hooks): `docs/user-storie
 
 - React 19 + TypeScript, Vite 8 (`@tailwindcss/vite`), Tailwind CSS v4
 - `motion` for animation, `lucide-react` for icons, `canvas-confetti` for victory effects
-- Firebase (`src/services/firebase.ts`), Google Sheets sync, pluggable photo storage (R2 / Drive / local)
+- Firebase (`src/services/firebase.ts`), Google Sheets sync, photos in Cloudflare R2 via the media Worker (`worker/`)
 - Package manager: **bun** (`bun.lock`). Originally scaffolded in Google AI Studio.
 
 ## Commands
@@ -38,6 +38,7 @@ src/
   data/mockData.ts           seed dancers/judges for local dev
   utils/placeholderAssets.ts fallback avatars and team images
 scripts/                     dev/maintenance scripts (see scripts/README.md)
+worker/                      Cloudflare Worker in front of the R2 photo bucket (admin-only upload, cached public GET)
 ```
 
 ## Domain glossary
@@ -74,6 +75,10 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   Any admin client on an admin page derives and writes all three (`toPublicDancer`, `toPublicVotes`,
   `toJudgeBallot`); rules keep raw dancers/votes admin-only.
   Moving between public and private pages reloads the page so the data source never mixes.
+- Photos: never inside Firestore docs. `src/services/media.ts` resizes to WebP in the browser and PUTs to
+  `VITE_MEDIA_URL/upload/{folder}/{name}-{sha256}.webp` with the admin's Firebase ID token; the Worker checks the
+  `admins` doc with that token. Content-hashed names = immutable caching. Dancers upload one half-body photo; the
+  avatar is a crop of it (`avatarCrop`, % of the photo, editable later). `MediaStoragePanel` migrates old base64 photos.
 - URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here

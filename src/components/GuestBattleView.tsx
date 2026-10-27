@@ -83,7 +83,7 @@ const ShareModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClo
             <X className="h-5 w-5" />
           </button>
         </div>
-        <img
+        <img loading="lazy" decoding="async"
           src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`}
           alt="Mã QR"
           className="mx-auto h-52 w-52 rounded-lg bg-white p-2"
@@ -113,7 +113,7 @@ const SideAvatar: React.FC<{ match: BattleMatch; side: BattleSide; ring: string;
     match.category === 'pro_2v2'
       ? getTeamPhotoUrl(side, storageConfig.placeholders)
       : getDancerAvatarUrl(side.dancers[0], storageConfig.placeholders);
-  return <img src={src} alt="" className={`${size} shrink-0 rounded-full border-2 object-cover ${ring}`} />;
+  return <img loading="lazy" decoding="async" src={src} alt="" className={`${size} shrink-0 rounded-full border-2 object-cover ${ring}`} />;
 };
 
 const StatusBadge: React.FC<{ match: BattleMatch; live: boolean }> = ({ match, live }) =>

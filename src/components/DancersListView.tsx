@@ -111,7 +111,7 @@ export const DancersListView: React.FC = () => {
             <Cloud className="w-3.5 h-3.5 text-zinc-500" />
             <span className="hidden sm:inline">Cài đặt ảnh:</span>
             <span className="font-bold text-zinc-900 uppercase">
-              {storageConfig.provider === 'r2' ? 'R2' : storageConfig.provider === 'drive' ? 'Drive' : 'Trực tiếp'}
+              R2
             </span>
           </button>
 
@@ -265,7 +265,7 @@ export const DancersListView: React.FC = () => {
                     {/* Avatar thumbnail with placeholder */}
                     <td className="py-2 px-3 text-center">
                       <div className="relative inline-block">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={avatarSrc}
                           alt={d.name}
                           className="w-8 h-8 rounded-full object-cover border border-zinc-300 mx-auto shadow-2xs"
@@ -325,7 +325,7 @@ export const DancersListView: React.FC = () => {
                     {/* Half body thumbnail & status */}
                     <td className="py-2 px-3 text-center hidden md:table-cell">
                       <div className="flex items-center justify-center gap-1.5">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={halfBodySrc}
                           alt="Halfbody"
                           className="w-5 h-7 object-contain rounded border border-zinc-200 bg-zinc-900"

@@ -54,7 +54,8 @@ export interface Dancer {
   crew?: string; // CLB / Đội
   category: CategoryType;
   avatarUrl?: string; // Ảnh avatar cận mặt
-  halfBodyUrl?: string; // Ảnh nửa người (pose chiến đấu / cut-out)
+  halfBodyUrl?: string; // Ảnh nửa người (pose chiến đấu / cut-out), ảnh gốc duy nhất BTC tải lên
+  avatarCrop?: { x: number; y: number; width: number; height: number }; // vùng cắt avatar (% ảnh nửa người)
   prelimScores: Record<string, number>; // judgeId -> score (0-100)
   prelimScoreTotal: number;
   prelimScoreAvg: number;
@@ -111,8 +112,6 @@ export interface BattleMatch {
   entranceTriggerTimestamp?: number; // Timestamp when team entrance animation was triggered
 }
 
-export type StorageProviderType = 'r2' | 'drive' | 'local';
-
 export interface PlaceholderConfig {
   maleAvatarUrl?: string;
   femaleAvatarUrl?: string;
@@ -121,23 +120,8 @@ export interface PlaceholderConfig {
   team2v2Url?: string;
 }
 
+// Photos are stored in Cloudflare R2 (src/services/media.ts); this only holds the per-browser placeholder images.
 export interface StorageConfig {
-  provider: StorageProviderType;
-  // Cloudflare R2
-  r2: {
-    accountId: string;
-    bucketName: string;
-    accessKeyId: string;
-    secretAccessKey: string;
-    publicDomain: string; // e.g. 'https://pub-xxxx.r2.dev' or custom domain
-  };
-  // Google Drive
-  drive: {
-    folderId?: string;
-    folderName?: string;
-    isAuthorized?: boolean;
-  };
-  // Placeholder images for dancers & teams
   placeholders: PlaceholderConfig;
 }
 

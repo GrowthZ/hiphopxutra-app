@@ -184,7 +184,7 @@ export const CheckInView: React.FC = () => {
               key={d.id}
               className={`flex items-center gap-3 px-3 sm:px-4 py-3 ${lastIssued?.id === d.id ? 'bg-emerald-50' : ''}`}
             >
-              <img
+              <img loading="lazy" decoding="async"
                 src={getDancerAvatarUrl(d, storageConfig.placeholders)}
                 alt=""
                 className="w-11 h-11 rounded-full object-cover bg-zinc-100 shrink-0"

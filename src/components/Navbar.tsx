@@ -217,7 +217,7 @@ export const Navbar: React.FC = () => {
           >
             <Cloud className="w-3.5 h-3.5 text-emerald-400" />
             <span className="hidden xl:inline uppercase text-[11px]">
-              {storageConfig.provider === 'r2' ? 'R2' : storageConfig.provider === 'drive' ? 'Drive' : 'Ảnh'}
+              R2
             </span>
           </button>
 

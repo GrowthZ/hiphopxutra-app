@@ -28,6 +28,32 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
 
 > Muốn **làm lại từ đầu**: xoá collection `events/hiphopxutra-2026/*` (trừ `admins`) trong Console, rồi admin tải lại trang.
 
+## 0b. Kho ảnh Cloudflare R2 (làm 1 lần, bắt buộc trước khi tải ảnh)
+
+Ảnh thí sinh, đội, giám khảo **không lưu trong Firestore**: máy admin thu nhỏ và nén WebP rồi tải lên R2
+qua một Cloudflare Worker (thư mục `worker/`). Worker chỉ nhận ảnh từ admin (kiểm tra bằng đăng nhập Firebase)
+và trả ảnh cho mọi người với cache 1 năm (trình duyệt + CDN Cloudflare). R2 không tính phí băng thông tải ra.
+
+1. Cloudflare Dashboard → **R2** → **Create bucket** tên `hiphopxutra-media` (giữ private, không cần bật public).
+2. Deploy Worker:
+   ```bash
+   cd worker
+   npx wrangler login
+   npx wrangler deploy
+   ```
+   Wrangler in ra link dạng `https://hiphopxutra-media.<tên>.workers.dev`.
+3. **Nên** gắn tên miền riêng (Workers → `hiphopxutra-media` → Settings → Domains & Routes → Custom domain,
+   vd `anh.hiphopxutra.vn`): cache CDN của Worker chỉ chạy trên tên miền riêng, không chạy trên `workers.dev`.
+4. Tạo file `.env.local` ở thư mục gốc (cho cả `bun run dev` và `bun run build`):
+   ```
+   VITE_MEDIA_URL=https://anh.hiphopxutra.vn
+   ```
+   Build lại và deploy lại app sau khi đổi biến này.
+5. Có ảnh cũ (tải lên trước khi có R2): `/admin/cai-dat/luu-tru` → **Chuyển N ảnh lên R2**.
+
+Tải ảnh thí sinh: chỉ cần **1 ảnh nửa người**; kéo/phóng vòng tròn để chọn khuôn mặt làm avatar
+(nửa người tối đa 1080×1440, avatar 320×320). Bấm vào ảnh thí sinh lần sau để cắt lại avatar, không cần tải lại.
+
 ## Yêu cầu
 
 - **Node.js 20+** (đã test với Node 24)
@@ -125,8 +151,8 @@ Firebase Console → **Authentication → Settings → Authorized domains** → 
 
 ## Biến môi trường
 
-Code hiện **không đọc** biến môi trường nào; `.env.example` (`GEMINI_API_KEY`, `APP_URL`) là mẫu của AI Studio,
-chạy local không cần tạo `.env`. Nếu sau này thêm biến dùng ở trình duyệt, đặt tên bắt đầu bằng `VITE_`
+Biến duy nhất app đọc: **`VITE_MEDIA_URL`** (link Worker ảnh R2, mục 0b). `GEMINI_API_KEY`, `APP_URL` trong `.env.example` là mẫu của AI Studio,
+không dùng. Nếu sau này thêm biến dùng ở trình duyệt, đặt tên bắt đầu bằng `VITE_`
 và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ lộ ra trong bundle, **không** dùng cho khoá bí mật.
 
 ## Lỗi thường gặp
@@ -144,6 +170,9 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 | Giám khảo không gửi được điểm/phiếu (`permission-denied`) | Chưa deploy `firestore.rules` mới, Prelim đã chốt, hoặc hiệp đã công bố |
 | Trang `/ket-qua` không có điểm / phiếu, hoặc giám khảo tải lại trang không thấy phiếu mình đã gửi | Bình thường: điểm Prelim chỉ hiện khi thí sinh đã đủ 4 GK chấm (hoặc đã chốt Top 32), phiếu battle chỉ hiện sau khi lật/công bố hiệp. Kết quả do máy admin đẩy lên, nên phải có ít nhất 1 máy admin đang mở `/admin/...` |
 | Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
+| Tải ảnh báo "Chưa cấu hình VITE_MEDIA_URL" | Làm mục 0b, rồi chạy lại `bun run dev` / build lại |
+| Tải ảnh báo "Chỉ admin được tải ảnh lên" | Đăng nhập bằng email có trong `admins`; email Google phải đã xác minh |
+| Ảnh không hiện, console báo CORS | Kiểm tra `VITE_MEDIA_URL` đúng link Worker (không có `/` ở cuối cũng được) |
 | Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |
 | `auth/unauthorized-domain` | Thêm domain vào Authorized domains (Bước 3) |

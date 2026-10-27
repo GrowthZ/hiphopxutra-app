@@ -395,7 +395,7 @@ export const PrelimGuestView: React.FC = () => {
 
                   <div className="flex items-center gap-3.5 mt-3.5">
                     <div className="w-16 h-16 rounded-lg bg-zinc-800 border-2 border-slate-400/40 overflow-hidden shrink-0 shadow-md">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={getDancerHalfBodyUrl(top2, storageConfig.placeholders)}
                         alt={top2.name}
                         className="w-full h-full object-cover object-top"
@@ -473,7 +473,7 @@ export const PrelimGuestView: React.FC = () => {
 
                   <div className="flex items-center gap-3.5 mt-3.5">
                     <div className="w-20 h-20 rounded-lg bg-zinc-800 border-2 border-amber-500 overflow-hidden shrink-0 shadow-lg shadow-amber-500/20">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={getDancerHalfBodyUrl(top1, storageConfig.placeholders)}
                         alt={top1.name}
                         className="w-full h-full object-cover object-top"
@@ -551,7 +551,7 @@ export const PrelimGuestView: React.FC = () => {
 
                   <div className="flex items-center gap-3.5 mt-3.5">
                     <div className="w-16 h-16 rounded-lg bg-zinc-800 border-2 border-amber-700/40 overflow-hidden shrink-0 shadow-md">
-                      <img
+                      <img loading="lazy" decoding="async"
                         src={getDancerHalfBodyUrl(top3, storageConfig.placeholders)}
                         alt={top3.name}
                         className="w-full h-full object-cover object-top"
@@ -782,7 +782,7 @@ export const PrelimGuestView: React.FC = () => {
                             {/* Dancer Info */}
                             <td className="py-3 px-4">
                               <div className="flex items-center gap-3">
-                                <img
+                                <img loading="lazy" decoding="async"
                                   src={getDancerAvatarUrl(dancer, storageConfig.placeholders)}
                                   alt={dancer.name}
                                   className="w-9 h-9 rounded-lg object-cover bg-zinc-800 border border-zinc-700 shrink-0"
@@ -931,7 +931,7 @@ export const PrelimGuestView: React.FC = () => {
 
                       {/* Dancer Info */}
                       <div className="flex items-center gap-3 mt-3">
-                        <img
+                        <img loading="lazy" decoding="async"
                           src={getDancerAvatarUrl(dancer, storageConfig.placeholders)}
                           alt={dancer.name}
                           className="w-12 h-12 rounded-lg object-cover bg-zinc-800 border border-zinc-700 shrink-0"
@@ -999,7 +999,7 @@ export const PrelimGuestView: React.FC = () => {
               {/* Photo & Main Specs */}
               <div className="flex flex-col sm:flex-row items-center gap-4 bg-zinc-950/60 p-4 rounded-xl border border-zinc-800">
                 <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-xl bg-zinc-800 border-2 border-amber-500 overflow-hidden shrink-0 shadow-lg">
-                  <img
+                  <img loading="lazy" decoding="async"
                     src={getDancerHalfBodyUrl(selectedDancer, storageConfig.placeholders)}
                     alt={selectedDancer.name}
                     className="w-full h-full object-cover object-top"
@@ -1127,7 +1127,7 @@ export const PrelimGuestView: React.FC = () => {
 
             {/* QR Image */}
             <div className="p-4 bg-white rounded-xl mx-auto w-56 h-56 flex items-center justify-center shadow-lg">
-              <img
+              <img loading="lazy" decoding="async"
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
                   shareUrl
                 )}`}

@@ -1,22 +1,14 @@
 import React, { useState } from 'react';
 import { useTournament } from '../context/TournamentContext';
-import { StorageProviderType, PlaceholderConfig } from '../types/tournament';
+import { PlaceholderConfig } from '../types/tournament';
 import {
   Cloud,
-  HardDrive,
   Database,
   CheckCircle2,
   X,
-  ExternalLink,
-  ShieldCheck,
-  AlertCircle,
-  HelpCircle,
   Image as ImageIcon,
-  User,
-  Users,
   RotateCcw,
   Upload,
-  Link as LinkIcon,
   Trash2,
 } from 'lucide-react';
 import {
@@ -26,7 +18,9 @@ import {
   DEFAULT_FEMALE_HALFBODY,
   DEFAULT_TEAM_PHOTO,
 } from '../utils/placeholderAssets';
-import { uploadTournamentMedia, convertGoogleDriveUrl } from '../services/storageService';
+import { convertGoogleDriveUrl } from '../services/storageService';
+import { SIZES, uploadPhoto } from '../services/media';
+import { MediaStoragePanel } from './MediaStoragePanel';
 
 interface StorageConfigModalProps {
   isOpen: boolean;
@@ -34,12 +28,9 @@ interface StorageConfigModalProps {
 }
 
 export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, onClose }) => {
-  const { storageConfig, setStorageConfig, googleUser, handleGoogleLogin } = useTournament();
+  const { storageConfig, setStorageConfig } = useTournament();
 
   const [activeTab, setActiveTab] = useState<'storage' | 'placeholders'>('storage');
-  const [provider, setProvider] = useState<StorageProviderType>(storageConfig.provider);
-  const [r2Config, setR2Config] = useState(storageConfig.r2);
-  const [driveConfig, setDriveConfig] = useState(storageConfig.drive);
   const [placeholders, setPlaceholders] = useState<PlaceholderConfig>(storageConfig.placeholders || {});
   const [uploadingSlot, setUploadingSlot] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -47,9 +38,6 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
   // Sync state when opened
   React.useEffect(() => {
     if (isOpen) {
-      setProvider(storageConfig.provider);
-      setR2Config(storageConfig.r2);
-      setDriveConfig(storageConfig.drive);
       setPlaceholders(storageConfig.placeholders || {});
       setSaveSuccess(false);
     }
@@ -58,12 +46,7 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
   if (!isOpen) return null;
 
   const handleSave = () => {
-    setStorageConfig({
-      provider,
-      r2: r2Config,
-      drive: driveConfig,
-      placeholders,
-    });
+    setStorageConfig({ placeholders });
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -78,24 +61,10 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
   ) => {
     setUploadingSlot(slotKey);
     try {
-      const res = await uploadTournamentMedia(
-        file,
-        `placeholder_${slotKey}`,
-        {
-          provider,
-          r2: r2Config,
-          drive: driveConfig,
-          placeholders,
-        }
-      );
-      if (res.success && res.url) {
-        setPlaceholders((prev) => ({
-          ...prev,
-          [slotKey]: res.url,
-        }));
-      }
+      const url = await uploadPhoto(file, 'placeholders', slotKey, SIZES.halfBody);
+      setPlaceholders((prev) => ({ ...prev, [slotKey]: url }));
     } catch (e) {
-      console.error('Placeholder upload error:', e);
+      alert(e instanceof Error ? e.message : String(e));
     } finally {
       setUploadingSlot(null);
     }
@@ -168,7 +137,7 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
                 Cài Đặt Lưu Trữ & Ảnh Mẫu (Placeholder)
               </h2>
               <p className="text-[11px] text-zinc-400">
-                Quản lý Cloudflare R2, Google Drive và cấu hình hình ảnh mặc định theo giới tính
+                Kho ảnh Cloudflare R2 và ảnh mặc định theo giới tính
               </p>
             </div>
           </div>
@@ -192,7 +161,7 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
             }`}
           >
             <Database className="w-3.5 h-3.5 text-amber-400" />
-            <span>1. Nơi Lưu Trữ (R2 / Drive / Local)</span>
+            <span>1. Kho ảnh Cloudflare R2</span>
           </button>
 
           <button
@@ -208,187 +177,8 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
           </button>
         </div>
 
-        {/* TAB 1: Storage Config */}
-        {activeTab === 'storage' && (
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-zinc-300 uppercase tracking-wider block">
-                Chọn Dịch Vụ Lưu Trữ:
-              </label>
-              <div className="grid grid-cols-3 gap-2 text-xs font-bold">
-                {/* Cloudflare R2 */}
-                <button
-                  onClick={() => setProvider('r2')}
-                  className={`p-3 rounded border text-left transition-colors flex flex-col justify-between cursor-pointer ${
-                    provider === 'r2'
-                      ? 'bg-zinc-900 border-amber-500 text-white'
-                      : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Cloud className="w-4 h-4 text-amber-400" />
-                    {provider === 'r2' && <span className="w-2 h-2 rounded-full bg-amber-400" />}
-                  </div>
-                  <div className="mt-2 font-black uppercase text-xs text-white">Cloudflare R2</div>
-                  <div className="text-[10px] text-zinc-500 font-normal">S3 API / Tốc độ cao</div>
-                </button>
-
-                {/* Google Drive */}
-                <button
-                  onClick={() => setProvider('drive')}
-                  className={`p-3 rounded border text-left transition-colors flex flex-col justify-between cursor-pointer ${
-                    provider === 'drive'
-                      ? 'bg-zinc-900 border-emerald-500 text-white'
-                      : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <HardDrive className="w-4 h-4 text-emerald-400" />
-                    {provider === 'drive' && <span className="w-2 h-2 rounded-full bg-emerald-400" />}
-                  </div>
-                  <div className="mt-2 font-black uppercase text-xs text-white">Google Drive</div>
-                  <div className="text-[10px] text-zinc-500 font-normal">Thư mục Drive BTC</div>
-                </button>
-
-                {/* Local / Direct */}
-                <button
-                  onClick={() => setProvider('local')}
-                  className={`p-3 rounded border text-left transition-colors flex flex-col justify-between cursor-pointer ${
-                    provider === 'local'
-                      ? 'bg-zinc-900 border-blue-500 text-white'
-                      : 'bg-zinc-900/60 border-zinc-800 text-zinc-400 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <Database className="w-4 h-4 text-blue-400" />
-                    {provider === 'local' && <span className="w-2 h-2 rounded-full bg-blue-400" />}
-                  </div>
-                  <div className="mt-2 font-black uppercase text-xs text-white">Trực Tiếp (WebP)</div>
-                  <div className="text-[10px] text-zinc-500 font-normal">Nén nhanh, dùng ngay</div>
-                </button>
-              </div>
-            </div>
-
-            {/* Provider Forms */}
-            {provider === 'r2' && (
-              <div className="p-4 bg-zinc-900 rounded border border-zinc-800 space-y-3 text-xs">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-bold text-amber-400 uppercase tracking-wide flex items-center gap-1.5 text-xs">
-                    <Cloud className="w-4 h-4" />
-                    Thông tin Cloudflare R2 Bucket
-                  </span>
-                  <a
-                    href="https://dash.cloudflare.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 underline"
-                  >
-                    Mở Cloudflare Dash <ExternalLink className="w-3 h-3" />
-                  </a>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-zinc-400 block font-semibold">Tên Bucket:</label>
-                    <input
-                      type="text"
-                      placeholder="hiphop-xu-tra-2026"
-                      value={r2Config.bucketName}
-                      onChange={(e) => setR2Config({ ...r2Config, bucketName: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-zinc-400 block font-semibold">Account ID:</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 7a8b9c..."
-                      value={r2Config.accountId}
-                      onChange={(e) => setR2Config({ ...r2Config, accountId: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-zinc-400 block font-semibold">Access Key ID:</label>
-                    <input
-                      type="text"
-                      placeholder="R2 Access Key"
-                      value={r2Config.accessKeyId}
-                      onChange={(e) => setR2Config({ ...r2Config, accessKeyId: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-zinc-400 block font-semibold">Secret Access Key:</label>
-                    <input
-                      type="password"
-                      placeholder="••••••••••••••••"
-                      value={r2Config.secretAccessKey}
-                      onChange={(e) => setR2Config({ ...r2Config, secretAccessKey: e.target.value })}
-                      className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] text-zinc-400 block font-semibold">
-                    Public Domain hoặc Custom Domain (Khuyên dùng để LED tải ảnh siêu tốc):
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="https://pub-xxxx.r2.dev hoặc https://media.hiphopxutra.vn"
-                    value={r2Config.publicDomain}
-                    onChange={(e) => setR2Config({ ...r2Config, publicDomain: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                  />
-                </div>
-              </div>
-            )}
-
-            {provider === 'drive' && (
-              <div className="p-4 bg-zinc-900 rounded border border-zinc-800 space-y-3 text-xs">
-                <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-bold text-emerald-400 uppercase tracking-wide flex items-center gap-1.5 text-xs">
-                    <HardDrive className="w-4 h-4" />
-                    Lưu trữ vào Google Drive
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-[11px] text-zinc-400 block font-semibold">Tên thư mục Drive lưu trữ:</label>
-                  <input
-                    type="text"
-                    placeholder="HIPHOP_XU_TRA_2026_MEDIA"
-                    value={driveConfig.folderName}
-                    onChange={(e) => setDriveConfig({ ...driveConfig, folderName: e.target.value })}
-                    className="w-full px-3 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-xs outline-none"
-                  />
-                </div>
-
-                <div className="text-[11px] text-zinc-400 bg-zinc-950/60 p-2.5 rounded border border-zinc-800 leading-relaxed">
-                  💡 <strong>Hỗ trợ link Google Drive:</strong> Bạn có thể dán trực tiếp link chia sẻ của bất kỳ ảnh nào trên Google Drive, hệ thống sẽ tự động chuyển đổi thành ảnh hiển thị trực tiếp chất lượng cao trên màn LED sân khấu!
-                </div>
-              </div>
-            )}
-
-            {provider === 'local' && (
-              <div className="p-4 bg-zinc-900 rounded border border-zinc-800 space-y-2 text-xs">
-                <div className="font-bold text-blue-400 uppercase tracking-wide text-[11px]">
-                  Chế Độ Lưu Trữ Trực Tiếp (Không Cần Cài Đặt Cloud)
-                </div>
-                <p className="text-zinc-300 text-xs leading-relaxed">
-                  Mỗi khi bạn chọn ảnh từ máy tính hoặc điện thoại, ảnh sẽ tự động được thu gọn và nén thành định dạng <strong>WebP siêu nhẹ</strong> (dưới 150KB), lưu tức thì vào bộ nhớ ứng dụng và đồng bộ mượt mà sang màn LED sân khấu và thiết bị chấm điểm.
-                </p>
-                <div className="text-[11px] text-zinc-400 bg-zinc-950/60 p-2.5 rounded border border-zinc-800">
-                  ✔️ Sử dụng được ngay lập tức mà không cần tài khoản R2 hay Google Drive API.
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {/* TAB 1: R2 photo storage */}
+        {activeTab === 'storage' && <MediaStoragePanel />}
 
         {/* TAB 2: Placeholders Setting */}
         {activeTab === 'placeholders' && (

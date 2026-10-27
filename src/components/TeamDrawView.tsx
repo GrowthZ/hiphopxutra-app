@@ -114,7 +114,7 @@ export const TeamDrawView: React.FC = () => {
             <Cloud className="w-3.5 h-3.5 text-zinc-500" />
             <span className="hidden sm:inline">Lưu ảnh:</span>
             <span className="font-bold text-zinc-900 uppercase">
-              {storageConfig.provider === 'r2' ? 'R2' : storageConfig.provider === 'drive' ? 'Drive' : 'Trực tiếp'}
+              R2
             </span>
           </button>
 

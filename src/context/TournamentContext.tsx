@@ -60,6 +60,8 @@ import { eventDoc } from '../services/firestore';
 import { currentSessionId, judgeIdFromEmail } from '../services/judgeAccounts';
 import confetti from 'canvas-confetti';
 
+export type DancerMediaUpdate = Partial<Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop' | 'gender'>>;
+
 interface TournamentContextType {
   // Rules & Setup
   rules: TournamentRules;
@@ -119,7 +121,7 @@ interface TournamentContextType {
   updateDancerMedia: (
     category: CategoryType,
     dancerId: string,
-    photos: { avatarUrl?: string; halfBodyUrl?: string; gender?: 'male' | 'female' }
+    photos: DancerMediaUpdate
   ) => void;
   updateDancerGender: (category: CategoryType, dancerId: string, gender: 'male' | 'female') => void;
   updateTeamPhoto: (teamId: string, teamPhotoUrl: string) => void;
@@ -813,7 +815,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDancerMedia = (
     category: CategoryType,
     dancerId: string,
-    photos: { avatarUrl?: string; halfBodyUrl?: string; gender?: 'male' | 'female' }
+    photos: DancerMediaUpdate
   ) => {
     const updater = (prev: Dancer[]) =>
       prev.map((d) => {
@@ -822,6 +824,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             ...d,
             ...(photos.avatarUrl !== undefined && { avatarUrl: photos.avatarUrl }),
             ...(photos.halfBodyUrl !== undefined && { halfBodyUrl: photos.halfBodyUrl }),
+            ...('avatarCrop' in photos && { avatarCrop: photos.avatarCrop }),
             ...(photos.gender !== undefined && { gender: photos.gender }),
           };
         }

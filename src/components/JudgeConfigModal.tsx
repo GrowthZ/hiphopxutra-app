@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTournament } from '../context/TournamentContext';
+import { SIZES, uploadPhoto } from '../services/media';
 import { Judge } from '../types/tournament';
 import {
   X,
@@ -62,30 +63,36 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
 
   if (!isOpen) return null;
 
-  // File Upload Helper (converts to base64 Data URL)
-  const handleFileUpload = (
+  // Resized to WebP and stored in R2; the judge doc keeps only the URL.
+  const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
     type: 'avatar' | 'full'
   ) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    e.target.value = '';
+    if (!file || !currentJudge) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Vui lòng chọn tệp định dạng hình ảnh (PNG, JPG, WEBP, SVG)!');
+      alert('Vui lòng chọn tệp định dạng hình ảnh (PNG, JPG, WEBP)!');
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const result = event.target?.result as string;
+    try {
+      const url = await uploadPhoto(
+        file,
+        'judges',
+        `${currentJudge.id}-${type}`,
+        type === 'avatar' ? SIZES.avatar : SIZES.photo
+      );
       if (type === 'avatar') {
-        setAvatarUrl(result);
+        setAvatarUrl(url);
       } else {
-        setFullPhotoUrl(result);
+        setFullPhotoUrl(url);
       }
       playAudioEffect('tick');
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    }
   };
 
   const handleSave = () => {
