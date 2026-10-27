@@ -136,11 +136,6 @@ Domain mặc định: `https://gen-lang-client-0810099059.web.app` (Auth tự nh
 - **Bắt buộc:** cấu hình rewrite mọi đường dẫn về `/index.html` (Vercel: `vercel.json` rewrites; Netlify/Cloudflare:
   file `public/_redirects` với dòng `/* /index.html 200`). Thiếu bước này, mở thẳng `/led` hay `/admin` sẽ bị 404.
 
-#### Cách C — Google AI Studio
-
-App được tạo từ AI Studio; bấm **Deploy** trong AI Studio để đẩy lên Cloud Run.
-Sau khi deploy, mở thử thẳng `/led` và `/admin` để chắc chắn server trả về app (không 404).
-
 ### Bước 3 — Cho phép domain đăng nhập Google (bắt buộc với Cách B và domain riêng)
 
 Firebase Console → **Authentication → Settings → Authorized domains** → **Add domain** → thêm domain production

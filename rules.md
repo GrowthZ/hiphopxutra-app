@@ -12,7 +12,6 @@ Hard rules for anyone (human or agent) changing this codebase.
 - Keep components focused: one view or modal per file. Split a file once it grows past ~600 lines
   by extracting sub-components next to it.
 - Icons from `lucide-react` only. Animations with `motion` (or the keyframes already in `src/index.css`).
-- Do not edit `vite.config.ts` HMR/watch settings — AI Studio depends on them.
 
 ## Styling
 

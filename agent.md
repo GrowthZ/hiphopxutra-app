@@ -11,7 +11,7 @@ Product design (roles, user stories, URLs, LED control hooks): `docs/user-storie
 - React 19 + TypeScript, Vite 8 (`@tailwindcss/vite`), Tailwind CSS v4
 - `motion` for animation, `lucide-react` for icons, `canvas-confetti` for victory effects
 - Firebase (`src/services/firebase.ts`), Google Sheets sync, photos in Cloudflare R2 via the media Worker (`worker/`)
-- Package manager: **bun** (`bun.lock`). Originally scaffolded in Google AI Studio.
+- Package manager: **bun** (`bun.lock`).
 
 ## Commands
 
