@@ -68,9 +68,11 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   and heartbeats `presence/san-khau-chinh`. Effects (entrance, round reveal, victory) ride on match data, not screens.
   `/led?preview=1` is the admin preview iframe: no heartbeat, no sound, no writes.
 - Public pages (`/ket-qua/*`, `/led`, `IS_PUBLIC_SOURCE` in `routes.ts`) read only `publicDancers` (prelim scores
-  once all 4 prelim judges scored or Top 32 is locked) and `publicVotes` (sides masked as `hidden` until the round is
-  revealed/confirmed) plus the public-safe `teams`, `matches`, `judges`, `meta`. Any admin client on an admin page
-  derives and writes these (`toPublicDancer`, `toPublicVotes`); rules keep raw dancers/votes to admins + judges.
+  once all 4 prelim judges scored or Top 32 is locked; no real name or age) and `publicVotes` (sides masked as
+  `hidden` until the round is revealed/confirmed) plus the public-safe `teams`, `matches`, `judges`, `meta`.
+  Judges read the same copies plus their own `judgeBallots/{judgeId}` (GK-09), overlaid in `TournamentContext`.
+  Any admin client on an admin page derives and writes all three (`toPublicDancer`, `toPublicVotes`,
+  `toJudgeBallot`); rules keep raw dancers/votes admin-only.
   Moving between public and private pages reloads the page so the data source never mixes.
 - URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 

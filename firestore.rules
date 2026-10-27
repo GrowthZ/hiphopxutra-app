@@ -64,15 +64,19 @@ service cloud.firestore {
         allow write: if isAdmin();
       }
 
-      // Guests and the LED read only what is public: the bracket, LED state and the published copies
-      // (publicDancers / publicVotes, kept in step by an admin client). Raw scores and votes stay with
-      // admins and judges, so unfinished prelim scores and unrevealed battle votes never leak (KG-06).
+      // Guests, the LED and judges read only what is public: the bracket, LED state and the published copies
+      // (publicDancers / publicVotes, kept in step by an admin client). Raw scores and votes are admin-only,
+      // so unfinished prelim scores and unrevealed votes never leak (KG-06) and judges score independently (GK-09).
       // Everything is admin-only to write, apart from the judge/LED rules below.
       match /{collection}/{docId} {
         allow read: if collection in ['teams', 'matches', 'judges', 'meta', 'screens', 'presence', 'publicDancers', 'publicVotes']
-          || isAdmin()
-          || (isJudge() && collection in ['newbieDancers', 'proDancers', 'votes']);
+          || isAdmin();
         allow write: if isAdmin();
+      }
+
+      // A judge reads back only their own scores and votes (published by an admin client).
+      match /judgeBallots/{id} {
+        allow read: if isJudge() && judgeId() == id;
       }
 
       match /newbieDancers/{dancerId} {

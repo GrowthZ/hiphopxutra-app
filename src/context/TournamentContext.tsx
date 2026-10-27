@@ -49,6 +49,8 @@ import {
   matchVotesToDoc,
   toPublicDancer,
   toPublicVotes,
+  toJudgeBallot,
+  JudgeBallot,
   sortJudges,
 } from './tournamentModel';
 import { IS_LED_PREVIEW, IS_PUBLIC_SOURCE, VIEW_PATHS, isPublicView, viewFromLocation } from '../routes';
@@ -380,9 +382,53 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   }, []);
 
+  // ---------- Who reads what ----------
+  // Admins read the raw data. Guests, the LED and judges read the published copies; a judge also gets their
+  // own ballot (judgeBallots/{judgeId}) laid over it, so they see their own scores/votes but never others' (GK-09).
+  const judgeMode = !IS_PUBLIC_SOURCE && !isAdmin && Boolean(judgeAccountId);
+  const readsPublic = IS_PUBLIC_SOURCE || judgeMode;
+  const [ownBallot, setOwnBallot] = useState<JudgeBallot | null>(null);
+
+  useEffect(() => {
+    if (!judgeMode || !judgeAccountId) return setOwnBallot(null);
+    return onSnapshot(eventDoc('judgeBallots', judgeAccountId), (snap) =>
+      setOwnBallot(snap.exists() ? ({ prelim: {}, votes: {}, ...snap.data(), id: snap.id } as JudgeBallot) : null)
+    );
+  }, [judgeMode, judgeAccountId]);
+
+  const withOwnScores = useCallback(
+    (list: Dancer[]) =>
+      !ownBallot
+        ? list
+        : list.map((d) =>
+            d.id in ownBallot.prelim
+              ? { ...d, prelimScores: { ...d.prelimScores, [ownBallot.id]: ownBallot.prelim[d.id] } }
+              : d
+          ),
+    [ownBallot]
+  );
+  const visibleVotes = useMemo(() => {
+    if (!ownBallot) return votes;
+    const merged: Record<string, Votes> = { ...votes };
+    for (const [matchId, rounds] of Object.entries(ownBallot.votes)) {
+      merged[matchId] = { ...merged[matchId] };
+      for (const [key, side] of Object.entries(rounds)) {
+        merged[matchId][key] = { ...merged[matchId][key], [ownBallot.id]: side };
+      }
+    }
+    return merged;
+  }, [votes, ownBallot]);
+
+  /** Judge device: show a just-sent score/vote at once; the published ballot confirms it shortly after. */
+  const recordOwnBallot = (update: (b: JudgeBallot) => JudgeBallot) => {
+    if (judgeMode && judgeAccountId) {
+      setOwnBallot((prev) => update(prev ?? { id: judgeAccountId, prelim: {}, votes: {} }));
+    }
+  };
+
   // ---------- Derived views exposed to components ----------
-  const newbieDancers = useMemo(() => recalculateDancers(newbieBase), [newbieBase]);
-  const proDancers = useMemo(() => recalculateDancers(proBase), [proBase]);
+  const newbieDancers = useMemo(() => recalculateDancers(withOwnScores(newbieBase)), [newbieBase, withOwnScores]);
+  const proDancers = useMemo(() => recalculateDancers(withOwnScores(proBase)), [proBase, withOwnScores]);
   const dancersById = useMemo(
     () => new Map([...newbieDancers, ...proDancers].map((d) => [d.id, d])),
     [newbieDancers, proDancers]
@@ -390,8 +436,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const proTeams = useMemo(() => teamsBase.map((t) => hydrateTeam(t, dancersById)), [teamsBase, dancersById]);
   const matches = useMemo(() => {
     const teamsById = new Map(proTeams.map((t) => [t.id, t]));
-    return matchesBase.map((m) => hydrateMatch(applyVotes(m, votes[m.id]), dancersById, teamsById));
-  }, [matchesBase, votes, dancersById, proTeams]);
+    return matchesBase.map((m) => hydrateMatch(applyVotes(m, visibleVotes[m.id]), dancersById, teamsById));
+  }, [matchesBase, visibleVotes, dancersById, proTeams]);
 
   // ---------- Firestore sync (events/{EVENT_ID}/...) ----------
   // Public pages (/ket-qua/*, /led and its admin preview iframe) only read the published copies, never write.
@@ -400,7 +446,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked }],
     [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
   );
-  const privateOnly = { enabled: !IS_PUBLIC_SOURCE };
+  const privateOnly = { enabled: canWrite }; // raw scores and votes: admins only
   const syncStates = [
     useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
     useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
@@ -438,30 +484,35 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     () => matchesBase.filter((m) => votes[m.id]).map((m) => toPublicVotes(m, votes[m.id])),
     [matchesBase, votes]
   );
+  const judgeBallots = useMemo(
+    () => judges.map((j) => toJudgeBallot(j.id, [...newbieBase, ...proBase], votes)),
+    [judges, newbieBase, proBase, votes]
+  );
   const publicSync = [
     useSyncedCollection('publicDancers', publicDancers, applyRemotePublicDancers, {
       canWrite: canPublish,
-      keepLocalWhenEmpty: !IS_PUBLIC_SOURCE,
-      enabled: IS_PUBLIC_SOURCE || canWrite,
+      keepLocalWhenEmpty: !readsPublic,
+      enabled: readsPublic || canWrite,
     }),
     useSyncedCollection('publicVotes', publicVotes, applyRemotePublicVotes, {
       canWrite: canPublish,
       toDoc: matchVotesToDoc,
       fromDoc: matchVotesFromDoc,
-      keepLocalWhenEmpty: !IS_PUBLIC_SOURCE,
-      enabled: IS_PUBLIC_SOURCE || canWrite,
+      keepLocalWhenEmpty: !readsPublic,
+      enabled: readsPublic || canWrite,
     }),
+    useSyncedCollection('judgeBallots', judgeBallots, () => {}, { canWrite: canPublish, enabled: canWrite }),
   ];
   const syncError =
     actionError ?? [...syncStates, ...publicSync].find((s) => s.error)?.error ?? null;
 
   function applyRemotePublicDancers(list: Dancer[]) {
-    if (!IS_PUBLIC_SOURCE) return; // the publisher keeps its private data
+    if (!readsPublic) return; // the publisher keeps its private data
     setNewbieDancers(list.filter((d) => d.category === 'newbie_1v1'));
     setProDancers(list.filter((d) => d.category === 'pro_2v2'));
   }
   function applyRemotePublicVotes(list: MatchVotes[]) {
-    if (IS_PUBLIC_SOURCE) applyRemoteVotes(list);
+    if (readsPublic) applyRemoteVotes(list);
   }
 
   function applyRemoteTeams(list: Team2v2[]) {
@@ -675,7 +726,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const validScore = Math.min(100, Math.max(0, Math.round(score)));
     // Resolves once the server has the score (offline: stays pending and is resent automatically).
     return writePrelimScore(category, dancerId, judgeId, validScore).then(
-      () => true,
+      () => {
+        recordOwnBallot((b) => ({ ...b, prelim: { ...b.prelim, [dancerId]: validScore } }));
+        return true;
+      },
       (err: Error) => {
         setActionError(`Không lưu được điểm: ${err.message}`);
         return false;
@@ -880,7 +934,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const isAllVotedNow = Object.keys(roundVotes).length === judges.length;
 
     const saved = writeBattleVote(matchId, roundNumber, judgeId, side).then(
-      () => true,
+      () => {
+        recordOwnBallot((b) => ({
+          ...b,
+          votes: { ...b.votes, [matchId]: { ...b.votes[matchId], [`r${roundNumber}`]: side } },
+        }));
+        return true;
+      },
       (err: Error) => {
         setActionError(`Không gửi được phiếu: ${err.message}`);
         return false;

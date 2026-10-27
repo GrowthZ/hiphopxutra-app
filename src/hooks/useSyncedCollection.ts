@@ -35,6 +35,7 @@ export function useSyncedCollection<T extends { id: string }>(
   }: Options<T>
 ) {
   const synced = useRef(new Map<string, DocumentData>()); // id -> last known remote document
+  const live = useRef(false); // set synchronously, so a write in the same render as a resubscribe is skipped
   const [hydrated, setHydrated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +47,11 @@ export function useSyncedCollection<T extends { id: string }>(
   });
 
   useEffect(() => {
+    // Re-enabling (e.g. after signing in again) must wait for a fresh snapshot before writing.
+    synced.current = new Map();
+    live.current = false;
+    setHydrated(false);
+    setError(null);
     if (!enabled) return;
     return onSnapshot(
       eventCollection(name),
@@ -54,6 +60,7 @@ export function useSyncedCollection<T extends { id: string }>(
         // An empty cache says nothing about the server; wait for the real answer.
         if (snap.metadata.fromCache && snap.empty) return;
         setError(null);
+        live.current = true;
         setHydrated(true);
         if (snap.docChanges().length === 0 && synced.current.size === snap.size) return;
         synced.current = new Map(snap.docs.map((d) => [d.id, d.data()]));
@@ -66,7 +73,7 @@ export function useSyncedCollection<T extends { id: string }>(
   }, [name, keepLocalWhenEmpty, enabled]);
 
   useEffect(() => {
-    if (!hydrated || !canWrite) return;
+    if (!hydrated || !live.current || !canWrite) return;
     const batch = writeBatch(db);
     let ops = 0;
     const seen = new Set<string>();

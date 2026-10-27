@@ -78,6 +78,9 @@ export const JudgePortalView: React.FC = () => {
     if (existingVote === 'red' || existingVote === 'blue') {
       setSelectedSide(existingVote);
       setIsVoteSubmitted(true);
+    } else if (existingVote === 'hidden') {
+      // Published "has voted" arrived before this judge's own ballot: keep the current pick.
+      setIsVoteSubmitted(true);
     } else {
       setSelectedSide(null);
       setIsVoteSubmitted(false);
@@ -608,7 +611,7 @@ export const JudgePortalView: React.FC = () => {
                   {activePrelimDancer?.name}
                 </div>
                 <div className="text-[11px] text-zinc-500 truncate">
-                  {activePrelimDancer?.crew} · {activePrelimDancer?.age} tuổi
+                  {activePrelimDancer?.crew || 'Tự do'}
                 </div>
               </div>
               <div className="text-right shrink-0 pl-1">

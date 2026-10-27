@@ -112,7 +112,7 @@ Quy ước: **P0** = bắt buộc trước ngày thi · **P1** = nên có · **P
 | GK-06 | Là giám khảo, tôi muốn **màn hình tự chuyển** sang thí sinh/hiệp mới khi Admin chuyển, không cần tải lại. | P0 |
 | GK-07 | Là giám khảo, tôi muốn **không đổi được phiếu** sau khi Admin đã khoá/công bố hiệp. | P0 |
 | GK-08 | Là giám khảo, tôi muốn **phiếu không bị mất khi mạng chập chờn**: phiếu được lưu tạm và tự gửi lại, có trạng thái "Đang gửi / Đã lưu". | P0 |
-| GK-09 | Là giám khảo, tôi **không muốn thấy phiếu của giám khảo khác** trước khi công bố, để chấm độc lập. | P1 |
+| GK-09 | Là giám khảo, tôi **không muốn thấy phiếu của giám khảo khác** trước khi công bố, để chấm độc lập. | P1 ✅ |
 
 **Tiêu chí chấp nhận chính**
 - GK-01: sai PIN 5 lần → khoá 1 phút. Một mã GK đăng nhập máy mới thì máy cũ bị đăng xuất.

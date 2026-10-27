@@ -84,8 +84,7 @@ export const PrelimResultsView: React.FC = () => {
       (d) =>
         d.name.toLowerCase().includes(term) ||
         d.sbd.toLowerCase().includes(term) ||
-        (d.crew && d.crew.toLowerCase().includes(term)) ||
-        (d.realName && d.realName.toLowerCase().includes(term))
+        (d.crew && d.crew.toLowerCase().includes(term))
     );
   }, [sortedDancers, searchTerm]);
 
@@ -447,14 +446,11 @@ export const PrelimResultsView: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-mono text-slate-400 font-bold uppercase tracking-wider">
-                        {top2.gender === 'female' ? 'BGIRL' : 'BBOY'} · {top2.age}T
+                        {top2.gender === 'female' ? 'BGIRL' : 'BBOY'}
                       </div>
                       <h3 className="font-condensed font-black text-xl text-white tracking-wide truncate uppercase leading-tight group-hover:text-slate-200 transition-colors">
                         {stripBreakerPrefix(top2.name)}
                       </h3>
-                      <p className="text-xs text-zinc-400 truncate">
-                        {top2.realName || 'Thí sinh tài năng'}
-                      </p>
                       <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
                         {top2.crew || 'Tự do'}
                       </div>
@@ -528,14 +524,11 @@ export const PrelimResultsView: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider">
-                        {top1.gender === 'female' ? 'BGIRL' : 'BBOY'} · {top1.age}T
+                        {top1.gender === 'female' ? 'BGIRL' : 'BBOY'}
                       </div>
                       <h3 className="font-condensed font-black text-2xl text-amber-400 tracking-wide truncate uppercase leading-tight group-hover:text-amber-300 transition-colors">
                         {stripBreakerPrefix(top1.name)}
                       </h3>
-                      <p className="text-xs text-zinc-300 truncate font-medium">
-                        {top1.realName || 'Thí sinh dẫn đầu'}
-                      </p>
                       <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
                         {top1.crew || 'Tự do'}
                       </div>
@@ -609,14 +602,11 @@ export const PrelimResultsView: React.FC = () => {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[10px] font-mono text-amber-600 font-bold uppercase tracking-wider">
-                        {top3.gender === 'female' ? 'BGIRL' : 'BBOY'} · {top3.age}T
+                        {top3.gender === 'female' ? 'BGIRL' : 'BBOY'}
                       </div>
                       <h3 className="font-condensed font-black text-xl text-white tracking-wide truncate uppercase leading-tight group-hover:text-amber-300 transition-colors">
                         {stripBreakerPrefix(top3.name)}
                       </h3>
-                      <p className="text-xs text-zinc-400 truncate">
-                        {top3.realName || 'Thí sinh tài năng'}
-                      </p>
                       <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
                         {top3.crew || 'Tự do'}
                       </div>
@@ -802,7 +792,7 @@ export const PrelimResultsView: React.FC = () => {
                                   </span>
                                 </div>
                                 <div className="text-[11px] text-zinc-400 truncate">
-                                  {dancer.realName || '—'} · {dancer.age} tuổi
+                                  {dancer.crew || 'Tự do'}
                                 </div>
                               </div>
                             </div>

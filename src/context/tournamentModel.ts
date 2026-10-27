@@ -139,10 +139,37 @@ export const matchVotesToDoc = (v: MatchVotes): DocumentData => v.rounds;
 // ---------- Published copies for guests and the LED (KG-06) ----------
 // An admin client derives these from the private collections; rules keep the private ones unreadable to guests.
 
-/** A dancer's prelim scores go public once all prelim judges have scored, or when the category is locked. */
+/**
+ * A dancer's prelim scores go public once all prelim judges have scored, or when the category is locked.
+ * Real name and age of the (under-16) dancers stay private.
+ */
 export function toPublicDancer(d: Dancer, categoryLocked: boolean): DocumentData {
+  const { realName: _name, age: _age, ...stored } = dancerToDoc(d);
   const complete = PRELIM_JUDGE_IDS.every((j) => typeof d.prelimScores?.[j] === 'number');
-  return { ...dancerToDoc(d), prelimScores: complete || categoryLocked ? d.prelimScores : {} };
+  return { ...stored, prelimScores: complete || categoryLocked ? d.prelimScores : {} };
+}
+
+/** What one judge has scored and voted: lets a judge see their own ballots, never the others' (GK-09). */
+export interface JudgeBallot {
+  id: string; // judgeId
+  prelim: Record<string, number>; // dancerId -> score
+  votes: Record<string, Record<string, 'red' | 'blue'>>; // matchId -> `r{round}` -> side
+}
+
+export function toJudgeBallot(judgeId: string, dancers: Dancer[], votes: Record<string, Votes>): JudgeBallot {
+  const prelim: Record<string, number> = {};
+  for (const d of dancers) {
+    const score = d.prelimScores?.[judgeId];
+    if (typeof score === 'number') prelim[d.id] = score;
+  }
+  const own: JudgeBallot['votes'] = {};
+  for (const [matchId, rounds] of Object.entries(votes)) {
+    for (const [key, roundVotes] of Object.entries(rounds)) {
+      const side = roundVotes[judgeId];
+      if (side === 'red' || side === 'blue') (own[matchId] ??= {})[key] = side;
+    }
+  }
+  return { id: judgeId, prelim, votes: own };
 }
 
 /** A round's sides go public once the admin reveals or confirms it; before that only "has voted" shows. */

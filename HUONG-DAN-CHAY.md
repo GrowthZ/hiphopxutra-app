@@ -142,7 +142,7 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 | Giám khảo báo "Sai mã PIN" dù nhập đúng | Kiểm tra đã bấm **Tạo tài khoản** cho GK đó ở `/admin/cai-dat/giam-khao` |
 | Giám khảo bị đăng xuất giữa chừng | Mã GK đó vừa đăng nhập trên máy khác (mỗi GK chỉ 1 máy), hoặc admin vừa đổi PIN |
 | Giám khảo không gửi được điểm/phiếu (`permission-denied`) | Chưa deploy `firestore.rules` mới, Prelim đã chốt, hoặc hiệp đã công bố |
-| Trang `/ket-qua` không có điểm / phiếu | Bình thường: điểm Prelim chỉ hiện khi thí sinh đã đủ 4 GK chấm (hoặc đã chốt Top 32), phiếu battle chỉ hiện sau khi lật/công bố hiệp. Kết quả do máy admin đẩy lên, nên phải có ít nhất 1 máy admin đang mở `/admin/...` |
+| Trang `/ket-qua` không có điểm / phiếu, hoặc giám khảo tải lại trang không thấy phiếu mình đã gửi | Bình thường: điểm Prelim chỉ hiện khi thí sinh đã đủ 4 GK chấm (hoặc đã chốt Top 32), phiếu battle chỉ hiện sau khi lật/công bố hiệp. Kết quả do máy admin đẩy lên, nên phải có ít nhất 1 máy admin đang mở `/admin/...` |
 | Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
 | Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |
