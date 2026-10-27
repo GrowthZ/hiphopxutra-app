@@ -353,7 +353,7 @@ export const JudgePortalView: React.FC = () => {
                   <div className="text-[11px] font-bold text-red-600 whitespace-nowrap overflow-hidden text-ellipsis uppercase mt-0.5">
                     {match?.category === 'pro_2v2'
                       ? match.sideRed.name
-                      : match?.sideRed.dancers[0]?.crew || 'Thí sinh tự do'}
+                      : match?.sideRed.dancers[0]?.crew}
                   </div>
 
                   {/* Avatars / Team Photo with Placeholders */}
@@ -424,7 +424,7 @@ export const JudgePortalView: React.FC = () => {
                   <div className="text-[11px] font-bold text-blue-600 whitespace-nowrap overflow-hidden text-ellipsis uppercase mt-0.5">
                     {match?.category === 'pro_2v2'
                       ? match.sideBlue.name
-                      : match?.sideBlue.dancers[0]?.crew || 'Thí sinh tự do'}
+                      : match?.sideBlue.dancers[0]?.crew}
                   </div>
 
                   {/* Avatars / Team Photo with Placeholders */}
@@ -611,7 +611,7 @@ export const JudgePortalView: React.FC = () => {
                   {activePrelimDancer?.name}
                 </div>
                 <div className="text-[11px] text-zinc-500 truncate">
-                  {activePrelimDancer?.crew || 'Tự do'}
+                  {activePrelimDancer?.crew}
                 </div>
               </div>
               <div className="text-right shrink-0 pl-1">

@@ -237,7 +237,7 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
                 </span>
               </div>
               <div className="text-xs text-zinc-500 truncate mt-0.5">
-                {dancer.crew || 'Tự do'} · {dancer.gender === 'female' ? 'Bgirl' : 'Bboy'} ({dancer.age}T)
+                {[dancer.crew, dancer.gender === 'female' ? 'Bgirl' : 'Bboy'].filter(Boolean).join(' · ')}
               </div>
             </div>
           </div>

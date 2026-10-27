@@ -189,7 +189,7 @@ export const BracketView: React.FC = () => {
                       <div className="text-[10px] text-zinc-500 font-mono truncate">
                         {m.category === 'pro_2v2'
                           ? `${m.sideRed.name} · ${m.sideRed.sbdText}`
-                          : `${m.sideRed.dancers[0]?.crew || 'Tự do'} · ${m.sideRed.sbdText}`}
+                          : [m.sideRed.dancers[0]?.crew, m.sideRed.sbdText].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                   </div>
@@ -223,7 +223,7 @@ export const BracketView: React.FC = () => {
                       <div className="text-[10px] text-zinc-500 font-mono truncate">
                         {m.category === 'pro_2v2'
                           ? `${m.sideBlue.name} · ${m.sideBlue.sbdText}`
-                          : `${m.sideBlue.dancers[0]?.crew || 'Tự do'} · ${m.sideBlue.sbdText}`}
+                          : [m.sideBlue.dancers[0]?.crew, m.sideBlue.sbdText].filter(Boolean).join(' · ')}
                       </div>
                     </div>
                   </div>

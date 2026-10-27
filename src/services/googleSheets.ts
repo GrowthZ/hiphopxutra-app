@@ -85,7 +85,7 @@ export async function syncAllTournamentData(
   try {
     // Headers for Prelim
     const judgeHeaders = judges.map((j) => j.code);
-    const prelimHeader = ['Hạng', 'SBD', 'Tên Thí Sinh', 'CLB / Đội', 'Tuổi', ...judgeHeaders, 'Tổng Điểm', 'Điểm TB', 'Kết Quả'];
+    const prelimHeader = ['Hạng', 'SBD', 'Tên Thí Sinh', 'CLB / Đội', ...judgeHeaders, 'Tổng Điểm', 'Điểm TB', 'Kết Quả'];
 
     const formatPrelimRows = (dancers: Dancer[]) => {
       return dancers.map((d, index) => {
@@ -95,7 +95,6 @@ export async function syncAllTournamentData(
           d.sbd,
           d.name,
           d.crew || '',
-          d.age,
           ...jScores,
           d.prelimScoreTotal,
           d.prelimScoreAvg,

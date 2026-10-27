@@ -8,13 +8,17 @@
 //   bun run db backup [file]
 //   bun run db restore <file>          (overwrites docs with the same ids)
 //   bun run db reset                   (deletes event data, keeps admins + judgeSecrets)
+//   bun run db dancer:list [newbie|pro]
+//   bun run db dancer:import <file.tsv|csv>   (header row: Tên thi đấu, Họ và tên, CLB, Hạng mục; upserts by name)
+//   bun run db dancer:set <id> field=value ...  (name, realName, crew, gender; empty value removes the field)
+//   bun run db dancer:remove <id> ...
 //   flags: --emulator  --yes (skip the confirmation prompt)
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { applicationDefault, cert, initializeApp } from 'firebase-admin/app';
-import { DocumentReference, getFirestore, Timestamp, WriteBatch } from 'firebase-admin/firestore';
+import { DocumentReference, FieldValue, getFirestore, Timestamp, WriteBatch } from 'firebase-admin/firestore';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts
@@ -85,6 +89,33 @@ async function inBatches<T>(items: T[], write: (batch: WriteBatch, item: T) => v
   }
 }
 
+// ---------- Dancers ----------
+const DANCER_COLLECTIONS = { newbie: 'newbieDancers', pro: 'proDancers' } as const;
+type Cat = keyof typeof DANCER_COLLECTIONS;
+const CATEGORY_TYPE: Record<Cat, string> = { newbie: 'newbie_1v1', pro: 'pro_2v2' };
+const EDITABLE = ['name', 'realName', 'crew', 'gender'];
+
+/** 'Bboy  T - YD' -> 'BBOY T-YD' (same form the app shows). */
+const normalizeName = (s: string) => s.replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
+const genderOf = (name: string) => (/^BGIRL\b/.test(name) ? 'female' : 'male');
+
+/** 'Kid Pro' -> pro, 'Cả 2 hạng mục' -> both, anything else -> newbie. */
+const categoriesOf = (s: string): Cat[] => (/cả 2|both|\+/i.test(s) ? ['newbie', 'pro'] : /pro/i.test(s) ? ['pro'] : ['newbie']);
+
+const catOfId = (id: string): Cat => {
+  const cat = id.split('-')[0] as Cat;
+  if (!(cat in DANCER_COLLECTIONS)) throw new Error(`Id không hợp lệ: ${id} (dạng newbie-001 / pro-001)`);
+  return cat;
+};
+
+/** Splits a TSV (pasted from Google Sheets) or CSV file into rows of trimmed cells. */
+function readTable(file: string) {
+  const text = readFileSync(file, 'utf8').replace(/^﻿/, '');
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  const sep = lines[0]?.includes('\t') ? '\t' : ',';
+  return lines.map((l) => l.split(sep).map((c) => c.trim().replace(/^"(.*)"$/, '$1')));
+}
+
 async function collections() {
   return (await event.listCollections()).sort((a, b) => a.id.localeCompare(b.id));
 }
@@ -153,6 +184,88 @@ const commands: Record<string, () => Promise<void>> = {
     await confirm('Xoá dữ liệu giải');
     await inBatches(refs, (batch, ref) => batch.delete(ref));
     log('Đã xoá. Admin mở /admin để nạp lại dữ liệu mẫu.');
+  },
+
+  async 'dancer:list'() {
+    const cats = params[0] ? [params[0] as Cat] : (Object.keys(DANCER_COLLECTIONS) as Cat[]);
+    for (const cat of cats) {
+      const snap = await event.collection(DANCER_COLLECTIONS[cat]).orderBy('__name__').get();
+      log(`${cat.toUpperCase()} (${snap.size})`);
+      snap.docs.forEach((d) =>
+        log(`  ${d.id.padEnd(11)} ${(d.get('sbd') || '').padEnd(5)} ${[d.get('name'), d.get('realName'), d.get('crew')].filter(Boolean).join(' · ')}`)
+      );
+    }
+  },
+
+  async 'dancer:import'() {
+    if (!params[0]) throw new Error('Cách dùng: dancer:import <file.tsv|csv>');
+    const [header, ...rows] = readTable(params[0]);
+    const col = (re: RegExp) => header.findIndex((h) => re.test(h));
+    const c = { name: col(/thi đấu|bboy|bgirl|nghệ danh/i), realName: col(/họ.*tên/i), crew: col(/clb|đội|crew|địa chỉ/i), cat: col(/hạng mục/i) };
+    if (c.name < 0 || c.cat < 0) throw new Error(`Dòng đầu phải có cột "Tên thi đấu" và "Hạng mục". Đang có: ${header.join(' | ')}`);
+
+    // Existing dancers by category + name, so re-importing an edited sheet updates instead of duplicating.
+    const existing = new Map<string, DocumentReference>();
+    const next: Record<Cat, number> = { newbie: 0, pro: 0 };
+    for (const cat of Object.keys(DANCER_COLLECTIONS) as Cat[]) {
+      for (const d of (await event.collection(DANCER_COLLECTIONS[cat]).get()).docs) {
+        existing.set(`${cat}|${d.get('name')}`, d.ref);
+        next[cat] = Math.max(next[cat], Number(d.id.split('-')[1]) || 0);
+      }
+    }
+
+    const writes: [DocumentReference, Record<string, unknown>, boolean][] = []; // ref, fields, isNew
+    for (const row of rows) {
+      const name = normalizeName(row[c.name] ?? '');
+      if (!name) continue;
+      const fields: Record<string, unknown> = { name, gender: genderOf(name) };
+      const realName = c.realName >= 0 ? row[c.realName] : '';
+      const crew = c.crew >= 0 ? row[c.crew] : '';
+      if (realName && realName.toUpperCase() !== name) fields.realName = realName;
+      if (crew) fields.crew = crew;
+      for (const cat of categoriesOf(row[c.cat] ?? '')) {
+        const ref = existing.get(`${cat}|${name}`);
+        if (ref) writes.push([ref, fields, false]);
+        else {
+          const id = `${cat}-${String(++next[cat]).padStart(3, '0')}`;
+          const created = event.collection(DANCER_COLLECTIONS[cat]).doc(id);
+          existing.set(`${cat}|${name}`, created);
+          writes.push([created, { ...fields, sbd: '', category: CATEGORY_TYPE[cat], prelimScores: {} }, true]);
+        }
+      }
+    }
+    const added = writes.filter((w) => w[2]).length;
+    log(`Thêm mới ${added}, cập nhật ${writes.length - added} thí sinh.`);
+    await confirm(`Ghi ${writes.length} thí sinh từ ${path.basename(params[0])}`);
+    // merge: keeps SBD, check-in, photos and scores of dancers already in the database
+    await inBatches(writes, (batch, [ref, fields]) => batch.set(ref, fields, { merge: true }));
+    log('Xong.');
+  },
+
+  async 'dancer:set'() {
+    const [id, ...pairs] = params;
+    if (!id || pairs.length === 0) throw new Error('Cách dùng: dancer:set <id> name="BBOY X" crew="CLB Y" realName=');
+    const ref = event.collection(DANCER_COLLECTIONS[catOfId(id)]).doc(id);
+    if (!(await ref.get()).exists) throw new Error(`Không có thí sinh ${id}`);
+    const update: Record<string, unknown> = {};
+    for (const pair of pairs) {
+      const [key, ...rest] = pair.split('=');
+      if (!EDITABLE.includes(key)) throw new Error(`Chỉ sửa được: ${EDITABLE.join(', ')}`);
+      const value = rest.join('=').trim();
+      update[key] = !value ? FieldValue.delete() : key === 'name' ? normalizeName(value) : value;
+      if (key === 'name' && value) update.gender ??= genderOf(normalizeName(value));
+    }
+    await confirm(`Sửa ${id}`);
+    await ref.update(update);
+    log(`Đã sửa ${id}.`);
+  },
+
+  async 'dancer:remove'() {
+    if (params.length === 0) throw new Error('Cách dùng: dancer:remove <id> [id...]');
+    const refs = params.map((id) => event.collection(DANCER_COLLECTIONS[catOfId(id)]).doc(id));
+    await confirm(`Xoá thí sinh ${params.join(', ')}`);
+    await inBatches(refs, (batch, ref) => batch.delete(ref));
+    log(`Đã xoá ${refs.length} thí sinh.`);
   },
 };
 

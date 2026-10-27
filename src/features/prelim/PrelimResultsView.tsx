@@ -452,7 +452,7 @@ export const PrelimResultsView: React.FC = () => {
                         {stripBreakerPrefix(top2.name)}
                       </h3>
                       <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
-                        {top2.crew || 'Tự do'}
+                        {top2.crew}
                       </div>
                     </div>
                   </div>
@@ -530,7 +530,7 @@ export const PrelimResultsView: React.FC = () => {
                         {stripBreakerPrefix(top1.name)}
                       </h3>
                       <div className="text-[11px] text-zinc-400 font-medium truncate mt-0.5">
-                        {top1.crew || 'Tự do'}
+                        {top1.crew}
                       </div>
                     </div>
                   </div>
@@ -608,7 +608,7 @@ export const PrelimResultsView: React.FC = () => {
                         {stripBreakerPrefix(top3.name)}
                       </h3>
                       <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
-                        {top3.crew || 'Tự do'}
+                        {top3.crew}
                       </div>
                     </div>
                   </div>
@@ -792,7 +792,7 @@ export const PrelimResultsView: React.FC = () => {
                                   </span>
                                 </div>
                                 <div className="text-[11px] text-zinc-400 truncate">
-                                  {dancer.crew || 'Tự do'}
+                                  {dancer.crew}
                                 </div>
                               </div>
                             </div>
@@ -800,7 +800,7 @@ export const PrelimResultsView: React.FC = () => {
 
                           {/* Crew */}
                           <td className="py-3 px-3 text-center text-zinc-300 font-medium truncate max-w-[120px]">
-                            {dancer.crew || 'Tự do'}
+                            {dancer.crew}
                           </td>
 
                           {/* 4 Judges' Scores */}

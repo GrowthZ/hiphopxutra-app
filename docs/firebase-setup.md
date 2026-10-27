@@ -67,10 +67,14 @@ Nếu đã cài `gcloud`, có thể dùng `gcloud auth application-default login
 | `bun run db backup [file]` | Sao lưu toàn bộ dữ liệu giải ra `backups/<project>-<thời gian>.json` |
 | `bun run db restore <file>` | Ghi lại dữ liệu từ file sao lưu (ghi đè document cùng id) |
 | `bun run db reset` | Xoá dữ liệu giải, **giữ lại** `admins` và `judgeSecrets` (PIN giám khảo) |
+| `bun run db dancer:list [newbie|pro]` | Danh sách thí sinh kèm id (`newbie-001`, `pro-001`...) |
+| `bun run db dancer:import <file>` | Nhập thí sinh từ file TSV/CSV (xem bên dưới). Chạy lại với file đã sửa thì **cập nhật** theo tên, không tạo trùng |
+| `bun run db dancer:set <id> trường=giá trị ...` | Sửa `name`, `realName`, `crew`, `gender`. Để trống giá trị (`crew=`) là xoá trường đó |
+| `bun run db dancer:remove <id> ...` | Xoá thí sinh |
 
 Thêm `--emulator` vào cuối để chạy trên emulator thay vì prod.
 
-Với prod, các lệnh ghi/xoá (`admin:remove`, `restore`, `reset`) **bắt gõ lại tên project** để xác nhận.
+Với prod, các lệnh ghi/xoá (`admin:remove`, `restore`, `reset`, `dancer:*`) **bắt gõ lại tên project** để xác nhận.
 `--yes` bỏ qua bước xác nhận; chỉ dùng khi bạn chắc chắn.
 
 Ví dụ:
@@ -84,6 +88,30 @@ bun run db restore backups/hiphopxutra2026-2026-11-01T08-00-00.json
 
 Sau `reset`, admin mở `/admin` để app nạp lại dữ liệu mẫu (hoặc `restore` một bản sao lưu).
 Thư mục `backups/` không được commit (có tên thí sinh); hãy tự cất giữ các bản sao lưu quan trọng.
+
+### Nhập danh sách thí sinh
+
+Copy bảng từ Google Sheet/Excel (kể cả dòng tiêu đề), dán vào một file `.tsv`, hoặc xuất ra `.csv`. Dòng đầu
+cần có cột **Tên thi đấu** và **Hạng mục**; **Họ và tên** và **CLB** (hoặc *Đội*, *Địa chỉ*) có thì nhập, các cột khác bỏ qua.
+
+```
+STT	Họ và tên	Tên thi đấu	CLB	Hạng mục
+1	Đỗ Hoà Bình	Bboy Peace	Clb thầy Lê Xuân Trường	Kid Pro
+2		BBoy Sigma		Cả 2 hạng mục (Kid Pro + Newbie)
+```
+
+- Hạng mục có chữ "Pro" → Pro; "Cả 2" → tạo hồ sơ ở cả hai bảng; còn lại → Newbie.
+- Tên thi đấu được viết hoa; bắt đầu bằng "Bgirl" thì giới tính Nữ, còn lại Nam.
+- Thí sinh đã có (cùng hạng mục, cùng tên) chỉ được cập nhật họ tên/CLB; SBD, check-in, ảnh và điểm giữ nguyên.
+- Ô trống không được ghi, nên app không hiển thị trường đó.
+
+```bash
+bun run db backup
+bun run db dancer:import thi-sinh.tsv
+bun run db dancer:list newbie
+bun run db dancer:set newbie-027 name="Bboy Milo" crew="CLB Thái Nguyên"
+bun run db dancer:remove newbie-028
+```
 
 ## 5. Emulator (thử nghiệm không đụng dữ liệu thật)
 

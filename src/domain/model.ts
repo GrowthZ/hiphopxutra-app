@@ -36,7 +36,6 @@ const stubDancer = (id: string): Dancer => ({
   sbd: '',
   name: '',
   gender: 'male',
-  age: 0,
   category: 'newbie_1v1',
   prelimScores: {},
   prelimScoreTotal: 0,
@@ -144,7 +143,7 @@ export const matchVotesToDoc = (v: MatchVotes): DocumentData => v.rounds;
  * Real name and age of the (under-16) dancers stay private.
  */
 export function toPublicDancer(d: Dancer, categoryLocked: boolean): DocumentData {
-  const { realName: _name, age: _age, ...stored } = dancerToDoc(d);
+  const { realName: _name, ...stored } = dancerToDoc(d);
   const complete = PRELIM_JUDGE_IDS.every((j) => typeof d.prelimScores?.[j] === 'number');
   return { ...stored, prelimScores: complete || categoryLocked ? d.prelimScores : {} };
 }

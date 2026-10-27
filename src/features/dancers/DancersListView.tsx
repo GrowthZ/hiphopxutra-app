@@ -62,7 +62,6 @@ export const DancersListView: React.FC = () => {
       'Tên Thí Sinh',
       'Giới Tính',
       'Họ Tên Thật',
-      'Tuổi',
       'CLB / Đội',
       'Avatar URL',
       'Ảnh Nửa Người URL',
@@ -76,7 +75,6 @@ export const DancersListView: React.FC = () => {
       d.name,
       d.gender === 'female' ? 'Nữ' : 'Nam',
       d.realName || '',
-      d.age,
       d.crew || '',
       d.avatarUrl || '',
       d.halfBodyUrl || '',
@@ -235,7 +233,6 @@ export const DancersListView: React.FC = () => {
                 <th className="py-2.5 px-3">Tên Thí Sinh</th>
                 <th className="py-2.5 px-3 text-center w-20">Giới tính</th>
                 <th className="py-2.5 px-3 hidden sm:table-cell">Họ và tên</th>
-                <th className="py-2.5 px-3 text-center w-14">Tuổi</th>
                 <th className="py-2.5 px-3">CLB / Đội</th>
                 <th className="py-2.5 px-3 text-center w-24 hidden md:table-cell">Nửa người</th>
                 <th className="py-2.5 px-3 text-right w-16">Tổng</th>
@@ -309,17 +306,12 @@ export const DancersListView: React.FC = () => {
 
                     {/* Real name */}
                     <td className="py-2 px-3 text-zinc-600 hidden sm:table-cell">
-                      {d.realName || '—'}
-                    </td>
-
-                    {/* Age */}
-                    <td className="py-2 px-3 text-center font-mono text-zinc-700">
-                      {d.age}
+                      {d.realName}
                     </td>
 
                     {/* Crew */}
                     <td className="py-2 px-3 text-zinc-600">
-                      {d.crew || 'Tự do'}
+                      {d.crew}
                     </td>
 
                     {/* Half body thumbnail & status */}

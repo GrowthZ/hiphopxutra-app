@@ -224,7 +224,7 @@ export const TeamDrawView: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-[10px] text-zinc-500 font-mono truncate">
-                      {team.dancer1.crew || 'Tự do'}
+                      {team.dancer1.crew}
                     </div>
                   </div>
                 </div>
@@ -249,7 +249,7 @@ export const TeamDrawView: React.FC = () => {
                       </span>
                     </div>
                     <div className="text-[10px] text-zinc-500 font-mono truncate">
-                      {team.dancer2.crew || 'Tự do'}
+                      {team.dancer2.crew}
                     </div>
                   </div>
                 </div>

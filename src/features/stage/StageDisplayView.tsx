@@ -304,7 +304,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
     if (dancer?.crew) {
       return dancer.crew;
     }
-    return side.name !== dancer?.name ? side.name : 'THÍ SINH TỰ DO';
+    return side.name !== dancer?.name ? side.name : '';
   };
 
   // Helper to extract SBD text / identifier

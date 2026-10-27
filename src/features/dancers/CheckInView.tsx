@@ -192,7 +192,7 @@ export const CheckInView: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <p className="font-condensed font-black text-lg uppercase leading-tight text-zinc-900 truncate">{d.name}</p>
                 <p className="text-xs text-zinc-500 truncate">
-                  {[d.realName, d.crew, `${d.age} tuổi`, d.gender === 'female' ? 'Nữ' : 'Nam'].filter(Boolean).join(' · ')}
+                  {[d.realName, d.crew, d.gender === 'female' ? 'Nữ' : 'Nam'].filter(Boolean).join(' · ')}
                 </p>
               </div>
 

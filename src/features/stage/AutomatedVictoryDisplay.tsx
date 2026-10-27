@@ -40,7 +40,7 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
   // Extract crew or team name
   const teamCrewText = match.category === 'pro_2v2'
     ? winningSideData.name
-    : winningSideData.dancers?.[0]?.crew || 'THÍ SINH TỰ DO';
+    : winningSideData.dancers?.[0]?.crew || '';
 
   // Winner photo url
   const winnerPhotoUrl = match.category === 'pro_2v2'
@@ -340,9 +340,11 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
                 <span className="text-amber-300 font-black">{sbdText}</span>
               </div>
 
-              <div className="px-4 py-1 rounded-lg bg-zinc-800/90 border border-zinc-700 text-white font-bold uppercase tracking-wider shadow">
-                {teamCrewText}
-              </div>
+              {teamCrewText && (
+                <div className="px-4 py-1 rounded-lg bg-zinc-800/90 border border-zinc-700 text-white font-bold uppercase tracking-wider shadow">
+                  {teamCrewText}
+                </div>
+              )}
 
               <div className="px-3.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400 text-amber-300 font-bold uppercase tracking-wider shadow">
                 {match.category === 'pro_2v2' ? 'PRO 2VS2 BREAKING' : '1VS1 NEWBIE U16'}

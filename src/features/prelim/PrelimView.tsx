@@ -403,7 +403,7 @@ export const PrelimView: React.FC = () => {
                               </div>
                               {dancer.realName && (
                                 <div className="text-[10px] text-zinc-400 leading-none">
-                                  {dancer.realName} · Tuổi {dancer.age}
+                                  {dancer.realName}
                                 </div>
                               )}
                             </div>
@@ -412,7 +412,7 @@ export const PrelimView: React.FC = () => {
 
                         {/* Crew */}
                         <td className="py-2 px-3 text-zinc-600 hidden sm:table-cell truncate max-w-[120px]">
-                          {dancer.crew || '—'}
+                          {dancer.crew}
                         </td>
 
                         {/* 4 Prelim Judges Scores */}

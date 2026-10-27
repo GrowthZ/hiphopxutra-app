@@ -50,7 +50,6 @@ export interface Dancer {
   name: string; // e.g., 'BBOY T-REX'
   realName?: string;
   gender: 'male' | 'female'; // 'male' (Nam) hoặc 'female' (Nữ)
-  age: number; // U16: 10-15
   crew?: string; // CLB / Đội
   category: CategoryType;
   avatarUrl?: string; // Ảnh avatar cận mặt

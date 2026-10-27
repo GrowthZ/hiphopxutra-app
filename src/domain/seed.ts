@@ -85,7 +85,6 @@ function generateDancers(category: 'newbie_1v1' | 'pro_2v2', names: string[]): D
         ? `Nguyễn Thị ${String.fromCharCode(65 + (index % 26))}`
         : `Nguyễn Văn ${String.fromCharCode(65 + (index % 26))}`,
       gender: isFemale ? 'female' : 'male',
-      age: 11 + (index % 5),
       crew: index % 3 === 0 ? 'Thái Nguyên HipHop' : index % 3 === 1 ? 'S-Zone Kids' : 'Trà Xanh Crew',
       category,
       prelimScores: scores,

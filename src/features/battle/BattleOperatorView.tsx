@@ -178,8 +178,8 @@ export const BattleOperatorView: React.FC = () => {
                 </div>
                 <div className="text-xs text-red-300 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.category === 'pro_2v2'
-                    ? match.sideRed.name
-                    : match.sideRed.dancers[0]?.crew || 'Thí sinh tự do'} · {match.sideRed.sbdText}
+                    ? `${match.sideRed.name} · ${match.sideRed.sbdText}`
+                    : [match.sideRed.dancers[0]?.crew, match.sideRed.sbdText].filter(Boolean).join(' · ')}
                 </div>
               </div>
             </div>
@@ -203,8 +203,8 @@ export const BattleOperatorView: React.FC = () => {
                 </div>
                 <div className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.category === 'pro_2v2'
-                    ? match.sideBlue.name
-                    : match.sideBlue.dancers[0]?.crew || 'Thí sinh tự do'} · {match.sideBlue.sbdText}
+                    ? `${match.sideBlue.name} · ${match.sideBlue.sbdText}`
+                    : [match.sideBlue.dancers[0]?.crew, match.sideBlue.sbdText].filter(Boolean).join(' · ')}
                 </div>
               </div>
               <img
