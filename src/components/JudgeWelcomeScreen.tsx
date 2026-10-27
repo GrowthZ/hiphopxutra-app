@@ -37,6 +37,7 @@ export const JudgeWelcomeScreen: React.FC<JudgeWelcomeScreenProps> = ({
     activeJudge,
     playAudioEffect,
     setActiveView,
+    judgeAccountId,
   } = useTournament();
 
   const handleSelectJudge = (id: string) => {
@@ -104,7 +105,8 @@ export const JudgeWelcomeScreen: React.FC<JudgeWelcomeScreenProps> = ({
               <select
                 value={selectedJudgeId}
                 onChange={(e) => handleSelectJudge(e.target.value)}
-                className="bg-transparent text-xs font-black text-amber-400 outline-none cursor-pointer"
+                disabled={Boolean(judgeAccountId)}
+                className="bg-transparent text-xs font-black text-amber-400 outline-none cursor-pointer disabled:cursor-default"
               >
                 {judges.map((j) => (
                   <option key={j.id} value={j.id} className="bg-zinc-900 text-white">
@@ -209,14 +211,16 @@ export const JudgeWelcomeScreen: React.FC<JudgeWelcomeScreenProps> = ({
                 </ul>
               </div>
 
-              {/* Upload 2 Photos Button */}
-              <button
-                onClick={() => onOpenConfig(activeJudge.id)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold border border-zinc-700 transition-colors cursor-pointer"
-              >
-                <Camera className="w-3.5 h-3.5 text-amber-400" />
-                <span>Cấu hình 2 ảnh Giám khảo (Ảnh Full & Avatar)</span>
-              </button>
+              {/* Upload 2 Photos Button (organizers only: judge accounts can't write judge profiles) */}
+              {!judgeAccountId && (
+                <button
+                  onClick={() => onOpenConfig(activeJudge.id)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-zinc-800/80 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-bold border border-zinc-700 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Cấu hình 2 ảnh Giám khảo (Ảnh Full & Avatar)</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

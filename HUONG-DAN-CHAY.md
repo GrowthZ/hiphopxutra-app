@@ -10,7 +10,8 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
 
 1. **Bật Firestore:** [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0810099059/firestore)
    → **Create database** → chọn vị trí `asia-southeast1` (Singapore) → chế độ **Production**.
-2. **Bật đăng nhập:** Authentication → **Sign-in method** → bật **Google** và **Anonymous** (giám khảo dùng Anonymous ở giai đoạn này).
+2. **Bật đăng nhập:** Authentication → **Sign-in method** → bật **Google** (admin), **Email/Password** (giám khảo)
+   và **Anonymous** (máy LED báo online).
 3. **Đẩy rules bảo mật** (file `firestore.rules`):
    ```bash
    npm install -g firebase-tools
@@ -22,6 +23,8 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
    Admin sau có thể thêm admin khác theo cùng cách.
 5. Mở `/admin`, đăng nhập Google bằng email vừa thêm. Lần đầu admin vào, dữ liệu đang có trên trình duyệt đó
    (dữ liệu cũ trong localStorage, hoặc dữ liệu mẫu) sẽ được **tự động đẩy lên Firestore**.
+6. **Tạo tài khoản giám khảo:** `/admin/cai-dat/giam-khao` → **Tạo 9 tài khoản còn thiếu**. Mỗi GK nhận một PIN 6 số
+   (bấm 👁 để xem). Giám khảo mở `/giam-khao`, chọn mã GK, nhập PIN. Lộ PIN thì bấm **Đổi PIN**.
 
 > Muốn **làm lại từ đầu**: xoá collection `events/hiphopxutra-2026/*` (trừ `admins`) trong Console, rồi admin tải lại trang.
 
@@ -54,7 +57,8 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 | Bảng xếp hạng Prelim | `/ket-qua/bang-xep-hang` | Không |
 | Màn LED sân khấu (kiosk, bấm 1 lần để toàn màn hình) | `/led` | Tự động (ẩn danh, để báo online) |
 | Điều khiển màn LED | `/admin/led` | Google (admin) |
-| Cổng giám khảo | `/giam-khao` | Tự động (ẩn danh) |
+| Cổng giám khảo | `/giam-khao` | Mã GK + PIN 6 số (1 máy / 1 GK) |
+| Tài khoản giám khảo (tạo / xem / đổi PIN) | `/admin/cai-dat/giam-khao` | Google (admin) |
 | Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
 | Check-in thí sinh (cấp SBD N001… / P001…) | `/admin/check-in` | Google (admin) |
 | Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |
@@ -129,7 +133,11 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 | Banner đỏ "Cloud Firestore API has not been used… or it is disabled" | Chưa bật Firestore — làm mục 0, bước 1 |
 | Banner đỏ `Missing or insufficient permissions` | Chưa deploy `firestore.rules`, hoặc email chưa có trong `admins` |
 | `/admin` báo "chưa có quyền admin" | Thêm email (viết thường) vào `events/hiphopxutra-2026/admins` |
-| Giám khảo báo "Không đăng nhập ẩn danh được" | Bật **Anonymous** trong Authentication → Sign-in method |
+| Máy LED báo "Không đăng nhập ẩn danh được" | Bật **Anonymous** trong Authentication → Sign-in method |
+| Giám khảo báo "BTC chưa bật đăng nhập Email/Password" | Bật **Email/Password** trong Authentication → Sign-in method |
+| Giám khảo báo "Sai mã PIN" dù nhập đúng | Kiểm tra đã bấm **Tạo tài khoản** cho GK đó ở `/admin/cai-dat/giam-khao` |
+| Giám khảo bị đăng xuất giữa chừng | Mã GK đó vừa đăng nhập trên máy khác (mỗi GK chỉ 1 máy), hoặc admin vừa đổi PIN |
+| Giám khảo không gửi được điểm/phiếu (`permission-denied`) | Chưa deploy `firestore.rules` mới, Prelim đã chốt, hoặc hiệp đã công bố |
 | Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
 | Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |

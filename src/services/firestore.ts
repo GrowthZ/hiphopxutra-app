@@ -33,7 +33,10 @@ export type SyncedCollection =
   | 'votes'
   | 'screens'
   | 'presence'
-  | 'counters';
+  | 'counters'
+  | 'judgeSecrets'
+  | 'judgeSessions'
+  | 'judgePresence';
 
 export const eventCollection = (name: SyncedCollection) => collection(db, 'events', EVENT_ID, name);
 export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', EVENT_ID, name, id);

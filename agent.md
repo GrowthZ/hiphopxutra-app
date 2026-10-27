@@ -57,6 +57,10 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   `meta/current` (activeMatchId, Top 32 locks), `votes/{matchId}`, `admins/{email}`. Rules: `firestore.rules`.
 - Admin clients write through `useSyncedCollection` (only changed fields). Judges never write those collections:
   scores go through `writePrelimScore` (one field), battle votes through `writeBattleVote` (`votes` doc).
+- Judges: Firebase email/password accounts `gk-N@giamkhao.hiphopxutra.vn`, PIN = password
+  (`src/services/judgeAccounts.ts`; admins manage them at `/admin/cai-dat/giam-khao` through a secondary in-memory
+  Auth instance). `firestore.rules` derives the judge id from that email, so keep the format in sync.
+  PINs live in admin-only `judgeSecrets`; `judgeSessions` enforces one device per judge; `judgePresence` = heartbeat.
 - Teams/matches store dancer **ids**, not copies; `hydrateMatch`/`hydrateTeam` rebuild full objects for the UI.
 - `BroadcastChannel` now carries only same-machine audio/animation cues, never data.
 - LED: `/admin/led` (`StageControlView`, `useStageController`) writes `screens/san-khau-chinh` (scene, theme,

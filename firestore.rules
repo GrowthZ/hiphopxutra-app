@@ -1,8 +1,9 @@
 rules_version = '2';
 
-// Phase 1 rules. Admins: Google accounts listed in events/{eventId}/admins/{email}.
-// Judges: any signed-in session (anonymous for now) may write scores/votes only;
-// phase 3 replaces this with per-judge accounts.
+// Admins: Google accounts listed in events/{eventId}/admins/{email}.
+// Judges: email/password accounts gk-N@giamkhao.hiphopxutra.vn (see src/services/judgeAccounts.ts);
+//         each judge may only write their own prelim score / battle vote, never other judges'.
+// LED PC: anonymous session, heartbeat only.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /events/{eventId} {
@@ -12,36 +13,83 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower()));
       }
 
-      function prelimLocked(lockField) {
-        return get(/databases/$(database)/documents/events/$(eventId)/meta/current).data.get(lockField, false);
+      function isJudge() {
+        return request.auth != null
+          && request.auth.token.email is string
+          && request.auth.token.email.matches('^gk-[0-9]+@giamkhao[.]hiphopxutra[.]vn$');
       }
 
-      function onlyScoresChanged() {
-        return request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prelimScores']);
+      function judgeId() {
+        return request.auth.token.email.split('@')[0];
       }
 
-      // Admin whitelist: each admin can see their own entry; edit it in the Firebase Console.
+      function eventData(path) {
+        return get(/databases/$(database)/documents/events/$(eventId)/$(path)).data;
+      }
+
+      // Prelim: only the 4 prelim judges, only their own score, 0-100, while Top 32 isn't locked.
+      function validOwnPrelimScore(lockField) {
+        let before = resource.data.get('prelimScores', {});
+        let after = request.resource.data.prelimScores;
+        return isJudge()
+          && judgeId() in ['gk-1', 'gk-2', 'gk-3', 'gk-4']
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prelimScores'])
+          && after.diff(before).affectedKeys().hasOnly([judgeId()])
+          && after[judgeId()] is number
+          && after[judgeId()] >= 0 && after[judgeId()] <= 100
+          && eventData('meta/current').get(lockField, false) == false;
+      }
+
+      // Battle: votes/{matchId} = { r1: { gk-1: 'red', ... }, ... }. A judge changes one round,
+      // only their own key, only while that round isn't announced and the match isn't finished.
+      function validOwnVote(matchId) {
+        let before = resource == null ? {} : resource.data;
+        let changed = request.resource.data.diff(before).affectedKeys();
+        let roundKey = changed.toList()[0];
+        let afterRound = request.resource.data[roundKey];
+        let beforeRound = before.get(roundKey, {});
+        let match = eventData('matches/' + matchId);
+        let round = match.rounds[int(roundKey.replace('r', '')) - 1];
+        return isJudge()
+          && changed.size() == 1
+          && afterRound.diff(beforeRound).affectedKeys().hasOnly([judgeId()])
+          && afterRound[judgeId()] in ['red', 'blue']
+          && match.status != 'finished'
+          && round.get('isConfirmed', false) == false;
+      }
+
+      // Admin whitelist: each admin can see their own entry.
       match /admins/{email} {
         allow read: if request.auth != null && request.auth.token.email.lower() == email;
         allow write: if isAdmin();
       }
 
       // Tournament data is public to read (results pages, LED), admin-only to write.
+      // Judge PINs are admin-only.
       match /{collection}/{docId} {
-        allow read: if collection != 'admins';
+        allow read: if !(collection in ['admins', 'judgeSecrets']) || isAdmin();
         allow write: if isAdmin();
       }
 
       match /newbieDancers/{dancerId} {
-        allow update: if request.auth != null && onlyScoresChanged() && !prelimLocked('isNewbieTop32Locked');
+        allow update: if validOwnPrelimScore('isNewbieTop32Locked');
       }
 
       match /proDancers/{dancerId} {
-        allow update: if request.auth != null && onlyScoresChanged() && !prelimLocked('isProTop32Locked');
+        allow update: if validOwnPrelimScore('isProTop32Locked');
       }
 
       match /votes/{matchId} {
-        allow create, update: if request.auth != null;
+        allow create, update: if validOwnVote(matchId);
+      }
+
+      // A judge claims their session (a newer login signs other devices out) and sends a heartbeat.
+      match /judgeSessions/{id} {
+        allow write: if isJudge() && judgeId() == id;
+      }
+
+      match /judgePresence/{id} {
+        allow write: if isJudge() && judgeId() == id && request.resource.data.keys().hasOnly(['lastSeen']);
       }
 
       // LED heartbeat (anonymous session on the LED PC); screens/{screenId} itself is admin-only.

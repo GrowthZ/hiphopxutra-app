@@ -14,6 +14,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   storage: '/admin/cai-dat/luu-tru',
   stage_control: '/admin/led',
   checkin: '/admin/check-in',
+  judge_accounts: '/admin/cai-dat/giam-khao',
 };
 
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */

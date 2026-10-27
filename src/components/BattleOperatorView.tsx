@@ -17,6 +17,7 @@ import {
   getDancerAvatarUrl,
   stripBreakerPrefix,
 } from '../utils/placeholderAssets';
+import { useOnlineJudgeIds } from '../hooks/useJudgePresence';
 
 export const BattleOperatorView: React.FC = () => {
   const {
@@ -37,6 +38,7 @@ export const BattleOperatorView: React.FC = () => {
     playAudioEffect,
     storageConfig,
   } = useTournament();
+  const onlineJudgeIds = useOnlineJudgeIds();
 
   const [selectedRoundNum, setSelectedRoundNum] = React.useState<number | null>(null);
 
@@ -477,7 +479,13 @@ export const BattleOperatorView: React.FC = () => {
                       : 'bg-zinc-900 border-zinc-800 text-zinc-400'
                   }`}
                 >
-                  <div className="text-[11px] font-mono font-bold truncate text-amber-400">{j.code}</div>
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-bold truncate text-amber-400">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${onlineJudgeIds.has(j.id) ? 'bg-emerald-400' : 'bg-zinc-600'}`}
+                      title={onlineJudgeIds.has(j.id) ? 'Giám khảo đang online' : 'Giám khảo offline'}
+                    />
+                    {j.code}
+                  </div>
                   <div className="text-[10px] text-zinc-300 font-bold truncate uppercase">{j.judgeName || j.name.split('•')[1]?.trim() || j.code}</div>
                   <div className="font-condensed font-black text-sm mt-0.5 uppercase">
                     {vote === 'red' ? (

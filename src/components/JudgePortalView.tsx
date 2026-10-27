@@ -18,6 +18,9 @@ import {
 import { JudgeWelcomeScreen } from './JudgeWelcomeScreen';
 import { JudgeConfigModal } from './JudgeConfigModal';
 import { BankingScoreKeypadModal } from './BankingScoreKeypadModal';
+import { useJudgeHeartbeat } from '../hooks/useJudgePresence';
+
+type SaveState = 'idle' | 'saving' | 'saved' | 'failed';
 
 export const JudgePortalView: React.FC = () => {
   const {
@@ -37,7 +40,16 @@ export const JudgePortalView: React.FC = () => {
     storageConfig,
     isJudgeConfigModalOpen,
     setIsJudgeConfigModalOpen,
+    judgeAccountId,
+    isNewbieTop32Locked,
+    isProTop32Locked,
   } = useTournament();
+
+  useJudgeHeartbeat(judgeAccountId);
+
+  // Server-confirmed save status (a write made offline stays "saving" until it reaches the server).
+  const [voteSave, setVoteSave] = useState<SaveState>('idle');
+  const [prelimSave, setPrelimSave] = useState<SaveState>('idle');
 
   const [showWelcome, setShowWelcome] = useState<boolean>(true);
   const [scoringMode, setScoringMode] = useState<'battle' | 'prelim'>('battle');
@@ -53,6 +65,8 @@ export const JudgePortalView: React.FC = () => {
   const activeRoundNum = selectedRoundNum ?? (match?.currentRound || 1);
   const currentRound = match?.rounds.find((r) => r.roundNumber === activeRoundNum) || match?.rounds[0];
   const existingVote = currentRound?.votes[selectedJudgeId];
+  // Once the operator announces the round (or the match ends), votes can't change.
+  const isRoundLocked = Boolean(currentRound?.isConfirmed) || match?.status === 'finished';
 
   // Reset or initialize selected round when activeMatchId changes
   React.useEffect(() => {
@@ -68,18 +82,22 @@ export const JudgePortalView: React.FC = () => {
       setSelectedSide(null);
       setIsVoteSubmitted(false);
     }
+    setVoteSave((prev) => (prev === 'saving' ? prev : existingVote ? 'saved' : 'idle'));
   }, [match?.id, activeRoundNum, existingVote, selectedJudgeId]);
 
   const handleSelectSide = (side: 'red' | 'blue') => {
+    if (isRoundLocked) return;
     setSelectedSide(side);
     setIsVoteSubmitted(false);
     soundFX.playVoteClick();
   };
 
-  const handleConfirmVote = () => {
-    if (!match || !selectedSide) return;
-    submitJudgeVote(match.id, activeRoundNum, selectedJudgeId, selectedSide);
+  const handleConfirmVote = async () => {
+    if (!match || !selectedSide || isRoundLocked) return;
     setIsVoteSubmitted(true);
+    setVoteSave('saving');
+    const ok = await submitJudgeVote(match.id, activeRoundNum, selectedJudgeId, selectedSide);
+    setVoteSave(ok ? 'saved' : 'failed');
   };
 
   // Prelim mode dancers & 4 Prelim Judges
@@ -100,6 +118,7 @@ export const JudgePortalView: React.FC = () => {
       const valid = typeof saved === 'number' && !isNaN(saved) ? Math.round(saved) : 80;
       setStagedScore(valid);
     }
+    setPrelimSave('idle');
   }, [activePrelimDancer?.id, selectedJudgeId]);
 
   const isCurrentDancerConfirmed = Boolean(
@@ -108,15 +127,19 @@ export const JudgePortalView: React.FC = () => {
       activePrelimDancer.prelimScores[selectedJudgeId] === stagedScore
   );
 
-  const handleConfirmPrelimScore = (scoreToConfirm?: number) => {
-    if (!activePrelimDancer) return;
+  const isPrelimLocked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
+
+  const handleConfirmPrelimScore = async (scoreToConfirm?: number) => {
+    if (!activePrelimDancer || isPrelimLocked) return;
     const finalScore = scoreToConfirm ?? stagedScore;
-    updatePrelimScore(activeCategory, activePrelimDancer.id, selectedJudgeId, finalScore);
     soundFX.playVoteConfirmed();
     setConfirmedPrelimDancers((prev) => ({
       ...prev,
       [activePrelimDancer.id]: true,
     }));
+    setPrelimSave('saving');
+    const ok = await updatePrelimScore(activeCategory, activePrelimDancer.id, selectedJudgeId, finalScore);
+    setPrelimSave(ok ? 'saved' : 'failed');
   };
 
   // Preset click: ONLY shows number on screen, does NOT commit yet!
@@ -166,7 +189,8 @@ export const JudgePortalView: React.FC = () => {
             <select
               value={selectedJudgeId}
               onChange={(e) => setSelectedJudgeId(e.target.value)}
-              className="font-mono font-bold text-xs bg-zinc-100 border border-zinc-300 text-zinc-900 rounded px-2 py-1 outline-none cursor-pointer"
+              disabled={Boolean(judgeAccountId)}
+              className="font-mono font-bold text-xs bg-zinc-100 border border-zinc-300 text-zinc-900 rounded px-2 py-1 outline-none cursor-pointer disabled:cursor-default"
             >
               {activeJudgesList.map((j) => (
                 <option key={j.id} value={j.id}>
@@ -189,14 +213,16 @@ export const JudgePortalView: React.FC = () => {
               <span className="hidden sm:inline">Chào mừng</span>
             </button>
 
-            {/* Quick 2 Photos Config */}
-            <button
-              onClick={() => setIsJudgeConfigModalOpen(true)}
-              className="p-1.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-300 transition-colors cursor-pointer"
-              title="Cấu hình 2 ảnh Giám khảo (Ảnh Full & Avatar)"
-            >
-              <Camera className="w-3.5 h-3.5 text-amber-600" />
-            </button>
+            {/* Quick 2 Photos Config (organizers only) */}
+            {!judgeAccountId && (
+              <button
+                onClick={() => setIsJudgeConfigModalOpen(true)}
+                className="p-1.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-300 transition-colors cursor-pointer"
+                title="Cấu hình 2 ảnh Giám khảo (Ảnh Full & Avatar)"
+              >
+                <Camera className="w-3.5 h-3.5 text-amber-600" />
+              </button>
+            )}
 
             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200 text-emerald-700 text-[11px] font-bold">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" />
@@ -466,20 +492,38 @@ export const JudgePortalView: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5 text-xs">
+                <div className="flex items-center gap-1.5 text-xs" aria-live="polite">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isVoteSubmitted ? 'bg-emerald-600' : 'bg-zinc-400'
+                      voteSave === 'saved'
+                        ? 'bg-emerald-600'
+                        : voteSave === 'saving'
+                        ? 'bg-amber-500 animate-pulse'
+                        : voteSave === 'failed'
+                        ? 'bg-red-600'
+                        : 'bg-zinc-400'
                     }`}
                   />
                   <span className="text-zinc-500 font-medium">
-                    {isVoteSubmitted ? 'Đã gửi phiếu' : 'Chưa gửi'}
+                    {voteSave === 'saved'
+                      ? 'Đã lưu ✓'
+                      : voteSave === 'saving'
+                      ? 'Đang gửi…'
+                      : voteSave === 'failed'
+                      ? 'Gửi lỗi, bấm xác nhận lại'
+                      : isVoteSubmitted
+                      ? 'Đã gửi phiếu'
+                      : 'Chưa gửi'}
                   </span>
                 </div>
               </div>
 
               <div className="text-[11px] text-zinc-400">
-                Có thể đổi lựa chọn trước khi xác nhận gửi.
+                {isRoundLocked
+                  ? 'Hiệp này đã được công bố, phiếu đã khoá.'
+                  : voteSave === 'saving'
+                  ? 'Mạng chập chờn? Phiếu được giữ trên máy và tự gửi lại khi có mạng.'
+                  : 'Có thể đổi lựa chọn trước khi xác nhận gửi.'}
               </div>
             </div>
 
@@ -491,7 +535,7 @@ export const JudgePortalView: React.FC = () => {
 
               <button
                 onClick={handleConfirmVote}
-                disabled={!selectedSide}
+                disabled={!selectedSide || isRoundLocked}
                 className={`w-full py-3.5 px-4 rounded font-bold text-xs sm:text-sm text-white shadow-xs transition-all uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                   selectedSide === 'red'
                     ? 'bg-red-700 hover:bg-red-800'
@@ -502,7 +546,9 @@ export const JudgePortalView: React.FC = () => {
               >
                 <Send className="w-4 h-4" />
                 <span>
-                  {selectedSide === 'red'
+                  {isRoundLocked
+                    ? 'Hiệp đã khoá'
+                    : selectedSide === 'red'
                     ? 'Xác nhận chọn đội đỏ'
                     : selectedSide === 'blue'
                     ? 'Xác nhận chọn đội xanh'
@@ -661,9 +707,15 @@ export const JudgePortalView: React.FC = () => {
                       isCurrentDancerConfirmed ? 'bg-emerald-600' : 'bg-amber-500 animate-pulse'
                     }`}
                   />
-                  <span className={isCurrentDancerConfirmed ? 'text-emerald-700' : 'text-amber-800'}>
-                    {isCurrentDancerConfirmed
-                      ? `Đã chốt: ${stagedScore} đ`
+                  <span className={isCurrentDancerConfirmed ? 'text-emerald-700' : 'text-amber-800'} aria-live="polite">
+                    {isPrelimLocked
+                      ? 'Prelim đã chốt, không sửa được điểm'
+                      : prelimSave === 'saving'
+                      ? `Đang gửi: ${stagedScore} đ…`
+                      : prelimSave === 'failed'
+                      ? 'Gửi lỗi, bấm xác nhận lại'
+                      : isCurrentDancerConfirmed
+                      ? `Đã lưu ✓ ${stagedScore} đ`
                       : `Chưa lưu: ${stagedScore} đ`}
                   </span>
                 </div>
@@ -676,7 +728,8 @@ export const JudgePortalView: React.FC = () => {
                 /* Primary Confirmation Button */
                 <button
                   onClick={() => handleConfirmPrelimScore()}
-                  className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-zinc-950 font-black text-sm uppercase tracking-wider transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                  disabled={isPrelimLocked}
+                  className="w-full py-3 px-4 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 text-zinc-950 font-black text-sm uppercase tracking-wider transition-all shadow-md shadow-amber-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <Check className="w-5 h-5 font-black stroke-[3]" />
                   <span>XÁC NHẬN CHẤM: {stagedScore} ĐIỂM</span>

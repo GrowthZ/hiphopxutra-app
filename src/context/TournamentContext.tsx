@@ -49,7 +49,10 @@ import {
   sortJudges,
 } from './tournamentModel';
 import { IS_LED_PREVIEW, VIEW_PATHS, viewFromLocation } from '../routes';
-import { User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { User, onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
+import { onSnapshot } from 'firebase/firestore';
+import { eventDoc } from '../services/firestore';
+import { currentSessionId, judgeIdFromEmail } from '../services/judgeAccounts';
 import confetti from 'canvas-confetti';
 
 interface TournamentContextType {
@@ -81,7 +84,7 @@ interface TournamentContextType {
   setActiveCategory: (cat: CategoryType) => void;
   newbieDancers: Dancer[];
   proDancers: Dancer[];
-  updatePrelimScore: (category: CategoryType, dancerId: string, judgeId: string, score: number) => void;
+  updatePrelimScore: (category: CategoryType, dancerId: string, judgeId: string, score: number) => Promise<boolean>;
   isNewbieTop32Locked: boolean;
   isProTop32Locked: boolean;
   lockTop32: (category: CategoryType) => void;
@@ -95,7 +98,7 @@ interface TournamentContextType {
   activeMatchId: string;
   setActiveMatchId: (id: string) => void;
   activeMatch: BattleMatch | undefined;
-  submitJudgeVote: (matchId: string, roundNumber: number, judgeId: string, side: 'red' | 'blue') => void;
+  submitJudgeVote: (matchId: string, roundNumber: number, judgeId: string, side: 'red' | 'blue') => Promise<boolean>;
   confirmRoundResult: (matchId: string, roundNumber: number) => void;
   revealAllRounds: (matchId: string) => void;
   declareMatchWinner: (matchId: string, side: 'red' | 'blue') => void;
@@ -138,6 +141,10 @@ interface TournamentContextType {
   authReady: boolean;
   isAdmin: boolean;
   syncError: string | null;
+  /** Judge id when this device is signed in with a judge account, else null. */
+  judgeAccountId: string | null;
+  judgeNotice: string | null;
+  judgeSignOut: () => Promise<void>;
 
   // Reset/Seed
   resetAllData: () => void;
@@ -250,12 +257,36 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 
   useEffect(() => {
-    // Judges need a session to vote, the LED to send its heartbeat.
-    const needsSession = activeView === 'judge' || (activeView === 'stage' && !IS_LED_PREVIEW);
-    if (authReady && !authUser && needsSession) {
+    // The LED PC needs a session to send its heartbeat; judges sign in with their own GK account.
+    if (authReady && !authUser && activeView === 'stage' && !IS_LED_PREVIEW) {
       signInAnonymously(auth).catch((err: Error) => setActionError(`Không đăng nhập ẩn danh được: ${err.message}`));
     }
   }, [authReady, authUser, activeView]);
+
+  // Signed in as a judge account: that judge is fixed on this device.
+  const judgeAccountId = judgeIdFromEmail(authUser?.email);
+  const [judgeNotice, setJudgeNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (judgeAccountId) setSelectedJudgeId(judgeAccountId);
+  }, [judgeAccountId]);
+
+  // One device per judge: a newer login elsewhere signs this one out.
+  useEffect(() => {
+    if (!judgeAccountId) return;
+    return onSnapshot(eventDoc('judgeSessions', judgeAccountId), (snap) => {
+      const sessionId = snap.data()?.sessionId;
+      if (sessionId && sessionId !== currentSessionId()) {
+        setJudgeNotice('Mã giám khảo này vừa đăng nhập trên một máy khác, nên máy này đã bị đăng xuất.');
+        signOut(auth);
+      }
+    });
+  }, [judgeAccountId]);
+
+  const judgeSignOut = useCallback(() => {
+    setJudgeNotice(null);
+    return signOut(auth);
+  }, []);
   const [storageConfig, setStorageConfigState] = useState<StorageConfig>(getSavedStorageConfig);
   const [isStorageModalOpen, setIsStorageModalOpen] = useState<boolean>(false);
   const [isJudgeConfigModalOpen, setIsJudgeConfigModalOpen] = useState<boolean>(false);
@@ -577,8 +608,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     score: number
   ) => {
     const validScore = Math.min(100, Math.max(0, Math.round(score)));
-    writePrelimScore(category, dancerId, judgeId, validScore).catch((err: Error) =>
-      setActionError(`Không lưu được điểm: ${err.message}`)
+    // Resolves once the server has the score (offline: stays pending and is resent automatically).
+    return writePrelimScore(category, dancerId, judgeId, validScore).then(
+      () => true,
+      (err: Error) => {
+        setActionError(`Không lưu được điểm: ${err.message}`);
+        return false;
+      }
     );
   };
 
@@ -778,8 +814,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const roundVotes = { ...votes[matchId]?.[`r${roundNumber}`], [judgeId]: side };
     const isAllVotedNow = Object.keys(roundVotes).length === judges.length;
 
-    writeBattleVote(matchId, roundNumber, judgeId, side).catch((err: Error) =>
-      setActionError(`Không gửi được phiếu: ${err.message}`)
+    const saved = writeBattleVote(matchId, roundNumber, judgeId, side).then(
+      () => true,
+      (err: Error) => {
+        setActionError(`Không gửi được phiếu: ${err.message}`);
+        return false;
+      }
     );
 
     // Audio Feedback for Judge
@@ -800,6 +840,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       broadcastSync('REMOTE_AUDIO', { effect: 'VOTE_SUBMITTED' });
     }
 
+    return saved;
   };
 
   // Confirm Round Result with dramatic suspense audio & announcement
@@ -1445,6 +1486,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         authReady,
         isAdmin,
         syncError,
+        judgeAccountId,
+        judgeNotice,
+        judgeSignOut,
         resetAllData,
       }}
     >
