@@ -157,3 +157,12 @@
 .animate-judge-flip {
   animation: judgeCardFlip 0.45s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
+
+/* LED kiosk (/led): views render without operator controls and ignore clicks.
+   Mark a button with data-kiosk-keep when it carries information (e.g. the active category tab). */
+.kiosk {
+  pointer-events: none;
+}
+.kiosk button:not([data-kiosk-keep]) {
+  display: none;
+}

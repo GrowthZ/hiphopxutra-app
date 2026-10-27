@@ -83,7 +83,7 @@ export const BattleOperatorView: React.FC = () => {
           </select>
 
           <button
-            onClick={() => setActiveView('stage')}
+            onClick={() => setActiveView('stage_control')}
             className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold shadow-xs transition-colors cursor-pointer"
           >
             <Tv className="w-3.5 h-3.5" />

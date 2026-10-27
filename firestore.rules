@@ -43,6 +43,11 @@ service cloud.firestore {
       match /votes/{matchId} {
         allow create, update: if request.auth != null;
       }
+
+      // LED heartbeat (anonymous session on the LED PC); screens/{screenId} itself is admin-only.
+      match /presence/{screenId} {
+        allow write: if request.auth != null && request.resource.data.keys().hasOnly(['lastSeen']);
+      }
     }
   }
 }

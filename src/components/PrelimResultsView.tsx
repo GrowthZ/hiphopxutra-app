@@ -193,7 +193,7 @@ export const PrelimResultsView: React.FC = () => {
           <div className="flex items-center gap-2 flex-wrap lg:justify-end">
             {/* Category Toggle */}
             <div className="flex items-center bg-zinc-950 border border-zinc-800 rounded p-1">
-              <button
+              <button data-kiosk-keep
                 onClick={() => {
                   setActiveCategory('newbie_1v1');
                   playAudioEffect('tick');
@@ -206,7 +206,7 @@ export const PrelimResultsView: React.FC = () => {
               >
                 KID NEWBIE 1VS1
               </button>
-              <button
+              <button data-kiosk-keep
                 onClick={() => {
                   setActiveCategory('pro_2v2');
                   playAudioEffect('tick');

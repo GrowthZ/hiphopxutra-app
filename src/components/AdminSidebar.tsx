@@ -32,7 +32,7 @@ export const AdminSidebar: React.FC = () => {
     { id: 'teams', label: 'Ghép đội 2vs2', icon: Shuffle },
     { id: 'bracket', label: 'Nhánh đấu', icon: GitFork },
     { id: 'battle', label: 'Điều hành Battle (9 GK)', icon: Swords },
-    { id: 'stage', label: 'Màn LED Sân khấu', icon: Tv },
+    { id: 'stage_control', label: 'Điều khiển màn LED', icon: Tv },
     { id: 'judge', label: 'Cổng Giám khảo', icon: Smartphone },
     { id: 'dancers', label: 'Danh sách Thí sinh', icon: Users },
     { id: 'storage', label: 'Lưu trữ & Ảnh mẫu', icon: Cloud },

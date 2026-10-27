@@ -153,6 +153,14 @@ Quy ước: **P0** = bắt buộc trước ngày thi · **P1** = nên có · **P
 - Panel xem trước trên `/admin/led` render **cùng component** `<StageScene>` với LED, nên xem trước giống hệt LED.
 - Giữ `BroadcastChannel` làm **đường dự phòng** khi Admin và LED chạy cùng máy mà mất Internet.
 
+> **Đã triển khai (giai đoạn 2), khác bản thiết kế ở 2 điểm:**
+> - **Hiệu ứng không đi qua `effect` trong `StageState`.** Ra sân, lật phiếu và chiến thắng vốn đã gắn vào dữ liệu trận
+>   (`entranceTriggerTimestamp`, `rounds[].isRevealed`, `victoryTriggerTimestamp`). Dữ liệu này đồng bộ qua Firestore từ
+>   giai đoạn 1, nên LED trên máy khác vẫn chạy đúng 1 lần mỗi lần bấm. Thêm kênh `effect` riêng sẽ làm hiệu ứng chạy 2 lần.
+> - **Cảnh hiện có:** `idle`, `battle`, `prelim_leaderboard`. Các cảnh `prelim_current`, `team_draw`, `bracket` cần bố cục
+>   riêng cho LED (các màn admin hiện tại có nút bấm, nền sáng) nên để lại sau.
+> - Trận trên LED dùng chung `activeMatchId` với Bàn điều hành Battle.
+
 ### 4.2 Kiểu dữ liệu
 
 ```ts
@@ -265,7 +273,7 @@ events/{eventId}                         thông tin giải, cấu hình luật
 | Giai đoạn | Nội dung | Stories |
 |---|---|---|
 | **1. Nền tảng** ✅ code xong (chờ bật Firestore để chạy thật) | Router path + redirect hash cũ; Firestore + rules; chuyển state từ `localStorage` sang Firestore | AD-01, KG-01 |
-| **2. Màn LED** | `useStageState`, `useStageController`, trang `/admin/led`, heartbeat, blackout | AD-12, AD-13, LED-01…05 |
+| **2. Màn LED** ✅ code xong (chờ bật Firestore để chạy thật) | `useStageState`, `useStageController`, trang `/admin/led`, heartbeat, blackout | AD-12, AD-13, LED-01…06 |
 | **3. Giám khảo** | Đăng nhập mã GK + PIN, cổng chấm realtime, gửi lại khi mất mạng | AD-03, AD-05, GK-01…08 |
 | **4. Khán giả** | Trang `/ket-qua/*`, công bố kết quả, mã QR | AD-07, KG-02…06 |
 | **5. Hoàn thiện** | Undo, log sửa điểm, xuất kết quả, nhiều màn LED | AD-06, AD-14, AD-15, LED-07 |

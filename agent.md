@@ -59,6 +59,10 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   scores go through `writePrelimScore` (one field), battle votes through `writeBattleVote` (`votes` doc).
 - Teams/matches store dancer **ids**, not copies; `hydrateMatch`/`hydrateTeam` rebuild full objects for the UI.
 - `BroadcastChannel` now carries only same-machine audio/animation cues, never data.
+- LED: `/admin/led` (`StageControlView`, `useStageController`) writes `screens/san-khau-chinh` (scene, theme,
+  blackout); `/led` (`LedScreen`, `useStageState`) renders it in kiosk mode (`.kiosk` hides buttons, blocks clicks)
+  and heartbeats `presence/san-khau-chinh`. Effects (entrance, round reveal, victory) ride on match data, not screens.
+  `/led?preview=1` is the admin preview iframe: no heartbeat, no sound, no writes.
 - URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here

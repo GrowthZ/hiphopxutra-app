@@ -28,7 +28,9 @@ export type SyncedCollection =
   | 'matches'
   | 'judges'
   | 'meta'
-  | 'votes';
+  | 'votes'
+  | 'screens'
+  | 'presence';
 
 export const eventCollection = (name: SyncedCollection) => collection(db, 'events', EVENT_ID, name);
 export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', EVENT_ID, name, id);

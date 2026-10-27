@@ -48,7 +48,7 @@ import {
   matchVotesFromDoc,
   sortJudges,
 } from './tournamentModel';
-import { VIEW_PATHS, viewFromLocation } from '../routes';
+import { IS_LED_PREVIEW, VIEW_PATHS, viewFromLocation } from '../routes';
 import { User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import confetti from 'canvas-confetti';
 
@@ -250,7 +250,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   );
 
   useEffect(() => {
-    if (authReady && !authUser && activeView === 'judge') {
+    // Judges need a session to vote, the LED to send its heartbeat.
+    const needsSession = activeView === 'judge' || (activeView === 'stage' && !IS_LED_PREVIEW);
+    if (authReady && !authUser && needsSession) {
       signInAnonymously(auth).catch((err: Error) => setActionError(`Không đăng nhập ẩn danh được: ${err.message}`));
     }
   }, [authReady, authUser, activeView]);
@@ -337,25 +339,27 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [matchesBase, votes, dancersById, proTeams]);
 
   // ---------- Firestore sync (events/{EVENT_ID}/...) ----------
+  // The /admin/led preview iframe shares the admin's login but must never write a second copy.
+  const canWrite = isAdmin && !IS_LED_PREVIEW;
   const meta = useMemo(
     () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked }],
     [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
   );
   const syncStates = [
-    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite: isAdmin, toDoc: dancerToDoc }),
-    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite: isAdmin, toDoc: dancerToDoc }),
+    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc }),
+    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc }),
     useSyncedCollection('teams', teamsBase, applyRemoteTeams, {
-      canWrite: isAdmin,
+      canWrite,
       toDoc: teamToDoc,
       fromDoc: teamFromDoc,
     }),
     useSyncedCollection('matches', matchesBase, applyRemoteMatches, {
-      canWrite: isAdmin,
+      canWrite,
       toDoc: matchToDoc,
       fromDoc: matchFromDoc,
     }),
-    useSyncedCollection('judges', judges, applyRemoteJudges, { canWrite: isAdmin }),
-    useSyncedCollection('meta', meta, applyRemoteMeta, { canWrite: isAdmin }),
+    useSyncedCollection('judges', judges, applyRemoteJudges, { canWrite }),
+    useSyncedCollection('meta', meta, applyRemoteMeta, { canWrite }),
     useSyncedCollection('votes', [] as MatchVotes[], applyRemoteVotes, {
       canWrite: false,
       fromDoc: matchVotesFromDoc,

@@ -12,7 +12,11 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   battle: '/admin/battle',
   sheets: '/admin/cai-dat/google-sheets',
   storage: '/admin/cai-dat/luu-tru',
+  stage_control: '/admin/led',
 };
+
+/** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */
+export const IS_LED_PREVIEW = new URLSearchParams(window.location.search).has('preview');
 
 const PATH_ALIASES: Record<string, ActiveViewType> = {
   '/': 'prelim_guest',

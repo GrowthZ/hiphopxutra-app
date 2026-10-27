@@ -134,7 +134,12 @@ const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({
   );
 };
 
-export const StageDisplayView: React.FC = () => {
+interface StageDisplayViewProps {
+  /** Set by /admin/led; when present it overrides the local day/night toggle. */
+  theme?: 'daylight' | 'night';
+}
+
+export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => {
   const {
     matches,
     activeMatchId,
@@ -147,7 +152,8 @@ export const StageDisplayView: React.FC = () => {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
-  const [isDaylightHighContrast, setIsDaylightHighContrast] = useState(true); // Default true for outdoor daytime LED screen
+  const [localDaylight, setIsDaylightHighContrast] = useState(true); // Default true for outdoor daytime LED screen
+  const isDaylightHighContrast = theme ? theme === 'daylight' : localDaylight;
 
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
 

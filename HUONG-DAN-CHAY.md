@@ -52,7 +52,8 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 |---|---|---|
 | Khán giả xem Prelim (trang chủ) | `http://localhost:3000/` hoặc `/ket-qua/prelim` | Không |
 | Bảng xếp hạng Prelim | `/ket-qua/bang-xep-hang` | Không |
-| Màn LED sân khấu | `/led` | Không |
+| Màn LED sân khấu (kiosk, bấm 1 lần để toàn màn hình) | `/led` | Tự động (ẩn danh, để báo online) |
+| Điều khiển màn LED | `/admin/led` | Google (admin) |
 | Cổng giám khảo | `/giam-khao` | Tự động (ẩn danh) |
 | Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
 | Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |

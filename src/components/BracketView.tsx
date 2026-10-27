@@ -56,7 +56,7 @@ export const BracketView: React.FC = () => {
 
   const handleSelectMatchForStage = (matchId: string) => {
     setActiveMatchId(matchId);
-    setActiveView('stage');
+    setActiveView('stage_control');
   };
 
   return (

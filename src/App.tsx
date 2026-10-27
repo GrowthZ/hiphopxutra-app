@@ -6,7 +6,8 @@ import { PrelimView } from './components/PrelimView';
 import { TeamDrawView } from './components/TeamDrawView';
 import { BracketView } from './components/BracketView';
 import { BattleOperatorView } from './components/BattleOperatorView';
-import { StageDisplayView } from './components/StageDisplayView';
+import { LedScreen } from './components/LedScreen';
+import { StageControlView } from './components/StageControlView';
 import { JudgePortalView } from './components/JudgePortalView';
 import { PrelimResultsView } from './components/PrelimResultsView';
 import { PrelimGuestView } from './components/PrelimGuestView';
@@ -67,7 +68,7 @@ const MainContent: React.FC = () => {
           </button>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => setActiveView('stage')}
+              onClick={() => setActiveView('stage_control')}
               className="flex items-center gap-1 text-red-400 hover:text-red-300 font-bold cursor-pointer"
             >
               <Tv className="w-3.5 h-3.5" />
@@ -80,23 +81,9 @@ const MainContent: React.FC = () => {
     );
   }
 
-  // Stage Display View (Full-screen / 16:9 broadcast layout)
+  // LED screen: kiosk, controlled from /admin/led
   if (activeView === 'stage') {
-    return (
-      <div className="relative min-h-screen bg-black">
-        {/* Quick exit bar on top */}
-        <div className="absolute top-2 left-2 z-50 opacity-40 hover:opacity-100 transition-opacity flex items-center gap-2">
-          <button
-            onClick={() => setActiveView('battle')}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-zinc-900/90 text-white text-xs font-bold border border-zinc-700 hover:bg-zinc-800 transition-colors shadow-lg cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Về Bàn Điều Hành Battle</span>
-          </button>
-        </div>
-        <StageDisplayView />
-      </div>
-    );
+    return <LedScreen />;
   }
 
   // Judge Portal View (Mobile-first judging view)
@@ -142,6 +129,7 @@ const MainContent: React.FC = () => {
           {activeView === 'dancers' && <DancersListView />}
           {activeView === 'sheets' && <GoogleSheetSyncModal />}
           {activeView === 'storage' && <DancersListView />}
+          {activeView === 'stage_control' && <StageControlView />}
         </main>
       </div>
 

@@ -11,7 +11,21 @@ export type ActiveViewType =
   | 'judge'
   | 'dancers'
   | 'sheets'
-  | 'storage';
+  | 'storage'
+  | 'stage_control';
+
+// What the LED screen shows; written by admins at /admin/led, read by /led.
+export type StageSceneType = 'idle' | 'battle' | 'prelim_leaderboard';
+
+export interface StageState {
+  id: string; // screenId
+  scene: StageSceneType;
+  category: CategoryType; // category for the prelim leaderboard scene
+  theme: 'daylight' | 'night';
+  blackout: boolean; // overrides scene with the idle/logo screen
+  updatedAt: number;
+  updatedBy: string;
+}
 
 export type RoundStage = 'top32' | 'top16' | 'top8' | 'top4' | 'final';
 
