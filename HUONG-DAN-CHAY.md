@@ -2,7 +2,7 @@
 
 App là một **SPA tĩnh** (React + Vite): build ra thư mục `dist/` gồm HTML/JS/CSS, không cần server backend.
 Dữ liệu giải (thí sinh, điểm, đội, trận, phiếu) lưu trên **Cloud Firestore** và đồng bộ realtime giữa mọi thiết bị.
-Đăng nhập chạy qua **Firebase Auth** (cấu hình trong `src/services/firebase.config.json`, project `gen-lang-client-0810099059`).
+Đăng nhập chạy qua **Firebase Auth** (cấu hình trong `src/services/firebase.config.json`, project `hiphopxutra2026`).
 
 ## 0. Cài đặt Firebase (làm 1 lần, bắt buộc)
 
@@ -11,7 +11,7 @@ checklist ngày thi): **[docs/firebase-setup.md](docs/firebase-setup.md)**. Tóm
 
 Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ **"Lỗi đồng bộ dữ liệu"** và không vào được `/admin`.
 
-1. **Bật Firestore:** [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0810099059/firestore)
+1. **Bật Firestore:** [Firebase Console](https://console.firebase.google.com/project/hiphopxutra2026/firestore)
    → **Create database** → chọn vị trí `asia-southeast1` (Singapore) → chế độ **Production**.
 2. **Bật đăng nhập:** Authentication → **Sign-in method** → bật **Google** (admin), **Email/Password** (giám khảo)
    và **Anonymous** (máy LED báo online).
@@ -117,33 +117,23 @@ bun run build      # tạo thư mục dist/
 bun run preview    # (tuỳ chọn) xem thử bản build tại http://localhost:4173
 ```
 
-### Bước 2 — Deploy thư mục `dist/`
+### Bước 2 — Deploy: Vercel (tự động từ GitHub)
 
-Chọn **một** trong các cách sau.
+Repo `GrowthZ/hiphopxutra-app` đã nối với Vercel: **push lên `main` là Vercel tự build và deploy**;
+mỗi pull request có một bản preview riêng. Cấu hình build nằm trong `vercel.json` (`bun install`, `bun run build`,
+thư mục `dist`, rewrite mọi URL về `index.html` để mở thẳng `/led`, `/admin` không bị 404).
 
-#### Cách A — Firebase Hosting (khuyên dùng, cùng project Firebase với app)
+Lần đầu trên Vercel → Project → **Settings → Environment Variables**: thêm `VITE_MEDIA_URL` (link Worker ảnh R2,
+mục 0b) cho Production và Preview, rồi Redeploy.
 
-Repo đã có sẵn `firebase.json` (thư mục `dist`, rewrite mọi URL về `index.html`) và `.firebaserc`:
+`firestore.rules` **không** đi theo Vercel: mỗi khi sửa rules, chạy `bun run deploy:rules`.
 
-```bash
-bun run build
-firebase deploy --only hosting,firestore:rules
-```
-Domain mặc định: `https://gen-lang-client-0810099059.web.app` (Auth tự nhận domain này).
+### Bước 3 — Cho phép domain đăng nhập Google (bắt buộc)
 
-#### Cách B — Hosting tĩnh khác (Vercel, Netlify, Cloudflare Pages…)
-
-- Install command: `bun install` (hoặc `npm install`)
-- Build command: `bun run build` (hoặc `npm run build`)
-- Output directory: `dist`
-- **Bắt buộc:** cấu hình rewrite mọi đường dẫn về `/index.html` (Vercel: `vercel.json` rewrites; Netlify/Cloudflare:
-  file `public/_redirects` với dòng `/* /index.html 200`). Thiếu bước này, mở thẳng `/led` hay `/admin` sẽ bị 404.
-
-### Bước 3 — Cho phép domain đăng nhập Google (bắt buộc với Cách B và domain riêng)
-
-Firebase Console → **Authentication → Settings → Authorized domains** → **Add domain** → thêm domain production
-(ví dụ `hiphopxutra.vercel.app`). Thiếu bước này, nút đăng nhập Google / đồng bộ Sheets sẽ báo lỗi `auth/unauthorized-domain`.
-`localhost` đã được cho phép sẵn.
+Firebase Console → **Authentication → Settings → Authorized domains** → **Add domain** → thêm domain Vercel
+(ví dụ `hiphopxutra-app.vercel.app`, và domain riêng nếu có). Thiếu bước này, nút đăng nhập Google / đồng bộ Sheets
+báo lỗi `auth/unauthorized-domain`. `localhost` đã được cho phép sẵn. Bản preview của pull request có domain khác,
+nên đăng nhập admin trên preview sẽ bị chặn trừ khi thêm domain đó.
 
 ---
 

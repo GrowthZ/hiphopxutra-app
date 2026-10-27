@@ -24,7 +24,8 @@ Product design (roles, user stories, URLs, LED control hooks): `docs/user-storie
 | Production build | `bun run build` |
 | E2E on Firebase emulators (needs JDK 21) | `bun run test:e2e` |
 | Firestore admin tool (prod; `--emulator` for local) | `bun run db` |
-| Deploy hosting + rules / rules only | `bun run deploy` / `bun run deploy:rules` |
+| Deploy web | push `main` (Vercel auto-deploys, see `vercel.json`) |
+| Deploy Firestore rules | `bun run deploy:rules` |
 | Full pre-commit check | `bash scripts/check.sh` |
 
 ## Layout
@@ -96,6 +97,8 @@ worker/                      Cloudflare Worker in front of the R2 photo bucket (
   `VITE_MEDIA_URL/upload/{folder}/{name}-{sha256}.webp` with the admin's Firebase ID token; the Worker checks the
   `admins` doc with that token. Content-hashed names = immutable caching. Dancers upload one half-body photo; the
   avatar is a crop of it (`avatarCrop`, % of the photo, editable later). `MediaStoragePanel` migrates old base64 photos.
+- Firebase project `hiphopxutra2026`; web hosted on Vercel (GitHub integration). MCP servers for Firebase and
+  Vercel are declared in `.mcp.json`.
 - Dev and prod share one Firestore database; `VITE_FIREBASE_EMULATORS=true` switches the app to the local
   emulators. Setup, service-account key, `bun run db` and the emulator workflow: `docs/firebase-setup.md`.
   Test every `firestore.rules` change on the emulators (`bun run test:e2e`) before `bun run deploy:rules`.

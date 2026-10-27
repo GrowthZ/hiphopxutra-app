@@ -1,6 +1,6 @@
 # Cấu hình Firebase & quản trị dữ liệu
 
-Project Firebase: **`gen-lang-client-0810099059`** · Dữ liệu giải: `events/hiphopxutra-2026/…` trên Cloud Firestore.
+Project Firebase: **`hiphopxutra2026`** · Dữ liệu giải: `events/hiphopxutra-2026/…` trên Cloud Firestore.
 
 ## 1. Một database chung cho cả dev và production
 
@@ -10,7 +10,7 @@ dùng **chung** dữ liệu và tài khoản đó.
 | Bạn chạy | Đọc/ghi vào | Dùng khi |
 |---|---|---|
 | `bun run dev` | **Database thật (prod)** | Chuẩn bị giải, nhập thí sinh, chạy thật |
-| `bun run deploy` (web đã deploy) | **Database thật (prod)** | Ngày thi |
+| Web trên Vercel (tự deploy khi push `main`) | **Database thật (prod)** | Ngày thi |
 | `bun run db <lệnh>` | **Database thật (prod)**, có hỏi xác nhận trước khi ghi/xoá | Quản trị admin, sao lưu, khôi phục, xoá dữ liệu |
 | `bun run emulators` + `VITE_FIREBASE_EMULATORS=true bun run dev` | Emulator trên máy (project `demo-hiphopxutra`) | Thử nghiệm thoải mái, dữ liệu mất khi tắt |
 | `bun run test:e2e` | Emulator (tự bật, tự tắt) | Kiểm tra trước khi deploy |
@@ -21,15 +21,15 @@ dùng **chung** dữ liệu và tài khoản đó.
 
 ## 2. Cấu hình project lần đầu (Firebase Console)
 
-Mở [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0810099059).
+Mở [Firebase Console](https://console.firebase.google.com/project/hiphopxutra2026).
 
 1. **Firestore** → *Create database* → vị trí `asia-southeast1` (Singapore) → chế độ **Production**.
 2. **Authentication → Sign-in method**, bật cả 3:
    - **Google**: admin đăng nhập `/admin`.
    - **Email/Password**: tài khoản giám khảo `gk-N@giamkhao.hiphopxutra.vn` (PIN = mật khẩu).
    - **Anonymous**: máy chiếu LED (`/led`) dùng để báo "LED đang online". Thiếu cái này, `/led` báo lỗi 400 khi mở.
-3. **Authentication → Settings → Authorized domains**: `localhost` có sẵn; thêm domain production nếu không
-   dùng `*.web.app` / `*.firebaseapp.com`.
+3. **Authentication → Settings → Authorized domains**: `localhost` có sẵn; **thêm domain Vercel**
+   (vd. `hiphopxutra-app.vercel.app`) và domain riêng nếu có, nếu không đăng nhập Google sẽ báo `auth/unauthorized-domain`.
 4. Đăng nhập Firebase CLI một lần (CLI đã có trong devDependencies, không cần cài global):
    ```bash
    bunx firebase login
@@ -79,7 +79,7 @@ Ví dụ:
 bun run db admin:add hoangdu.tpg@gmail.com "Hoàng"
 bun run db backup                                  # trước ngày thi, sau mỗi vòng
 bun run db reset                                   # sau buổi tập dượt, trước khi chạy thật
-bun run db restore backups/gen-lang-client-0810099059-2026-11-01T08-00-00.json
+bun run db restore backups/hiphopxutra2026-2026-11-01T08-00-00.json
 ```
 
 Sau `reset`, admin mở `/admin` để app nạp lại dữ liệu mẫu (hoặc `restore` một bản sao lưu).
@@ -113,17 +113,19 @@ Lần đầu chạy cần `bunx playwright install chromium`. Khi test hỏng, x
 
 ## 7. Deploy
 
-```bash
-bun run test:e2e        # nên chạy trước
-bun run deploy          # build + đẩy hosting và firestore.rules
-```
+- **Web:** Vercel nối với GitHub, nên push lên `main` là tự deploy (cấu hình trong `vercel.json`). Biến `VITE_MEDIA_URL`
+  đặt trong Vercel → Settings → Environment Variables.
+- **Rules:** không đi theo Vercel. Mỗi khi `firestore.rules` đổi:
 
-`bun run deploy:rules` chỉ đẩy rules (nhanh, không đụng tới web).
+```bash
+bun run test:e2e        # thử rules trên emulator
+bun run deploy:rules    # đẩy rules lên project hiphopxutra2026
+```
 
 ## 8. Checklist trước ngày thi
 
 - [ ] `bun run test:e2e` qua hết.
-- [ ] `bun run deploy` (web và rules mới nhất).
+- [ ] Đã push `main` (Vercel deploy xong) và `bun run deploy:rules`.
 - [ ] Đã bật đủ Google, Email/Password và Anonymous (mục 2).
 - [ ] `bun run db admin:list` có đủ người điều hành.
 - [ ] 9 giám khảo đã có PIN (`/admin/cai-dat/giam-khao`) và đã đăng nhập thử trên đúng điện thoại sẽ dùng.
@@ -131,7 +133,21 @@ bun run deploy          # build + đẩy hosting và firestore.rules
 - [ ] `/admin/led` hiện "LED đang online" khi máy chiếu mở `/led`.
 - [ ] Trong ngày: `bun run db backup` sau mỗi vòng.
 
-## 9. Lỗi thường gặp
+## 9. MCP cho Claude Code (Firebase & Vercel)
+
+`.mcp.json` khai báo 2 MCP server cho dự án, giúp Claude đọc/ghi Firestore, xem Auth, deploy rules (Firebase)
+và xem các bản deploy, log build (Vercel):
+
+| Server | Chạy bằng | Đăng nhập |
+|---|---|---|
+| `firebase` | `bun x firebase mcp` (firebase-tools trong devDependencies, project lấy từ `.firebaserc`) | `bunx firebase login` một lần |
+| `vercel` | `https://mcp.vercel.com` | Trong Claude Code gõ `/mcp` → `vercel` → Authenticate (OAuth) |
+
+Lần đầu mở Claude Code trong thư mục này sẽ được hỏi có cho phép 2 server không; chọn đồng ý.
+Firebase MCP dùng quyền của tài khoản Google đã `firebase login`, nên ghi thẳng vào **prod**; hãy yêu cầu Claude
+`bun run db backup` trước khi nhờ nó sửa dữ liệu.
+
+## 10. Lỗi thường gặp
 
 | Lỗi | Cách xử lý |
 |---|---|

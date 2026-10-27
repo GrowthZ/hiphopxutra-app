@@ -13,7 +13,6 @@
     "test:e2e": "bun scripts/emulators.ts exec \"playwright test\"",
     "emulators": "bun scripts/emulators.ts start",
     "db": "bun scripts/db.ts",
-    "deploy": "bun run build && firebase deploy --only hosting,firestore:rules",
     "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {

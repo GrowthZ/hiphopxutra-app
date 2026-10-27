@@ -8,5 +8,5 @@ binding = "MEDIA"
 bucket_name = "hiphopxutra-media"
 
 [vars]
-FIREBASE_PROJECT_ID = "gen-lang-client-0810099059"
+FIREBASE_PROJECT_ID = "hiphopxutra2026"
 EVENT_ID = "hiphopxutra-2026"

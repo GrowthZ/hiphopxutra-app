@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "firebase": {
+      "type": "stdio",
+      "command": "bun",
+      "args": [
+        "x",
+        "firebase",
+        "mcp"
+      ],
+      "env": {}
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
+    }
+  }
+}
