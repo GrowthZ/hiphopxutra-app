@@ -6,6 +6,9 @@ Dữ liệu giải (thí sinh, điểm, đội, trận, phiếu) lưu trên **Cl
 
 ## 0. Cài đặt Firebase (làm 1 lần, bắt buộc)
 
+Hướng dẫn đầy đủ (database dùng chung dev/prod, khoá service account, script `bun run db`, emulator, test e2e,
+checklist ngày thi): **[docs/firebase-setup.md](docs/firebase-setup.md)**. Tóm tắt:
+
 Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ **"Lỗi đồng bộ dữ liệu"** và không vào được `/admin`.
 
 1. **Bật Firestore:** [Firebase Console](https://console.firebase.google.com/project/gen-lang-client-0810099059/firestore)
@@ -14,11 +17,11 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
    và **Anonymous** (máy LED báo online).
 3. **Đẩy rules bảo mật** (file `firestore.rules`):
    ```bash
-   npm install -g firebase-tools
-   firebase login
-   firebase deploy --only firestore:rules
+   bunx firebase login
+   bun run deploy:rules
    ```
-4. **Thêm admin đầu tiên:** Firestore → **Start collection** theo đường dẫn
+4. **Thêm admin đầu tiên:** `bun run db admin:add <email>` (cần khoá service account, xem docs/firebase-setup.md),
+   hoặc thủ công: Firestore → **Start collection** theo đường dẫn
    `events` / `hiphopxutra-2026` / `admins` / `<email-google-viết-thường>` (document để trống hoặc thêm field `name`).
    Admin sau có thể thêm admin khác theo cùng cách.
 5. Mở `/admin`, đăng nhập Google bằng email vừa thêm. Lần đầu admin vào, dữ liệu đang có trên trình duyệt đó
@@ -26,7 +29,7 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
 6. **Tạo tài khoản giám khảo:** `/admin/cai-dat/giam-khao` → **Tạo 9 tài khoản còn thiếu**. Mỗi GK nhận một PIN 6 số
    (bấm 👁 để xem). Giám khảo mở `/giam-khao`, chọn mã GK, nhập PIN. Lộ PIN thì bấm **Đổi PIN**.
 
-> Muốn **làm lại từ đầu**: xoá collection `events/hiphopxutra-2026/*` (trừ `admins`) trong Console, rồi admin tải lại trang.
+> Muốn **làm lại từ đầu**: `bun run db backup` rồi `bun run db reset` (giữ lại admin và PIN giám khảo), rồi admin tải lại trang.
 
 ## 0b. Kho ảnh Cloudflare R2 (làm 1 lần, bắt buộc trước khi tải ảnh)
 

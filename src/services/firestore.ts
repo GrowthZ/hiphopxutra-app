@@ -1,4 +1,5 @@
 import {
+  connectFirestoreEmulator,
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
@@ -12,7 +13,7 @@ import {
   deleteField,
   FieldPath,
 } from 'firebase/firestore';
-import { app } from './firebase';
+import { app, USE_EMULATORS } from './firebase';
 import { CategoryType } from '../domain/types';
 
 // One Firestore tree per tournament: events/{EVENT_ID}/...
@@ -22,6 +23,7 @@ export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   ignoreUndefinedProperties: true,
 });
+if (USE_EMULATORS) connectFirestoreEmulator(db, '127.0.0.1', 8080);
 
 export type SyncedCollection =
   | 'newbieDancers'

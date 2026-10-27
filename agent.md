@@ -22,6 +22,9 @@ Product design (roles, user stories, URLs, LED control hooks): `docs/user-storie
 | Type check | `bun run lint` |
 | Unit tests (`src/**/*.test.ts`) | `bun run test` |
 | Production build | `bun run build` |
+| E2E on Firebase emulators (needs JDK 21) | `bun run test:e2e` |
+| Firestore admin tool (prod; `--emulator` for local) | `bun run db` |
+| Deploy hosting + rules / rules only | `bun run deploy` / `bun run deploy:rules` |
 | Full pre-commit check | `bash scripts/check.sh` |
 
 ## Layout
@@ -48,6 +51,7 @@ src/
   features/<area>/           one file per view or modal: admin, prelim, dancers, teams, battle, stage, judge,
                              guest, settings
   shared/placeholderAssets.ts fallback avatars and team images
+e2e/                         Playwright specs, run against the emulators (project demo-hiphopxutra)
 scripts/                     dev/maintenance scripts (see scripts/README.md)
 worker/                      Cloudflare Worker in front of the R2 photo bucket (admin-only upload, cached public GET)
 ```
@@ -92,6 +96,9 @@ worker/                      Cloudflare Worker in front of the R2 photo bucket (
   `VITE_MEDIA_URL/upload/{folder}/{name}-{sha256}.webp` with the admin's Firebase ID token; the Worker checks the
   `admins` doc with that token. Content-hashed names = immutable caching. Dancers upload one half-body photo; the
   avatar is a crop of it (`avatarCrop`, % of the photo, editable later). `MediaStoragePanel` migrates old base64 photos.
+- Dev and prod share one Firestore database; `VITE_FIREBASE_EMULATORS=true` switches the app to the local
+  emulators. Setup, service-account key, `bun run db` and the emulator workflow: `docs/firebase-setup.md`.
+  Test every `firestore.rules` change on the emulators (`bun run test:e2e`) before `bun run deploy:rules`.
 - URLs: see `src/app/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here

@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import {
+  connectAuthEmulator,
   createUserWithEmailAndPassword,
   inMemoryPersistence,
   initializeAuth,
@@ -8,8 +9,7 @@ import {
   updatePassword,
 } from 'firebase/auth';
 import { onSnapshot, setDoc } from 'firebase/firestore';
-import firebaseConfig from './firebase.config.json';
-import { auth } from './firebase';
+import { auth, AUTH_EMULATOR_URL, firebaseConfig, USE_EMULATORS } from './firebase';
 import { eventCollection, eventDoc } from './firestore';
 
 // Each judge is a Firebase email/password account; the PIN is the password.
@@ -29,6 +29,7 @@ export const judgeIdFromEmail = (email?: string | null) =>
 const accountsAuth = initializeAuth(initializeApp(firebaseConfig, 'judge-accounts'), {
   persistence: inMemoryPersistence,
 });
+if (USE_EMULATORS) connectAuthEmulator(accountsAuth, AUTH_EMULATOR_URL, { disableWarnings: true });
 
 const generatePin = () => String(crypto.getRandomValues(new Uint32Array(1))[0] % 1_000_000).padStart(6, '0');
 
