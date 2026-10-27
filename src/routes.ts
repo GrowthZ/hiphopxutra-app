@@ -3,6 +3,8 @@ import { ActiveViewType } from './types/tournament';
 export const VIEW_PATHS: Record<ActiveViewType, string> = {
   prelim_guest: '/ket-qua/prelim',
   prelim_results: '/ket-qua/bang-xep-hang',
+  bracket_guest: '/ket-qua/nhanh-dau',
+  match_guest: '/ket-qua/tran', // + '/{matchSlug}'
   judge: '/giam-khao',
   stage: '/led',
   prelim: '/admin/prelim',
@@ -38,6 +40,9 @@ const LEGACY_VIEWS: Record<string, ActiveViewType> = {
 
 export const isAdminView = (view: ActiveViewType) => VIEW_PATHS[view].startsWith('/admin');
 
+/** Guest pages and the LED read only the published copies (publicDancers / publicVotes). */
+export const isPublicView = (view: ActiveViewType) => view === 'stage' || VIEW_PATHS[view].startsWith('/ket-qua');
+
 /** Reads the view from the URL, rewriting legacy hash/query links to their path. */
 export function viewFromLocation(): ActiveViewType {
   const { hash, search, pathname } = window.location;
@@ -49,6 +54,14 @@ export function viewFromLocation(): ActiveViewType {
   }
 
   const path = pathname.replace(/\/+$/, '') || '/';
+  if (path.startsWith(`${VIEW_PATHS.match_guest}/`)) return 'match_guest';
   const exact = (Object.keys(VIEW_PATHS) as ActiveViewType[]).find((v) => VIEW_PATHS[v] === path);
   return exact ?? PATH_ALIASES[path] ?? 'prelim_guest';
 }
+
+/** The data source is fixed per page load; moving between public and private pages reloads the page. */
+export const IS_PUBLIC_SOURCE = isPublicView(viewFromLocation());
+
+/** `/ket-qua/tran/{slug}` -> slug */
+export const matchSlugFromPath = (pathname: string) =>
+  decodeURIComponent(pathname.slice(VIEW_PATHS.match_guest.length + 1).replace(/\/+$/, ''));

@@ -46,9 +46,12 @@ import {
   hydrateMatch,
   hydrateTeam,
   matchVotesFromDoc,
+  matchVotesToDoc,
+  toPublicDancer,
+  toPublicVotes,
   sortJudges,
 } from './tournamentModel';
-import { IS_LED_PREVIEW, VIEW_PATHS, viewFromLocation } from '../routes';
+import { IS_LED_PREVIEW, IS_PUBLIC_SOURCE, VIEW_PATHS, isPublicView, viewFromLocation } from '../routes';
 import { User, onAuthStateChanged, signInAnonymously, signOut } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
 import { eventDoc } from '../services/firestore';
@@ -135,6 +138,9 @@ interface TournamentContextType {
   // Navigation views (each view has its own URL, see src/routes.ts)
   activeView: ActiveViewType;
   setActiveView: (view: ActiveViewType) => void;
+  /** Current URL path (for views with a parameter, e.g. /ket-qua/tran/{slug}). */
+  pathname: string;
+  navigate: (path: string) => void;
 
   // Auth & Firestore sync
   authUser: User | null;
@@ -219,15 +225,29 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [activeCategory, setActiveCategory] = useState<CategoryType>('pro_2v2');
   const [activeView, setActiveViewState] = useState<ActiveViewType>(viewFromLocation);
 
-  const setActiveView = useCallback((view: ActiveViewType) => {
-    if (window.location.pathname !== VIEW_PATHS[view]) {
-      window.history.pushState(null, '', VIEW_PATHS[view]);
+  const [pathname, setPathname] = useState(() => window.location.pathname);
+
+  const navigate = useCallback((path: string) => {
+    if (window.location.pathname === path) return;
+    window.history.pushState(null, '', path);
+    const view = viewFromLocation();
+    // Public pages read published copies, private pages the raw data: switching source needs a fresh load.
+    if (isPublicView(view) !== IS_PUBLIC_SOURCE) {
+      window.location.reload();
+      return;
     }
+    setPathname(path);
     setActiveViewState(view);
   }, []);
 
+  const setActiveView = useCallback((view: ActiveViewType) => navigate(VIEW_PATHS[view]), [navigate]);
+
   useEffect(() => {
-    const onPopState = () => setActiveViewState(viewFromLocation());
+    const onPopState = () => {
+      if (isPublicView(viewFromLocation()) !== IS_PUBLIC_SOURCE) return window.location.reload();
+      setPathname(window.location.pathname);
+      setActiveViewState(viewFromLocation());
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
@@ -297,6 +317,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   const [newbieBase, setNewbieDancers] = useState<Dancer[]>(() => {
+    if (IS_PUBLIC_SOURCE) return []; // guests never see local or sample data
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_newbie`);
       if (saved) {
@@ -309,6 +330,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [proBase, setProDancers] = useState<Dancer[]>(() => {
+    if (IS_PUBLIC_SOURCE) return [];
     try {
       const saved = localStorage.getItem(`${STORAGE_KEY}_pro`);
       if (saved) {
@@ -329,11 +351,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   });
 
   const [teamsBase, setProTeams] = useState<Team2v2[]>(() => {
+    if (IS_PUBLIC_SOURCE) return [];
     const saved = localStorage.getItem(`${STORAGE_KEY}_teams`);
     return saved ? JSON.parse(saved) : INITIAL_PRO_TEAMS;
   });
 
   const [matchesBase, setMatchesBase] = useState<BattleMatch[]>(() => {
+    if (IS_PUBLIC_SOURCE) return [];
     const saved = localStorage.getItem(`${STORAGE_KEY}_matches`);
     return saved ? JSON.parse(saved) : buildInitialMatches();
   });
@@ -370,15 +394,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, [matchesBase, votes, dancersById, proTeams]);
 
   // ---------- Firestore sync (events/{EVENT_ID}/...) ----------
-  // The /admin/led preview iframe shares the admin's login but must never write a second copy.
-  const canWrite = isAdmin && !IS_LED_PREVIEW;
+  // Public pages (/ket-qua/*, /led and its admin preview iframe) only read the published copies, never write.
+  const canWrite = isAdmin && !IS_PUBLIC_SOURCE;
   const meta = useMemo(
     () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked }],
     [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
   );
+  const privateOnly = { enabled: !IS_PUBLIC_SOURCE };
   const syncStates = [
-    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc }),
-    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc }),
+    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
+    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
     useSyncedCollection('teams', teamsBase, applyRemoteTeams, {
       canWrite,
       toDoc: teamToDoc,
@@ -395,9 +420,49 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       canWrite: false,
       fromDoc: matchVotesFromDoc,
       keepLocalWhenEmpty: false,
+      ...privateOnly,
     }),
   ];
-  const syncError = actionError ?? syncStates.find((s) => s.error)?.error ?? null;
+
+  // Publishing (KG-06): an admin client keeps publicDancers / publicVotes in step with the private data,
+  // hiding prelim scores until a dancer is fully scored and battle sides until a round is revealed.
+  const canPublish = canWrite && syncStates.every((s) => s.hydrated);
+  const publicDancers = useMemo(
+    () => [
+      ...newbieBase.map((d) => ({ ...toPublicDancer(d, isNewbieTop32Locked), id: d.id }) as Dancer),
+      ...proBase.map((d) => ({ ...toPublicDancer(d, isProTop32Locked), id: d.id }) as Dancer),
+    ],
+    [newbieBase, proBase, isNewbieTop32Locked, isProTop32Locked]
+  );
+  const publicVotes = useMemo(
+    () => matchesBase.filter((m) => votes[m.id]).map((m) => toPublicVotes(m, votes[m.id])),
+    [matchesBase, votes]
+  );
+  const publicSync = [
+    useSyncedCollection('publicDancers', publicDancers, applyRemotePublicDancers, {
+      canWrite: canPublish,
+      keepLocalWhenEmpty: !IS_PUBLIC_SOURCE,
+      enabled: IS_PUBLIC_SOURCE || canWrite,
+    }),
+    useSyncedCollection('publicVotes', publicVotes, applyRemotePublicVotes, {
+      canWrite: canPublish,
+      toDoc: matchVotesToDoc,
+      fromDoc: matchVotesFromDoc,
+      keepLocalWhenEmpty: !IS_PUBLIC_SOURCE,
+      enabled: IS_PUBLIC_SOURCE || canWrite,
+    }),
+  ];
+  const syncError =
+    actionError ?? [...syncStates, ...publicSync].find((s) => s.error)?.error ?? null;
+
+  function applyRemotePublicDancers(list: Dancer[]) {
+    if (!IS_PUBLIC_SOURCE) return; // the publisher keeps its private data
+    setNewbieDancers(list.filter((d) => d.category === 'newbie_1v1'));
+    setProDancers(list.filter((d) => d.category === 'pro_2v2'));
+  }
+  function applyRemotePublicVotes(list: MatchVotes[]) {
+    if (IS_PUBLIC_SOURCE) applyRemoteVotes(list);
+  }
 
   function applyRemoteTeams(list: Team2v2[]) {
     setProTeams(sortTeams(list));
@@ -1482,6 +1547,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setSheetId,
         activeView,
         setActiveView,
+        pathname,
+        navigate,
         authUser,
         authReady,
         isAdmin,

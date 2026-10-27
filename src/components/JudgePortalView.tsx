@@ -75,7 +75,7 @@ export const JudgePortalView: React.FC = () => {
 
   // Initialize selected side from current round if exists
   React.useEffect(() => {
-    if (existingVote) {
+    if (existingVote === 'red' || existingVote === 'blue') {
       setSelectedSide(existingVote);
       setIsVoteSubmitted(true);
     } else {

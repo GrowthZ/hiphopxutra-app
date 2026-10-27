@@ -9,6 +9,8 @@ interface Options<T> {
   fromDoc?: (id: string, data: DocumentData) => T;
   /** Keep local items when the remote collection is empty, so an admin seeds it. */
   keepLocalWhenEmpty?: boolean;
+  /** false = neither read nor write this collection (e.g. private data on a public page). */
+  enabled?: boolean;
 }
 
 // JSON round-trip drops undefined fields, which Firestore can't store.
@@ -24,7 +26,13 @@ export function useSyncedCollection<T extends { id: string }>(
   name: SyncedCollection,
   items: T[],
   applyRemote: (items: T[]) => void,
-  { canWrite, toDoc = plain, fromDoc = (id, data) => ({ ...data, id }) as T, keepLocalWhenEmpty = true }: Options<T>
+  {
+    canWrite,
+    toDoc = plain,
+    fromDoc = (id, data) => ({ ...data, id }) as T,
+    keepLocalWhenEmpty = true,
+    enabled = true,
+  }: Options<T>
 ) {
   const synced = useRef(new Map<string, DocumentData>()); // id -> last known remote document
   const [hydrated, setHydrated] = useState(false);
@@ -37,26 +45,25 @@ export function useSyncedCollection<T extends { id: string }>(
     fromDocRef.current = fromDoc;
   });
 
-  useEffect(
-    () =>
-      onSnapshot(
-        eventCollection(name),
-        { includeMetadataChanges: true },
-        (snap) => {
-          // An empty cache says nothing about the server; wait for the real answer.
-          if (snap.metadata.fromCache && snap.empty) return;
-          setError(null);
-          setHydrated(true);
-          if (snap.docChanges().length === 0 && synced.current.size === snap.size) return;
-          synced.current = new Map(snap.docs.map((d) => [d.id, d.data()]));
-          if (!snap.empty || !keepLocalWhenEmpty) {
-            applyRef.current(snap.docs.map((d) => fromDocRef.current(d.id, d.data())));
-          }
-        },
-        (err) => setError(err.message)
-      ),
-    [name, keepLocalWhenEmpty]
-  );
+  useEffect(() => {
+    if (!enabled) return;
+    return onSnapshot(
+      eventCollection(name),
+      { includeMetadataChanges: true },
+      (snap) => {
+        // An empty cache says nothing about the server; wait for the real answer.
+        if (snap.metadata.fromCache && snap.empty) return;
+        setError(null);
+        setHydrated(true);
+        if (snap.docChanges().length === 0 && synced.current.size === snap.size) return;
+        synced.current = new Map(snap.docs.map((d) => [d.id, d.data()]));
+        if (!snap.empty || !keepLocalWhenEmpty) {
+          applyRef.current(snap.docs.map((d) => fromDocRef.current(d.id, d.data())));
+        }
+      },
+      (err) => setError(err.message)
+    );
+  }, [name, keepLocalWhenEmpty, enabled]);
 
   useEffect(() => {
     if (!hydrated || !canWrite) return;

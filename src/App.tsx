@@ -14,6 +14,7 @@ import { JudgeAccountsView } from './components/JudgeAccountsView';
 import { JudgePortalView } from './components/JudgePortalView';
 import { PrelimResultsView } from './components/PrelimResultsView';
 import { PrelimGuestView } from './components/PrelimGuestView';
+import { GuestBracketView, GuestMatchView } from './components/GuestBattleView';
 import { DancersListView } from './components/DancersListView';
 import { GoogleSheetSyncModal } from './components/GoogleSheetSyncModal';
 import { StorageConfigModal } from './components/StorageConfigModal';
@@ -59,6 +60,8 @@ const MainContent: React.FC = () => {
   if (activeView === 'prelim_guest') {
     return <PrelimGuestView />;
   }
+  if (activeView === 'bracket_guest') return <GuestBracketView />;
+  if (activeView === 'match_guest') return <GuestMatchView />;
 
   // Prelim Results Public / Stage Leaderboard View
   if (activeView === 'prelim_results') {

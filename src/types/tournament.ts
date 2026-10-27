@@ -4,6 +4,8 @@ export type ActiveViewType =
   | 'prelim'
   | 'prelim_results'
   | 'prelim_guest'
+  | 'bracket_guest'
+  | 'match_guest'
   | 'teams'
   | 'bracket'
   | 'battle'
@@ -79,7 +81,8 @@ export interface BattleSide {
 
 export interface BattleRound {
   roundNumber: number;
-  votes: Record<string, 'red' | 'blue' | null>; // judgeId -> 'red' | 'blue' | null
+  // judgeId -> side; 'hidden' = voted but not revealed yet (public copy read by guests and the LED)
+  votes: Record<string, 'red' | 'blue' | 'hidden' | null>;
   redVotesCount: number;
   blueVotesCount: number;
   winner?: 'red' | 'blue' | null;

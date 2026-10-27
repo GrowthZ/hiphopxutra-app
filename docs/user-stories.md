@@ -275,7 +275,7 @@ events/{eventId}                         thông tin giải, cấu hình luật
 | **1. Nền tảng** ✅ code xong (chờ bật Firestore để chạy thật) | Router path + redirect hash cũ; Firestore + rules; chuyển state từ `localStorage` sang Firestore | AD-01, KG-01 |
 | **2. Màn LED** ✅ code xong (chờ bật Firestore để chạy thật) | `useStageState`, `useStageController`, trang `/admin/led`, heartbeat, blackout | AD-12, AD-13, LED-01…06 |
 | **3. Giám khảo** ✅ code xong (rules chưa test trên emulator) | Đăng nhập mã GK + PIN, cổng chấm realtime, gửi lại khi mất mạng | AD-03, AD-05, GK-01…08 |
-| **4. Khán giả** | Trang `/ket-qua/*`, công bố kết quả, mã QR | AD-07, KG-02…06 |
+| **4. Khán giả** ✅ code xong (rules chưa test trên emulator) | Trang `/ket-qua/*`, công bố kết quả, mã QR | AD-07, KG-02…06 |
 | **5. Hoàn thiện** | Undo, log sửa điểm, xuất kết quả, nhiều màn LED | AD-06, AD-14, AD-15, LED-07 |
 
 **Diễn tập bắt buộc trước ngày thi:** 1 laptop admin + 1 PC LED + 9 điện thoại giám khảo trên mạng thật tại địa điểm,

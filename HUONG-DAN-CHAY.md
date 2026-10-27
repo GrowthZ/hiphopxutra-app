@@ -55,6 +55,8 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 |---|---|---|
 | Khán giả xem Prelim (trang chủ) | `http://localhost:3000/` hoặc `/ket-qua/prelim` | Không |
 | Bảng xếp hạng Prelim | `/ket-qua/bang-xep-hang` | Không |
+| Nhánh đấu + trận đang diễn ra | `/ket-qua/nhanh-dau` | Không |
+| Chi tiết 1 trận (link chia sẻ được) | `/ket-qua/tran/pro-top16-01`, `/ket-qua/tran/newbie-final-01`… | Không |
 | Màn LED sân khấu (kiosk, bấm 1 lần để toàn màn hình) | `/led` | Tự động (ẩn danh, để báo online) |
 | Điều khiển màn LED | `/admin/led` | Google (admin) |
 | Cổng giám khảo | `/giam-khao` | Mã GK + PIN 6 số (1 máy / 1 GK) |
@@ -62,6 +64,8 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 | Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
 | Check-in thí sinh (cấp SBD N001… / P001…) | `/admin/check-in` | Google (admin) |
 | Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |
+
+Trang `/ket-qua/*` và `/led` chỉ đọc **bản công bố** (khán giả không xem được điểm đang chấm dở, kể cả khi rành kỹ thuật).
 
 Link cũ (`#stage`, `#judge`, `#guest`, `#khach`, `#prelim_results`, `?view=...`) vẫn dùng được, tự chuyển sang URL mới.
 Với production, thay `http://localhost:3000` bằng domain thật.
@@ -138,6 +142,7 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 | Giám khảo báo "Sai mã PIN" dù nhập đúng | Kiểm tra đã bấm **Tạo tài khoản** cho GK đó ở `/admin/cai-dat/giam-khao` |
 | Giám khảo bị đăng xuất giữa chừng | Mã GK đó vừa đăng nhập trên máy khác (mỗi GK chỉ 1 máy), hoặc admin vừa đổi PIN |
 | Giám khảo không gửi được điểm/phiếu (`permission-denied`) | Chưa deploy `firestore.rules` mới, Prelim đã chốt, hoặc hiệp đã công bố |
+| Trang `/ket-qua` không có điểm / phiếu | Bình thường: điểm Prelim chỉ hiện khi thí sinh đã đủ 4 GK chấm (hoặc đã chốt Top 32), phiếu battle chỉ hiện sau khi lật/công bố hiệp. Kết quả do máy admin đẩy lên, nên phải có ít nhất 1 máy admin đang mở `/admin/...` |
 | Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
 | Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |

@@ -25,12 +25,13 @@ import {
   DEFAULT_JUDGE_AVATAR,
 } from '../utils/placeholderAssets';
 import { BattleSide } from '../types/tournament';
+import { isRoundOpen } from '../context/tournamentModel';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
 
 interface JudgeBallotCardProps {
   judgeCode: string;
   judgeIndex: number;
-  vote?: 'red' | 'blue' | null;
+  vote?: 'red' | 'blue' | 'hidden' | null;
   isRevealed: boolean;
   revealStartTime?: number;
 }
@@ -68,7 +69,7 @@ const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({
           setIsFlipping(true);
           setHasFlipped(true);
           try {
-            soundFX.playCardFlipTick(judgeIndex, vote || undefined);
+            soundFX.playCardFlipTick(judgeIndex, vote === 'red' || vote === 'blue' ? vote : undefined);
           } catch {
             // ignore
           }
@@ -109,7 +110,7 @@ const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({
   }
 
   // Display submitted ballot with Green checkmark (Waiting for reveal flip)
-  const hasVoted = vote === 'red' || vote === 'blue';
+  const hasVoted = vote != null;
   if (hasVoted) {
     return (
       <div
@@ -239,7 +240,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
     const newlyRevealedRounds: number[] = [];
 
     match.rounds.forEach((r) => {
-      if (r.isRevealed || r.isConfirmed) {
+      if (isRoundOpen(r)) {
         currentlyRevealed.add(r.roundNumber);
         if (!prevRevealedRoundsRef.current.has(r.roundNumber)) {
           newlyRevealedRounds.push(r.roundNumber);
@@ -708,7 +709,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
               {match?.rounds.map((round) => {
                 const isCurrent = round.roundNumber === match.currentRound;
                 const isTieBreak = round.isTieBreak || round.roundNumber > (match.category === 'newbie_1v1' ? 2 : 4);
-                const isRevealed = Boolean(round.isConfirmed || round.isRevealed);
+                const isRevealed = isRoundOpen(round);
                 const votesCount = Object.keys(round.votes).length;
 
                 return (

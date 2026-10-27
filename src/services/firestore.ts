@@ -31,6 +31,8 @@ export type SyncedCollection =
   | 'judges'
   | 'meta'
   | 'votes'
+  | 'publicDancers'
+  | 'publicVotes'
   | 'screens'
   | 'presence'
   | 'counters'

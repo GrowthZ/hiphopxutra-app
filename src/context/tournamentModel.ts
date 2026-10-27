@@ -7,7 +7,7 @@ import { BattleMatch, BattleRound, BattleSide, Dancer, Judge, RoundStage, Team2v
 
 export const PRELIM_JUDGE_IDS = ['gk-1', 'gk-2', 'gk-3', 'gk-4'];
 
-export type Votes = Record<string, Record<string, 'red' | 'blue'>>; // `r{round}` -> judgeId -> side
+export type Votes = Record<string, Record<string, 'red' | 'blue' | 'hidden'>>; // `r{round}` -> judgeId -> side
 export interface MatchVotes {
   id: string; // matchId
   rounds: Votes;
@@ -134,7 +134,37 @@ export const hydrateTeam = (t: Team2v2, dancersById: Map<string, Dancer>): Team2
 });
 
 export const matchVotesFromDoc = (id: string, data: DocumentData): MatchVotes => ({ id, rounds: data as Votes });
+export const matchVotesToDoc = (v: MatchVotes): DocumentData => v.rounds;
+
+// ---------- Published copies for guests and the LED (KG-06) ----------
+// An admin client derives these from the private collections; rules keep the private ones unreadable to guests.
+
+/** A dancer's prelim scores go public once all prelim judges have scored, or when the category is locked. */
+export function toPublicDancer(d: Dancer, categoryLocked: boolean): DocumentData {
+  const complete = PRELIM_JUDGE_IDS.every((j) => typeof d.prelimScores?.[j] === 'number');
+  return { ...dancerToDoc(d), prelimScores: complete || categoryLocked ? d.prelimScores : {} };
+}
+
+/** A round's sides go public once the admin reveals or confirms it; before that only "has voted" shows. */
+export function toPublicVotes(m: BattleMatch, votes: Votes): MatchVotes {
+  const rounds = Object.fromEntries(
+    Object.entries(votes).map(([key, roundVotes]) => {
+      const round = m.rounds.find((r) => `r${r.roundNumber}` === key);
+      const open = round?.isConfirmed || round?.isRevealed;
+      return [key, open ? roundVotes : Object.fromEntries(Object.keys(roundVotes).map((j) => [j, 'hidden' as const]))];
+    })
+  );
+  return { id: m.id, rounds };
+}
+
+/** Friendly id for /ket-qua/tran/{slug}, e.g. `pro-top8-02`. */
+export const matchSlug = (m: BattleMatch) =>
+  `${m.category === 'pro_2v2' ? 'pro' : 'newbie'}-${m.stage}-${String(m.matchNumber).padStart(2, '0')}`;
 
 // ---------- Judges ----------
 export const sortJudges = (judges: Judge[]) =>
   [...judges].sort((a, b) => Number(a.id.split('-')[1]) - Number(b.id.split('-')[1]));
+
+/** Sides of a round may be shown: revealed/confirmed, and (on public pages) the published votes have arrived. */
+export const isRoundOpen = (r: BattleRound) =>
+  Boolean(r.isRevealed || r.isConfirmed) && !Object.values(r.votes).includes('hidden');

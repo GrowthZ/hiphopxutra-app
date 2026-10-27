@@ -22,6 +22,7 @@ import {
   X,
   ArrowLeft,
   Tv,
+  Swords,
 } from 'lucide-react';
 import {
   getDancerHalfBodyUrl,
@@ -168,6 +169,13 @@ export const PrelimGuestView: React.FC = () => {
 
           {/* Right Action Tools for Guests */}
           <div className="flex items-center gap-2 self-end sm:self-center">
+            <button
+              onClick={() => setActiveView('bracket_guest')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-bold transition-colors cursor-pointer"
+            >
+              <Swords className="w-3.5 h-3.5" />
+              <span>Nhánh đấu</span>
+            </button>
             {/* Share / QR Modal Button */}
             <button
               onClick={() => setIsShareModalOpen(true)}

@@ -67,6 +67,11 @@ scripts/                     dev/maintenance scripts (see scripts/README.md)
   blackout); `/led` (`LedScreen`, `useStageState`) renders it in kiosk mode (`.kiosk` hides buttons, blocks clicks)
   and heartbeats `presence/san-khau-chinh`. Effects (entrance, round reveal, victory) ride on match data, not screens.
   `/led?preview=1` is the admin preview iframe: no heartbeat, no sound, no writes.
+- Public pages (`/ket-qua/*`, `/led`, `IS_PUBLIC_SOURCE` in `routes.ts`) read only `publicDancers` (prelim scores
+  once all 4 prelim judges scored or Top 32 is locked) and `publicVotes` (sides masked as `hidden` until the round is
+  revealed/confirmed) plus the public-safe `teams`, `matches`, `judges`, `meta`. Any admin client on an admin page
+  derives and writes these (`toPublicDancer`, `toPublicVotes`); rules keep raw dancers/votes to admins + judges.
+  Moving between public and private pages reloads the page so the data source never mixes.
 - URLs: see `src/routes.ts` and the table in `HUONG-DAN-CHAY.md`.
 
 ## How to work here
