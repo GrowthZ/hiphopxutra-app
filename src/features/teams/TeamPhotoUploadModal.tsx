@@ -82,9 +82,14 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
         <div className="flex items-center gap-2 p-2.5 rounded bg-zinc-50 border border-zinc-200 text-xs text-zinc-500">
           <Cloud className="w-4 h-4 text-amber-600" />
           {MEDIA_URL
-            ? 'Ảnh được thu nhỏ, nén WebP và lưu trên Cloudflare R2.'
+            ? 'Ảnh được thu nhỏ, nén WebP và lưu trên Cloudflare R2. Nền trong suốt được giữ nguyên.'
             : 'Chưa cấu hình kho ảnh R2 (VITE_MEDIA_URL): chỉ dán link ảnh được.'}
         </div>
+
+        <p className="text-[11px] leading-relaxed text-zinc-500">
+          Ảnh ghép 2 thí sinh cho LED: <b className="text-zinc-700">PNG nền trong suốt</b>, khung ngang 4:3 (khoảng
+          1600×1200), 2 người cùng tỉ lệ, mép dưới cắt ngang hông/đùi và chạm đáy ảnh, chừa một ít khoảng trống phía trên đầu.
+        </p>
 
         {errorMessage && (
           <div className="p-2.5 rounded bg-red-50 border border-red-200 text-red-700 text-xs font-semibold">

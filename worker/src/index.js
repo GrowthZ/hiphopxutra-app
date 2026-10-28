@@ -1,12 +1,12 @@
 // Media Worker in front of the R2 bucket.
-//   PUT /upload/{folder}/{name}.webp|.jpg  admin-only (Firebase ID token), stores the image
-//   GET /{folder}/{name}.webp|.jpg         public, cached at the edge and in browsers for a year
-// (.jpg: Safari can't encode WebP, so iPhones upload JPEG instead.)
+//   PUT /upload/{folder}/{name}.webp|.jpg|.png  admin-only (Firebase ID token), stores the image
+//   GET /{folder}/{name}.webp|.jpg|.png     public, cached at the edge and in browsers for a year
+// (Safari can't encode WebP: iPhones upload JPEG, or PNG for cut-out photos that must keep their transparency.)
 // File names are content hashes, so a URL never changes meaning and can be cached as immutable.
 
 const FOLDERS = ['dancers', 'teams', 'judges', 'placeholders'];
-const KEY_PATTERN = new RegExp(`^(${FOLDERS.join('|')})/[A-Za-z0-9_-]{1,80}\\.(webp|jpg)$`);
-const TYPES = { webp: 'image/webp', jpg: 'image/jpeg' };
+const KEY_PATTERN = new RegExp(`^(${FOLDERS.join('|')})/[A-Za-z0-9_-]{1,80}\\.(webp|jpg|png)$`);
+const TYPES = { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png' };
 const BTC_DOMAIN = '@btc.hiphopxutra.vn';
 const MAX_BYTES = 3 * 1024 * 1024;
 const ADMIN_CACHE_MS = 5 * 60 * 1000;
@@ -63,13 +63,15 @@ async function isAdmin(token, env) {
 /** Checks the file really is what its name says (a mislabelled PNG would be served with the wrong type). */
 function matchesType(bytes, ext) {
   const ascii = (from, to) => String.fromCharCode(...bytes.subarray(from, to));
-  return ext === 'webp' ? ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP' : bytes[0] === 0xff && bytes[1] === 0xd8;
+  if (ext === 'webp') return ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP';
+  if (ext === 'png') return bytes[0] === 0x89 && ascii(1, 4) === 'PNG';
+  return bytes[0] === 0xff && bytes[1] === 0xd8;
 }
 
 async function upload(request, env, key) {
   if (!KEY_PATTERN.test(key)) return json(400, { error: 'Tên file không hợp lệ.' });
   const ext = key.split('.').pop();
-  if (request.headers.get('Content-Type') !== TYPES[ext]) return json(415, { error: 'Chỉ nhận ảnh WebP hoặc JPEG.' });
+  if (request.headers.get('Content-Type') !== TYPES[ext]) return json(415, { error: 'Chỉ nhận ảnh WebP, JPEG hoặc PNG.' });
 
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
   if (!token || !(await isAdmin(token, env))) return json(403, { error: 'Chỉ admin được tải ảnh lên.' });
@@ -77,7 +79,7 @@ async function upload(request, env, key) {
   const body = await request.arrayBuffer();
   if (body.byteLength === 0 || body.byteLength > MAX_BYTES) return json(413, { error: 'Ảnh rỗng hoặc lớn hơn 3MB.' });
 
-  if (!matchesType(new Uint8Array(body), ext)) return json(415, { error: 'Nội dung file không phải ảnh WebP/JPEG.' });
+  if (!matchesType(new Uint8Array(body), ext)) return json(415, { error: 'Nội dung file không đúng định dạng ảnh.' });
 
   // Names are content hashes: the same key means the same bytes, so a retry or re-upload is free.
   if (!(await env.MEDIA.head(key))) {

@@ -76,12 +76,50 @@ test('Safari-style browser without WebP encoding uploads JPEG', async ({ page })
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = 600;
-    canvas.getContext('2d')!.fillRect(0, 0, 400, 300);
+    canvas.getContext('2d')!.fillRect(0, 0, 800, 600); // an ordinary, fully opaque photo
     const png = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), 'image/png'));
     return media.uploadPhoto(png, 'teams', 'e2e-safari');
   });
   expect(url).toMatch(/\.jpg$/);
   expect((await fetch(url)).headers.get('content-type')).toBe('image/jpeg');
+});
+
+test('cut-out photos keep their transparent background (WebP, and PNG on Safari)', async ({ page }) => {
+  await signInAdmin(page);
+  const result = await page.evaluate(async () => {
+    // @ts-expect-error served by the Vite dev server, not resolvable by tsc
+    const media: typeof import('../src/services/media') = await import('/src/services/media.ts');
+    // Two dancers cut out on a transparent background, like an AI team composite.
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1800;
+    const ctx = canvas.getContext('2d')!;
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(500, 300, 500, 1500);
+    ctx.fillStyle = '#2563eb';
+    ctx.fillRect(1400, 300, 500, 1500);
+    const png = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), 'image/png'));
+    const cornerAlpha = async (url: string) => {
+      const bitmap = await createImageBitmap(await (await fetch(url)).blob());
+      const c = new OffscreenCanvas(bitmap.width, bitmap.height).getContext('2d')!;
+      c.drawImage(bitmap, 0, 0);
+      return [c.getImageData(5, 5, 1, 1).data[3], c.getImageData(Math.round(bitmap.width * 0.3), bitmap.height - 5, 1, 1).data[3]];
+    };
+    const webpUrl = await media.uploadPhoto(png, 'teams', 'e2e-cutout');
+    // Safari: no WebP encoder.
+    const toBlob = HTMLCanvasElement.prototype.toBlob;
+    HTMLCanvasElement.prototype.toBlob = function (cb, type, q) {
+      return toBlob.call(this, cb, type === 'image/webp' ? 'image/png' : type, q);
+    };
+    const safariUrl = await media.uploadPhoto(png, 'teams', 'e2e-cutout-safari');
+    return { webpUrl, safariUrl, webpAlpha: await cornerAlpha(webpUrl), safariAlpha: await cornerAlpha(safariUrl) };
+  });
+  // Corner: see-through; inside a dancer: solid.
+  expect(result.webpUrl).toMatch(/\.webp$/);
+  expect(result.webpAlpha).toEqual([0, 255]);
+  expect(result.safariUrl).toMatch(/\.png$/);
+  expect(result.safariAlpha).toEqual([0, 255]);
+  expect((await fetch(result.safariUrl)).headers.get('content-type')).toBe('image/png');
 });
 
 test('Worker refuses non-admins, check-in staff and mislabelled files', async () => {
