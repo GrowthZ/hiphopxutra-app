@@ -195,7 +195,7 @@
   .led-rise, .led-shine, .led-flash, .led-ticker-in { animation: none; }
 }
 
-/* Arch LED: RED WIN / BLUE WIN pops in when a result is announced */
+/* LED battle (16:9 and arch): RED WIN / BLUE WIN pops in when a result is announced */
 @keyframes led-pop {
   0% { opacity: 0; transform: scale(0.6); }
   60% { opacity: 1; transform: scale(1.08); }

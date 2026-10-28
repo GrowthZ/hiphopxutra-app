@@ -360,6 +360,20 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
     return code;
   };
 
+  // Announced result: the match winner once it's over, else the last revealed round until the next round's votes
+  // start coming in. Drives RED WIN / BLUE WIN in the centre and greys out the losing side.
+  const announcedWinner: 'red' | 'blue' | null = (() => {
+    if (!match) return null;
+    if (match.status === 'finished' && match.winnerSide) return match.winnerSide;
+    const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
+    if (current && !isRoundOpen(current) && Object.values(current.votes).some(Boolean)) return null;
+    const lastOpen = [...match.rounds].reverse().find(isRoundOpen);
+    return lastOpen?.winner ?? null;
+  })();
+  const announcedRound = match ? [...match.rounds].reverse().find(isRoundOpen) : undefined;
+  const loserDim = (side: 'red' | 'blue') =>
+    announcedWinner && announcedWinner !== side ? 'grayscale opacity-35 transition-all duration-700' : 'transition-all duration-700';
+
   const redBreakerName = getBreakerName(match?.sideRed);
   const blueBreakerName = getBreakerName(match?.sideBlue);
 
@@ -539,6 +553,33 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
         className="relative z-10 flex-1 flex flex-col justify-center pt-1 pb-3 sm:pb-5 my-auto overflow-hidden"
       >
         <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8 items-end px-1 sm:px-4 relative">
+          {announcedWinner && (
+            <div
+              key={`win-${announcedWinner}-${announcedRound?.roundNumber}-${match?.status}`}
+              className="led-pop pointer-events-none absolute inset-x-0 top-[6%] z-20 flex flex-col items-center"
+            >
+              <span
+                className={`font-condensed text-[11vw] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
+                  announcedWinner === 'red'
+                    ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.95)] [-webkit-text-stroke:0.35vw_#dc2626]'
+                    : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.95)] [-webkit-text-stroke:0.35vw_#2563eb]'
+                }`}
+              >
+                {announcedWinner === 'red' ? 'Red' : 'Blue'} win
+              </span>
+              <span
+                className={`mt-2 rounded-full px-5 py-1.5 font-condensed text-[2vw] font-black uppercase leading-none text-white ${
+                  announcedWinner === 'red' ? 'bg-red-600' : 'bg-blue-600'
+                }`}
+              >
+                {match?.status === 'finished'
+                  ? 'Chung cuộc'
+                  : announcedRound?.isTieBreak
+                    ? 'Tie-break'
+                    : `Round ${announcedRound?.roundNumber ?? ''}`}
+              </span>
+            </div>
+          )}
 
           {/* =====================================================================
               RED CORNER CARD (Cột đấu Góc Đỏ - Lướt từ ngoài bên trái vào)
@@ -547,7 +588,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
             isEntranceActive ? 'animate-entrance-left' : ''
           }`}>
             {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
-            <div className="w-full h-56 sm:h-72 md:h-80 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none">
+            <div className={`w-full h-56 sm:h-72 md:h-80 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none ${loserDim('red')}`}>
               {match?.category === 'pro_2v2' ? (
                 <TeamPhoto
                   photoUrl={match.sideRed.teamPhotoUrl}
@@ -570,7 +611,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
             </div>
 
             {/* Bảng tên Góc Đỏ & Hộp điểm */}
-            <div className="w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10">
+            <div className={`w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10 ${loserDim('red')}`}>
               {/* Bảng tên Đỏ */}
               <div className="flex-1 min-w-0 flex items-center rounded-xl sm:rounded-2xl bg-gradient-to-r from-red-600 via-red-600 to-red-500 border-2 sm:border-3 border-red-400 p-2 sm:p-3 shadow-[0_12px_35px_rgba(220,38,38,0.5)]">
                 {/* Flag Badge on Left */}
@@ -625,7 +666,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
             isEntranceActive ? 'animate-entrance-right' : ''
           }`}>
             {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
-            <div className="w-full h-56 sm:h-72 md:h-84 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none">
+            <div className={`w-full h-56 sm:h-72 md:h-84 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none ${loserDim('blue')}`}>
               {match?.category === 'pro_2v2' ? (
                 <TeamPhoto
                   photoUrl={match.sideBlue.teamPhotoUrl}
@@ -648,7 +689,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
             </div>
 
             {/* Hộp điểm & Bảng tên Góc Xanh */}
-            <div className="w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10 flex-row-reverse md:flex-row">
+            <div className={`w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10 flex-row-reverse md:flex-row ${loserDim('blue')}`}>
               {/* Hộp điểm Xanh */}
               <div className="w-16 sm:w-24 md:w-28 lg:w-32 h-16 sm:h-24 md:h-28 lg:h-32 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 border-2 sm:border-3 border-blue-400 flex items-center justify-center font-condensed font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-white shrink-0 tabular-nums shadow-[0_0_35px_rgba(59,130,246,0.7)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]">
                 {match?.roundWinsBlue ?? 0}
