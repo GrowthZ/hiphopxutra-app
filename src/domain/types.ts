@@ -5,6 +5,7 @@ export type ActiveViewType =
   | 'prelim_results'
   | 'prelim_guest'
   | 'prelim_screen'
+  | 'prelim_screen_led'
   | 'bracket_guest'
   | 'match_guest'
   | 'teams'

@@ -34,6 +34,7 @@ export const AdminSidebar: React.FC = () => {
     { id: 'prelim_results', label: 'Bảng Kết quả Prelim (LED)', icon: Trophy },
     { id: 'prelim_guest', label: 'Khách xem Prelim (Mobile)', icon: Eye },
     { id: 'prelim_screen', label: 'Màn chiếu Prelim (16:9)', icon: MonitorPlay },
+    { id: 'prelim_screen_led', label: 'Màn chiếu Prelim (LED tối)', icon: MonitorPlay },
     { id: 'teams', label: 'Ghép đội 2vs2', icon: Shuffle },
     { id: 'bracket', label: 'Nhánh đấu', icon: GitFork },
     { id: 'battle', label: 'Điều hành Battle (9 GK)', icon: Swords },

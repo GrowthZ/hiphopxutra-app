@@ -169,3 +169,28 @@
 .kiosk button:not([data-kiosk-keep]) {
   display: none;
 }
+
+/* Audience leaderboard (/ket-qua/trinh-chieu, -led): rows rise in, podium shine, fresh-score glow, ticker slide */
+@keyframes led-rise {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes led-shine {
+  0% { transform: translateX(-120%) skewX(-20deg); }
+  55%, 100% { transform: translateX(380%) skewX(-20deg); }
+}
+@keyframes led-flash {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.9), 0 0 40px rgba(251, 191, 36, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(251, 191, 36, 1), 0 0 90px rgba(239, 68, 68, 0.7); }
+}
+@keyframes led-ticker-in {
+  from { opacity: 0; transform: translateX(-60px); }
+  to { opacity: 1; transform: none; }
+}
+.led-rise { animation: led-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.led-shine { animation: led-shine 4.5s ease-in-out infinite; }
+.led-flash { animation: led-flash 1.2s ease-in-out infinite; }
+.led-ticker-in { animation: led-ticker-in 0.5s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .led-rise, .led-shine, .led-flash, .led-ticker-in { animation: none; }
+}

@@ -59,11 +59,21 @@ const RankBadge: React.FC<{ rank: number; scored: boolean }> = ({ rank, scored }
     </span>
   );
 
-export const Avatar: React.FC<{ dancer: Dancer; size: string }> = ({ dancer, size }) =>
+export const Avatar: React.FC<{ dancer: Dancer; size: string; dark?: boolean }> = ({ dancer, size, dark }) =>
   dancer.avatarUrl ? (
-    <img src={dancer.avatarUrl} alt="" loading="lazy" decoding="async" className={`${size} shrink-0 rounded-full object-cover bg-zinc-100`} />
+    <img
+      src={dancer.avatarUrl}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      className={`${size} shrink-0 rounded-full object-cover ${dark ? 'bg-white/10 ring-2 ring-white/20' : 'bg-zinc-100'}`}
+    />
   ) : (
-    <span className={`${size} shrink-0 rounded-full bg-zinc-100 text-zinc-400 font-condensed font-black flex items-center justify-center`}>
+    <span
+      className={`${size} shrink-0 rounded-full font-condensed font-black flex items-center justify-center ${
+        dark ? 'bg-white/10 text-white/50 ring-2 ring-white/15' : 'bg-zinc-100 text-zinc-400'
+      }`}
+    >
       {stripBreakerPrefix(dancer.name).charAt(0)}
     </span>
   );

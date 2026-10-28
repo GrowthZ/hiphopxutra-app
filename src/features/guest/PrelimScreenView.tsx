@@ -4,23 +4,138 @@ import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { VIEW_PATHS } from '../../app/routes';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
-import { Avatar, GenderBadge, isScored, LIVE_LIMIT, PODIUM, QUALIFY, rankForDisplay } from './PrelimGuestView';
+import { Avatar, GenderBadge, isScored, LIVE_LIMIT, QUALIFY, rankForDisplay } from './PrelimGuestView';
 
-// /ket-qua/trinh-chieu: landscape prelim leaderboard for a TV / projector the audience watches.
-// Laid out on a fixed 1920x1080 stage scaled to the window, so it fits any screen without scrolling.
-// Same public rules as the guest page: top 10 while judging, top 32 once official.
-// Alternates Newbie / Pro every ROTATE_MS; ?hang-muc=newbie|pro pins one. A freshly published score
-// switches to its category, highlights the row and shows in the ticker.
+// Landscape prelim leaderboard for the audience: /ket-qua/trinh-chieu (light, TV / projector) and
+// /ket-qua/trinh-chieu-led (dark, LED wall). Laid out on a fixed 1920x1080 stage scaled to the window, so it
+// fits any screen without scrolling. Same public rules as the guest page: top 10 while judging, top 32 once
+// official. Newbie / Pro tabs (?hang-muc=newbie|pro picks the first one). A dancer whose 4th score lands is
+// highlighted and announced in the ticker.
 
 const W = 1920;
 const H = 1080;
-const ROTATE_MS = 20_000;
 const FLASH_MS = 10_000;
-const CATEGORY_LABEL: Record<CategoryType, string> = { newbie_1v1: 'Newbie 1vs1', pro_2v2: 'Pro 2vs2' };
-const PINNED: CategoryType | null = (() => {
-  const p = new URLSearchParams(window.location.search).get('hang-muc');
-  return p === 'newbie' ? 'newbie_1v1' : p === 'pro' ? 'pro_2v2' : null;
-})();
+const CATEGORIES: [CategoryType, string][] = [
+  ['newbie_1v1', 'Newbie 1vs1'],
+  ['pro_2v2', 'Pro 2vs2'],
+];
+const LABEL = Object.fromEntries(CATEGORIES) as Record<CategoryType, string>;
+const START: CategoryType = new URLSearchParams(window.location.search).get('hang-muc') === 'pro' ? 'pro_2v2' : 'newbie_1v1';
+
+type Theme = 'light' | 'led';
+type Medalist = { card: string; badge: string; score: string };
+
+/** Everything that differs between the two looks. */
+const THEMES: Record<
+  Theme,
+  {
+    page: string;
+    backdrop?: React.ReactNode;
+    header: string;
+    kicker: string;
+    title: string;
+    tabs: string;
+    tabOn: string;
+    tabOff: string;
+    live: string;
+    official: string;
+    qr: string;
+    qrText: string;
+    row: string;
+    rank: string;
+    name: string;
+    score: string;
+    empty: string;
+    emptySub: string;
+    qualifiedTitle: string;
+    ticker: string;
+    tickerIdle: string;
+    tickerTag: string;
+    flash: string;
+    medal: Medalist[];
+  }
+> = {
+  light: {
+    page: 'bg-zinc-50 text-zinc-900',
+    header: 'border-b border-zinc-200 bg-white',
+    kicker: 'text-zinc-400',
+    title: 'text-zinc-900',
+    tabs: 'bg-zinc-100',
+    tabOn: 'bg-zinc-900 text-white',
+    tabOff: 'text-zinc-500',
+    live: 'bg-red-50 text-red-600',
+    official: 'bg-emerald-100 text-emerald-700',
+    qr: 'border border-zinc-200',
+    qrText: 'text-zinc-600',
+    row: 'bg-white shadow-sm',
+    rank: 'text-zinc-400',
+    name: 'text-zinc-900',
+    score: 'text-zinc-900',
+    empty: 'text-zinc-300',
+    emptySub: 'text-zinc-400',
+    qualifiedTitle: 'text-emerald-700',
+    ticker: 'bg-zinc-900 text-white',
+    tickerIdle: 'text-zinc-400',
+    tickerTag: 'bg-amber-400 text-zinc-900',
+    flash: 'ring-8 ring-amber-400 animate-pulse',
+    medal: [
+      { card: 'bg-amber-50 border border-zinc-200', badge: 'bg-amber-400 text-amber-950', score: 'text-zinc-900' },
+      { card: 'bg-zinc-100 border border-zinc-200', badge: 'bg-zinc-300 text-zinc-800', score: 'text-zinc-900' },
+      { card: 'bg-orange-50 border border-zinc-200', badge: 'bg-orange-300 text-orange-950', score: 'text-zinc-900' },
+    ],
+  },
+  led: {
+    page: 'bg-[#07070b] text-white',
+    backdrop: (
+      <>
+        <div className="absolute -left-60 -top-60 h-[900px] w-[900px] rounded-full bg-red-600/25 blur-[160px]" />
+        <div className="absolute -bottom-72 -right-40 h-[900px] w-[1000px] rounded-full bg-amber-500/20 blur-[180px]" />
+        <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_46px)]" />
+        <div className="absolute -bottom-24 right-10 select-none font-condensed text-[420px] font-black uppercase leading-none text-transparent [-webkit-text-stroke:2px_rgba(255,255,255,0.05)]">
+          Prelim
+        </div>
+      </>
+    ),
+    header: 'border-b border-white/10 bg-black/40 backdrop-blur',
+    kicker: 'text-amber-400/80',
+    title: 'bg-gradient-to-r from-white via-amber-200 to-amber-500 bg-clip-text text-transparent',
+    tabs: 'bg-white/5 ring-1 ring-white/10',
+    tabOn: 'bg-gradient-to-r from-red-600 to-amber-500 text-white shadow-[0_0_30px_rgba(245,158,11,0.55)]',
+    tabOff: 'text-white/50',
+    live: 'bg-red-600/20 text-red-400 ring-1 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.4)]',
+    official: 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/50',
+    qr: 'bg-white/5 ring-1 ring-white/15',
+    qrText: 'text-white/70',
+    row: 'bg-white/[0.06] ring-1 ring-white/10 backdrop-blur-sm',
+    rank: 'text-white/40',
+    name: 'text-white',
+    score: 'bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent',
+    empty: 'text-white/20',
+    emptySub: 'text-white/40',
+    qualifiedTitle: 'bg-gradient-to-r from-emerald-300 to-amber-300 bg-clip-text text-transparent',
+    ticker: 'bg-gradient-to-r from-red-700 via-red-600 to-amber-500 text-white',
+    tickerIdle: 'text-white/60',
+    tickerTag: 'bg-black text-amber-400 ring-2 ring-amber-400',
+    flash: 'led-flash',
+    medal: [
+      {
+        card: 'bg-gradient-to-br from-amber-500/30 via-amber-400/10 to-transparent ring-2 ring-amber-400/80 shadow-[0_0_60px_rgba(251,191,36,0.35)]',
+        badge: 'bg-gradient-to-b from-amber-300 to-amber-500 text-amber-950',
+        score: 'bg-gradient-to-b from-amber-100 to-amber-400 bg-clip-text text-transparent',
+      },
+      {
+        card: 'bg-gradient-to-br from-zinc-300/25 via-zinc-300/5 to-transparent ring-2 ring-zinc-300/70 shadow-[0_0_50px_rgba(212,212,216,0.25)]',
+        badge: 'bg-gradient-to-b from-zinc-100 to-zinc-400 text-zinc-900',
+        score: 'bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent',
+      },
+      {
+        card: 'bg-gradient-to-br from-orange-500/30 via-orange-400/5 to-transparent ring-2 ring-orange-400/70 shadow-[0_0_50px_rgba(251,146,60,0.3)]',
+        badge: 'bg-gradient-to-b from-orange-300 to-orange-600 text-orange-950',
+        score: 'bg-gradient-to-b from-orange-100 to-orange-400 bg-clip-text text-transparent',
+      },
+    ],
+  },
+};
 
 function useStageScale() {
   const [scale, setScale] = useState(1);
@@ -58,7 +173,8 @@ interface Fresh {
   at: number;
 }
 
-export const PrelimScreenView: React.FC = () => {
+export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' }) => {
+  const t = THEMES[theme];
   const { newbieDancers, proDancers, prelimJudges, isNewbieTop32Locked, isProTop32Locked } = useTournament();
   const judgeCount = prelimJudges.length || 4;
   const scale = useStageScale();
@@ -71,19 +187,10 @@ export const PrelimScreenView: React.FC = () => {
     }),
     [newbieDancers, proDancers, judgeCount]
   );
-  const hasData = (c: CategoryType) => lists[c].length > 0;
 
-  const [category, setCategory] = useState<CategoryType>(PINNED ?? 'newbie_1v1');
+  const [category, setCategory] = useState<CategoryType>(START);
   const [fresh, setFresh] = useState<Fresh | null>(null);
   const [now, setNow] = useState(Date.now());
-
-  // Rotate between categories (unless pinned or one is empty); a fresh score resets the timer.
-  useEffect(() => {
-    if (PINNED || !hasData('newbie_1v1') || !hasData('pro_2v2')) return;
-    const t = setTimeout(() => setCategory((c) => (c === 'newbie_1v1' ? 'pro_2v2' : 'newbie_1v1')), ROTATE_MS);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, fresh?.at, lists]);
 
   // Detect newly published scores (not the ones already there when the page opened).
   const known = useRef<Set<string> | null>(null);
@@ -92,22 +199,19 @@ export const PrelimScreenView: React.FC = () => {
       lists[c].filter((d) => isScored(d, judgeCount)).map((d) => ({ id: d.id, category: c }))
     );
     if (!known.current) {
-      if (scored.length || lists.newbie_1v1.length || lists.pro_2v2.length) known.current = new Set(scored.map((s) => s.id));
+      if (lists.newbie_1v1.length || lists.pro_2v2.length) known.current = new Set(scored.map((s) => s.id));
       return;
     }
     const added = scored.filter((s) => !known.current!.has(s.id));
     added.forEach((s) => known.current!.add(s.id));
     const latest = added.at(-1);
-    if (latest) {
-      setFresh({ ...latest, at: Date.now() });
-      if (!PINNED) setCategory(latest.category);
-    }
+    if (latest) setFresh({ ...latest, at: Date.now() });
   }, [lists, judgeCount]);
 
   useEffect(() => {
     if (!fresh) return;
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, [fresh]);
   const flashing = fresh && now - fresh.at < FLASH_MS ? fresh.id : null;
 
@@ -125,76 +229,88 @@ export const PrelimScreenView: React.FC = () => {
   const guestUrl = `${window.location.origin}${VIEW_PATHS.prelim_guest}`;
 
   return (
-    <div className={`fixed inset-0 overflow-hidden bg-zinc-200 ${idle ? 'cursor-none' : ''}`}>
+    <div className={`fixed inset-0 overflow-hidden ${theme === 'led' ? 'bg-black' : 'bg-zinc-200'} ${idle ? 'cursor-none' : ''}`}>
       <div
-        className="absolute left-1/2 top-1/2 flex flex-col bg-zinc-50 text-zinc-900"
+        className={`absolute left-1/2 top-1/2 flex flex-col overflow-hidden ${t.page}`}
         style={{ width: W, height: H, transform: `translate(-50%, -50%) scale(${scale})` }}
       >
+        {t.backdrop && <div className="pointer-events-none absolute inset-0">{t.backdrop}</div>}
+
         {/* Header */}
-        <header className="flex h-[150px] shrink-0 items-center gap-8 border-b border-zinc-200 bg-white px-14">
-          <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-[110px] w-auto" />
+        <header className={`relative flex h-[150px] shrink-0 items-center gap-8 px-14 ${t.header}`}>
+          <img
+            src="/logo.png"
+            alt="HipHop Xứ Trà U16"
+            className={`h-[110px] w-auto ${theme === 'led' ? 'drop-shadow-[0_0_25px_rgba(239,68,68,0.35)]' : ''}`}
+          />
           <div className="flex-1">
-            <p className="text-2xl font-bold uppercase tracking-[0.2em] text-zinc-400">Kết quả vòng loại</p>
-            <h1 className="font-condensed text-7xl font-black uppercase leading-none">{CATEGORY_LABEL[category]}</h1>
+            <p className={`text-2xl font-bold uppercase tracking-[0.3em] ${t.kicker}`}>Kết quả</p>
+            <h1 className={`pb-2 font-condensed text-7xl font-black uppercase leading-[1.05] ${t.title}`}>Vòng loại</h1>
           </div>
-          <div className="flex flex-col items-end gap-3">
-            {locked ? (
-              <span className="rounded-full bg-emerald-100 px-6 py-2 text-2xl font-black uppercase text-emerald-700">Kết quả chính thức</span>
-            ) : (
-              <span className="flex items-center gap-3 rounded-full bg-red-50 px-6 py-2 text-2xl font-black uppercase text-red-600">
-                <Radio className="h-7 w-7 animate-pulse" />
-                Đang chấm · {scored.length}/{ranked.length}
-              </span>
-            )}
-            {!PINNED && hasData('newbie_1v1') && hasData('pro_2v2') && (
-              <span className="flex gap-2" aria-hidden>
-                {(['newbie_1v1', 'pro_2v2'] as const).map((c) => (
-                  <span key={c} className={`h-2.5 w-12 rounded-full ${c === category ? 'bg-zinc-900' : 'bg-zinc-300'}`} />
-                ))}
-              </span>
-            )}
+          <div className={`flex rounded-2xl p-1.5 ${t.tabs}`} role="tablist" aria-label="Hạng mục">
+            {CATEGORIES.map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={category === id}
+                onClick={() => setCategory(id)}
+                className={`rounded-xl px-8 py-3 font-condensed text-4xl font-black uppercase transition-all cursor-pointer ${
+                  category === id ? t.tabOn : t.tabOff
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          <div className="flex items-center gap-4 rounded-2xl border border-zinc-200 p-3">
+          {locked ? (
+            <span className={`rounded-full px-6 py-3 text-2xl font-black uppercase ${t.official}`}>Chính thức</span>
+          ) : (
+            <span className={`flex items-center gap-3 rounded-full px-6 py-3 text-2xl font-black uppercase ${t.live}`}>
+              <Radio className="h-7 w-7 animate-pulse" />
+              Live · {scored.length}/{ranked.length}
+            </span>
+          )}
+          <div className={`flex items-center gap-4 rounded-2xl p-3 ${t.qr}`}>
             <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=0&data=${encodeURIComponent(guestUrl)}`}
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(guestUrl)}`}
               alt=""
-              className="h-[104px] w-[104px]"
+              className="h-[104px] w-[104px] rounded-lg bg-white"
             />
-            <p className="w-40 text-lg font-bold leading-tight text-zinc-600">Quét để xem trên điện thoại</p>
+            <p className={`w-32 text-lg font-bold leading-tight ${t.qrText}`}>Quét xem trên điện thoại</p>
           </div>
         </header>
 
-        {/* Body */}
-        <main className="min-h-0 flex-1 px-14 py-10">
+        {/* Body (re-mounted per tab so rows animate in again) */}
+        <main key={category} className="relative min-h-0 flex-1 px-14 py-10">
           {shown.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className="font-condensed text-8xl font-black uppercase text-zinc-300">Vòng loại sắp bắt đầu</p>
-              <p className="mt-4 text-3xl text-zinc-400">Điểm hiện lên ngay khi 4 giám khảo chấm xong mỗi thí sinh.</p>
+              <p className={`font-condensed text-8xl font-black uppercase ${t.empty}`}>Vòng loại sắp bắt đầu</p>
+              <p className={`mt-4 text-3xl ${t.emptySub}`}>Điểm hiện lên ngay khi 4 giám khảo chấm xong mỗi thí sinh.</p>
             </div>
           ) : locked ? (
-            <QualifiedGrid dancers={shown} flashing={flashing} />
+            <QualifiedGrid dancers={shown} flashing={flashing} theme={theme} />
           ) : (
-            <LiveBoard dancers={shown} flashing={flashing} />
+            <LiveBoard dancers={shown} flashing={flashing} theme={theme} />
           )}
         </main>
 
         {/* Ticker: the latest published score */}
-        <footer className="flex h-[96px] shrink-0 items-center gap-6 bg-zinc-900 px-14 text-white">
+        <footer className={`relative flex h-[96px] shrink-0 items-center gap-6 px-14 ${t.ticker}`}>
           {freshDancer && flashing ? (
-            <>
-              <span className="rounded-lg bg-amber-400 px-4 py-1.5 text-2xl font-black uppercase text-zinc-900">Vừa công bố</span>
+            <div key={fresh!.at} className="led-ticker-in flex w-full items-center gap-6">
+              <span className={`rounded-lg px-4 py-1.5 text-2xl font-black uppercase ${t.tickerTag}`}>Vừa công bố</span>
               <span className="font-condensed text-5xl font-black uppercase">{stripBreakerPrefix(freshDancer.name)}</span>
-              <span className="text-3xl text-zinc-400">{CATEGORY_LABEL[fresh!.category]}</span>
+              <span className="text-3xl opacity-70">{LABEL[fresh!.category]}</span>
               {freshPublic ? (
                 <span className="ml-auto font-condensed text-5xl font-black tabular-nums">
                   {freshDancer.prelimScoreTotal} điểm · Hạng {freshRank}
                 </span>
               ) : (
-                <span className="ml-auto text-3xl text-zinc-300">đã chấm xong</span>
+                <span className="ml-auto text-3xl opacity-80">đã chấm xong</span>
               )}
-            </>
+            </div>
           ) : (
-            <span className="text-3xl text-zinc-400">
+            <span className={`text-3xl ${t.tickerIdle}`}>
               {locked
                 ? `Top ${QUALIFY} bước vào vòng Battle · Chúc mừng các bạn!`
                 : `Top ${LIVE_LIMIT} tạm thời · Tổng điểm của 4 giám khảo, tối đa ${judgeCount * 100}`}
@@ -206,7 +322,7 @@ export const PrelimScreenView: React.FC = () => {
       {!idle && document.fullscreenEnabled && !document.fullscreenElement && (
         <button
           onClick={() => document.documentElement.requestFullscreen().catch(() => undefined)}
-          className="fixed bottom-5 right-5 flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-lg cursor-pointer"
+          className="fixed bottom-5 right-5 flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/20 cursor-pointer"
         >
           <Maximize className="h-4 w-4" /> Toàn màn hình
         </button>
@@ -215,31 +331,36 @@ export const PrelimScreenView: React.FC = () => {
   );
 };
 
-const flashClass = (id: string, flashing: string | null) => (id === flashing ? 'ring-8 ring-amber-400 animate-pulse' : '');
+const rise = (i: number): React.CSSProperties => ({ animationDelay: `${i * 70}ms` });
 
 /** While judging: big top 3 on the left, ranks 4–10 on the right. */
-const LiveBoard: React.FC<{ dancers: Dancer[]; flashing: string | null }> = ({ dancers, flashing }) => {
+const LiveBoard: React.FC<{ dancers: Dancer[]; flashing: string | null; theme: Theme }> = ({ dancers, flashing, theme }) => {
+  const t = THEMES[theme];
   const [first, second, third] = dancers;
   const rest = dancers.slice(3);
   return (
     <div className="grid h-full grid-cols-[760px_1fr] gap-10">
       <div className="flex flex-col gap-6">
-        {first && <PodiumCard dancer={first} rank={1} big flashing={flashing} />}
+        {first && <PodiumCard dancer={first} rank={1} big flashing={flashing} theme={theme} />}
         <div className="grid flex-1 grid-cols-2 gap-6">
-          {second && <PodiumCard dancer={second} rank={2} flashing={flashing} />}
-          {third && <PodiumCard dancer={third} rank={3} flashing={flashing} />}
+          {second && <PodiumCard dancer={second} rank={2} flashing={flashing} theme={theme} />}
+          {third && <PodiumCard dancer={third} rank={3} flashing={flashing} theme={theme} />}
         </div>
       </div>
       <ol className="flex flex-col gap-3">
         {rest.map((d, i) => (
-          <li key={d.id} className={`flex h-[94px] items-center gap-6 rounded-2xl bg-white px-6 shadow-sm ${flashClass(d.id, flashing)}`}>
-            <span className="w-14 text-center font-condensed text-5xl font-black tabular-nums text-zinc-400">{i + 4}</span>
-            <Avatar dancer={d} size="h-16 w-16 text-3xl" />
-            <span className="min-w-0 flex-1 truncate font-condensed text-5xl font-black uppercase">{stripBreakerPrefix(d.name)}</span>
-            <span className="scale-150 origin-right">
+          <li
+            key={d.id}
+            style={rise(i + 3)}
+            className={`led-rise flex h-[94px] items-center gap-6 rounded-2xl px-6 ${t.row} ${d.id === flashing ? t.flash : ''}`}
+          >
+            <span className={`w-14 text-center font-condensed text-5xl font-black tabular-nums ${t.rank}`}>{i + 4}</span>
+            <Avatar dancer={d} size="h-16 w-16 text-3xl" dark={theme === 'led'} />
+            <span className={`min-w-0 flex-1 truncate font-condensed text-5xl font-black uppercase ${t.name}`}>{stripBreakerPrefix(d.name)}</span>
+            <span className="origin-right scale-150">
               <GenderBadge dancer={d} />
             </span>
-            <span className="w-32 text-right font-condensed text-6xl font-black tabular-nums">{d.prelimScoreTotal}</span>
+            <span className={`w-32 text-right font-condensed text-6xl font-black tabular-nums ${t.score}`}>{d.prelimScoreTotal}</span>
           </li>
         ))}
       </ol>
@@ -247,50 +368,71 @@ const LiveBoard: React.FC<{ dancers: Dancer[]; flashing: string | null }> = ({ d
   );
 };
 
-const PodiumCard: React.FC<{ dancer: Dancer; rank: number; big?: boolean; flashing: string | null }> = ({ dancer, rank, big, flashing }) => (
-  <div
-    className={`flex items-center gap-6 rounded-3xl ${PODIUM[rank - 1].row} border border-zinc-200 px-8 ${big ? 'h-[330px]' : 'flex-col justify-center text-center'} ${flashClass(
-      dancer.id,
-      flashing
-    )}`}
-  >
-    <span className={`flex items-center gap-1 rounded-full px-4 py-1.5 font-black ${PODIUM[rank - 1].badge} ${big ? 'text-4xl' : 'text-3xl'}`}>
-      <Medal className={big ? 'h-9 w-9' : 'h-7 w-7'} />
-      {rank}
-    </span>
-    <Avatar dancer={dancer} size={big ? 'h-44 w-44 text-7xl' : 'h-28 w-28 text-5xl'} />
-    <div className={`min-w-0 ${big ? 'flex-1' : 'w-full'}`}>
-      <p className={`truncate font-condensed font-black uppercase leading-none ${big ? 'text-7xl' : 'text-5xl'}`}>{stripBreakerPrefix(dancer.name)}</p>
-      <p className={`font-condensed font-black tabular-nums leading-none ${big ? 'mt-3 text-[120px]' : 'mt-2 text-7xl'}`}>{dancer.prelimScoreTotal}</p>
+const PodiumCard: React.FC<{ dancer: Dancer; rank: number; big?: boolean; flashing: string | null; theme: Theme }> = ({
+  dancer,
+  rank,
+  big,
+  flashing,
+  theme,
+}) => {
+  const t = THEMES[theme];
+  const m = t.medal[rank - 1];
+  return (
+    <div
+      style={rise(rank - 1)}
+      className={`led-rise relative flex items-center gap-6 overflow-hidden rounded-3xl px-8 ${m.card} ${
+        big ? 'h-[330px]' : 'flex-col justify-center text-center'
+      } ${dancer.id === flashing ? t.flash : ''}`}
+    >
+      {theme === 'led' && <span className="led-shine pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent" />}
+      <span className={`flex items-center gap-1 rounded-full px-4 py-1.5 font-black ${m.badge} ${big ? 'text-4xl' : 'text-3xl'}`}>
+        <Medal className={big ? 'h-9 w-9' : 'h-7 w-7'} />
+        {rank}
+      </span>
+      <Avatar dancer={dancer} size={big ? 'h-44 w-44 text-7xl' : 'h-28 w-28 text-5xl'} dark={theme === 'led'} />
+      <div className={`min-w-0 ${big ? 'flex-1' : 'w-full'}`}>
+        <p className={`truncate font-condensed font-black uppercase leading-none ${t.name} ${big ? 'text-7xl' : 'text-5xl'}`}>
+          {stripBreakerPrefix(dancer.name)}
+        </p>
+        <p className={`font-condensed font-black tabular-nums leading-none ${m.score} ${big ? 'mt-3 text-[120px]' : 'mt-2 text-7xl'}`}>
+          {dancer.prelimScoreTotal}
+        </p>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /** Official: the 32 qualifiers in 4 columns. */
-const QualifiedGrid: React.FC<{ dancers: Dancer[]; flashing: string | null }> = ({ dancers, flashing }) => (
-  <div>
-    <p className="mb-6 font-condensed text-4xl font-black uppercase text-emerald-700">Top {QUALIFY} vào vòng Battle</p>
-    <ol className="grid grid-flow-col grid-cols-4 grid-rows-8 gap-x-6 gap-y-3">
-      {dancers.map((d, i) => {
-        const podium = i < 3 ? PODIUM[i] : null;
-        return (
-          <li
-            key={d.id}
-            className={`flex h-[78px] items-center gap-3 rounded-xl px-4 shadow-sm ${podium ? podium.row : 'bg-white'} ${flashClass(d.id, flashing)}`}
-          >
-            <span
-              className={`flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-full px-1.5 font-condensed text-2xl font-black tabular-nums ${
-                podium ? podium.badge : 'text-zinc-400'
+const QualifiedGrid: React.FC<{ dancers: Dancer[]; flashing: string | null; theme: Theme }> = ({ dancers, flashing, theme }) => {
+  const t = THEMES[theme];
+  return (
+    <div>
+      <p className={`mb-6 font-condensed text-4xl font-black uppercase ${t.qualifiedTitle}`}>Top {QUALIFY} vào vòng Battle</p>
+      <ol className="grid grid-flow-col grid-cols-4 grid-rows-8 gap-x-6 gap-y-3">
+        {dancers.map((d, i) => {
+          const m = i < 3 ? t.medal[i] : null;
+          return (
+            <li
+              key={d.id}
+              style={rise(i)}
+              className={`led-rise relative flex h-[78px] items-center gap-3 overflow-hidden rounded-xl px-4 ${m ? m.card : t.row} ${
+                d.id === flashing ? t.flash : ''
               }`}
             >
-              {podium && <Medal className="h-5 w-5" />}
-              {i + 1}
-            </span>
-            <span className="min-w-0 flex-1 truncate font-condensed text-3xl font-black uppercase">{stripBreakerPrefix(d.name)}</span>
-            <span className="font-condensed text-4xl font-black tabular-nums">{d.prelimScoreTotal}</span>
-          </li>
-        );
-      })}
-    </ol>
-  </div>
-);
+              <span
+                className={`flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-full px-1.5 font-condensed text-2xl font-black tabular-nums ${
+                  m ? m.badge : t.rank
+                }`}
+              >
+                {m && <Medal className="h-5 w-5" />}
+                {i + 1}
+              </span>
+              <span className={`min-w-0 flex-1 truncate font-condensed text-3xl font-black uppercase ${t.name}`}>{stripBreakerPrefix(d.name)}</span>
+              <span className={`font-condensed text-4xl font-black tabular-nums ${m ? m.score : t.score}`}>{d.prelimScoreTotal}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+};

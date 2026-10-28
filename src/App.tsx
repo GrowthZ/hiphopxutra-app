@@ -68,6 +68,7 @@ const MainContent: React.FC = () => {
     return <PrelimGuestView />;
   }
   if (activeView === 'prelim_screen') return <PrelimScreenView />;
+  if (activeView === 'prelim_screen_led') return <PrelimScreenView theme="led" />;
   if (activeView === 'bracket_guest') return <GuestBracketView />;
   if (activeView === 'match_guest') return <GuestMatchView />;
 
