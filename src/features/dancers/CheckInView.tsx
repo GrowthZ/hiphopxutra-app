@@ -30,13 +30,29 @@ export const CheckInView: React.FC = () => {
   const dancers = listOf(category);
   const countDone = (list: Dancer[]) => list.filter((d) => d.checkedInAt).length;
 
+  // Clubs arrive as a group: filter by crew. Spelling varies ("Clb ..." / "CLB ..."), so group by normalized name.
+  const [crew, setCrew] = useState('');
+  const crews = useMemo(() => {
+    const groups = new Map<string, { label: string; total: number; done: number }>();
+    for (const d of [...newbieDancers, ...proDancers]) {
+      if (!d.crew?.trim()) continue;
+      const key = normalize(d.crew);
+      const g = groups.get(key) ?? { label: d.crew.trim(), total: 0, done: 0 };
+      g.total += 1;
+      if (d.checkedInAt) g.done += 1;
+      groups.set(key, g);
+    }
+    return [...groups.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'vi'));
+  }, [newbieDancers, proDancers]);
+
   const visible = useMemo(() => {
     const q = normalize(query);
     return dancers
       .filter((d) => (status === 'pending' ? !d.checkedInAt : status === 'done' ? Boolean(d.checkedInAt) : true))
+      .filter((d) => !crew || normalize(d.crew) === crew)
       .filter((d) => !q || [d.name, d.realName, d.checkedInAt ? d.sbd : ''].some((f) => normalize(f).includes(q)))
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  }, [dancers, status, query]);
+  }, [dancers, status, query, crew]);
 
   const issueSbd = (cat: CategoryType, dancerId: string) => {
     const highestIssued = Math.max(0, ...listOf(cat).filter((d) => isIssuedSbd(cat, d.sbd)).map((d) => Number(d.sbd.slice(1))));
@@ -265,7 +281,7 @@ export const CheckInView: React.FC = () => {
             className="w-full rounded border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-2 focus:outline-amber-500"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <div className="flex rounded border border-zinc-300 bg-white p-0.5" role="group" aria-label="Hạng mục">
             {(
               [
@@ -294,6 +310,19 @@ export const CheckInView: React.FC = () => {
             <option value="pending">Chưa check-in</option>
             <option value="done">Đã check-in</option>
             <option value="all">Tất cả</option>
+          </select>
+          <select
+            value={crew}
+            onChange={(e) => setCrew(e.target.value)}
+            aria-label="Lọc theo CLB / Crew"
+            className="max-w-full rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 cursor-pointer sm:max-w-56"
+          >
+            <option value="">Tất cả CLB / Crew</option>
+            {crews.map(([key, g]) => (
+              <option key={key} value={key}>
+                {g.label} ({g.done}/{g.total})
+              </option>
+            ))}
           </select>
         </div>
       </div>
