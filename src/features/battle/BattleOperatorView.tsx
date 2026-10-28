@@ -95,14 +95,14 @@ export const BattleOperatorView: React.FC = () => {
       </div>
 
       {/* Main Console Panel (Dark Sports Terminal) */}
-      <div className="bg-zinc-950 text-white rounded p-5 border border-zinc-800 shadow-sm space-y-5">
+      <div className="bg-white text-zinc-900 rounded p-5 border border-zinc-200 shadow-sm space-y-5">
         {/* Match Metadata Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-800 pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-3">
           <div>
-            <div className="text-[11px] font-mono text-zinc-400 font-bold tracking-wider uppercase">
+            <div className="text-[11px] font-mono text-zinc-500 font-bold tracking-wider uppercase">
               {match.category === 'pro_2v2' ? 'HẠNG MỤC PRO 2VS2' : 'HẠNG MỤC NEWBIE 1VS1'}
             </div>
-            <div className="font-condensed font-black text-2xl text-white mt-0.5 uppercase">
+            <div className="font-condensed font-black text-2xl text-zinc-900 mt-0.5 uppercase">
               {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
             </div>
           </div>
@@ -110,8 +110,8 @@ export const BattleOperatorView: React.FC = () => {
           <div className="flex items-center gap-2">
             <span className={`px-3 py-1 rounded font-condensed font-black text-xs tracking-widest uppercase border ${
               currentRound?.isTieBreak
-                ? 'bg-amber-950 text-amber-300 border-amber-500 animate-pulse'
-                : 'bg-zinc-900 text-white border-zinc-700'
+                ? 'bg-amber-50 text-amber-700 border-amber-500 animate-pulse'
+                : 'bg-zinc-50 text-zinc-900 border-zinc-300'
             }`}>
               {currentRound?.isTieBreak ? `ROUND TIE-BREAK (HIỆP PHỤ)` : `ĐANG XEM: ROUND ${activeRoundNum} / ${match.totalRoundsRequired}`}
             </span>
@@ -119,8 +119,8 @@ export const BattleOperatorView: React.FC = () => {
         </div>
 
         {/* Round Selector Tabs for Admin */}
-        <div className="flex items-center gap-2 p-1.5 bg-zinc-900/90 border border-zinc-800 rounded-lg overflow-x-auto">
-          <span className="text-[11px] font-mono font-bold text-zinc-400 px-2 shrink-0">CHỌN ROUND ĐIỀU HÀNH:</span>
+        <div className="flex items-center gap-2 p-1.5 bg-white/90 border border-zinc-200 rounded-lg overflow-x-auto">
+          <span className="text-[11px] font-mono font-bold text-zinc-500 px-2 shrink-0">CHỌN ROUND ĐIỀU HÀNH:</span>
           {match.rounds.map((r) => {
             const isSelected = r.roundNumber === activeRoundNum;
             const votesCount = Object.keys(r.votes).length;
@@ -136,17 +136,17 @@ export const BattleOperatorView: React.FC = () => {
                       ? 'bg-amber-500 text-black shadow-md ring-2 ring-amber-400'
                       : 'bg-white text-black shadow-md ring-2 ring-white/50'
                     : r.isTieBreak
-                    ? 'bg-amber-950/80 text-amber-300 border border-amber-600/70 hover:bg-amber-900'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    ? 'bg-amber-50 text-amber-700 border border-amber-600/70 hover:bg-amber-100'
+                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                 }`}
               >
                 <span>{r.isTieBreak ? '⚡ TIE-BREAK' : `ROUND ${r.roundNumber}`}</span>
                 <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
                   isRev
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                     : votesCount >= 9
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-zinc-700 text-zinc-300'
+                    : 'bg-zinc-200 text-zinc-700'
                 }`}>
                   {isRev ? (r.winner === 'red' ? 'ĐỎ THẮNG' : r.winner === 'blue' ? 'XANH THẮNG' : 'HÒA') : `${votesCount}/9 GK`}
                 </span>
@@ -158,7 +158,7 @@ export const BattleOperatorView: React.FC = () => {
         {/* 2 Corners Split Score */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
           {/* GÓC ĐỎ */}
-          <div className="bg-zinc-900 border border-red-600/70 rounded p-4 flex items-center justify-between gap-4">
+          <div className="bg-zinc-50 border border-red-600/70 rounded p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <img
                 src={
@@ -170,13 +170,13 @@ export const BattleOperatorView: React.FC = () => {
                 className="w-14 h-14 rounded object-cover border-2 border-red-600 shrink-0"
               />
               <div className="space-y-0.5">
-                <span className="text-[10px] font-condensed font-black text-red-400 uppercase tracking-widest">
+                <span className="text-[10px] font-condensed font-black text-red-600 uppercase tracking-widest">
                   GÓC ĐỎ • RED CORNER
                 </span>
-                <div className="font-condensed font-black text-2xl text-white uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+                <div className="font-condensed font-black text-2xl text-zinc-900 uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.sideRed.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ') || stripBreakerPrefix(match.sideRed.name)}
                 </div>
-                <div className="text-xs text-red-300 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                <div className="text-xs text-red-700 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.category === 'pro_2v2'
                     ? `${match.sideRed.name} · ${match.sideRed.sbdText}`
                     : [match.sideRed.dancers[0]?.crew, match.sideRed.sbdText].filter(Boolean).join(' · ')}
@@ -189,19 +189,19 @@ export const BattleOperatorView: React.FC = () => {
           </div>
 
           {/* GÓC XANH */}
-          <div className="bg-zinc-900 border border-blue-600/70 rounded p-4 flex items-center justify-between gap-4">
+          <div className="bg-zinc-50 border border-blue-600/70 rounded p-4 flex items-center justify-between gap-4">
             <div className="w-16 h-16 rounded bg-blue-600 flex items-center justify-center font-condensed font-black text-4xl text-white shadow-sm shrink-0 tabular-nums">
               {match.roundWinsBlue}
             </div>
             <div className="flex items-center gap-3">
               <div className="text-right space-y-0.5 min-w-0">
-                <span className="text-[10px] font-condensed font-black text-blue-400 uppercase tracking-widest">
+                <span className="text-[10px] font-condensed font-black text-blue-600 uppercase tracking-widest">
                   BLUE CORNER • GÓC XANH
                 </span>
-                <div className="font-condensed font-black text-2xl text-white uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
+                <div className="font-condensed font-black text-2xl text-zinc-900 uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.sideBlue.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ') || stripBreakerPrefix(match.sideBlue.name)}
                 </div>
-                <div className="text-xs text-blue-300 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                <div className="text-xs text-blue-700 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                   {match.category === 'pro_2v2'
                     ? `${match.sideBlue.name} · ${match.sideBlue.sbdText}`
                     : [match.sideBlue.dancers[0]?.crew, match.sideBlue.sbdText].filter(Boolean).join(' · ')}
@@ -221,13 +221,13 @@ export const BattleOperatorView: React.FC = () => {
         </div>
 
         {/* Quick Entrance & Stage Visual Cues */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl shadow-sm">
-          <div className="flex items-center gap-2 text-xs text-zinc-300">
+        <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm">
+          <div className="flex items-center gap-2 text-xs text-zinc-700">
             <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="font-bold text-amber-300 uppercase tracking-wider font-mono text-[11px]">
+            <span className="font-bold text-amber-700 uppercase tracking-wider font-mono text-[11px]">
               ĐIỀU PHỐI MÀN LED SÂN KHẤU:
             </span>
-            <span className="text-zinc-400 text-xs hidden sm:inline">
+            <span className="text-zinc-500 text-xs hidden sm:inline">
               Hiệu ứng 2 team lướt từ 2 bên ngoài vào sân kèm âm thanh va chạm VS
             </span>
           </div>
@@ -237,7 +237,7 @@ export const BattleOperatorView: React.FC = () => {
             className="px-4 py-2 rounded-lg bg-gradient-to-r from-red-600 via-amber-500 to-blue-600 hover:brightness-110 text-white font-condensed font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-2 transition-all transform hover:scale-102 active:scale-98 cursor-pointer shrink-0"
             title="Kích hoạt hiệu ứng 2 team ra sân từ ngoài vào trên Màn LED"
           >
-            <Swords className="w-4 h-4 text-amber-300" />
+            <Swords className="w-4 h-4 text-amber-700" />
             <span>🎬 HIỆU ỨNG RA SÂN (2 TEAM TỪ NGOÀI VÀO)</span>
           </button>
         </div>
@@ -257,19 +257,19 @@ export const BattleOperatorView: React.FC = () => {
           return (
             <div className="space-y-3">
               {/* Notice Banner to Admin */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs px-3.5 py-2.5 rounded bg-zinc-900 border border-zinc-800 text-zinc-300 font-medium gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs px-3.5 py-2.5 rounded bg-zinc-50 border border-zinc-200 text-zinc-700 font-medium gap-2">
                 <div className="flex items-center gap-2">
                   <span className={`w-2.5 h-2.5 rounded-full ${hasUnrevealedReg || isTieBreakUnrevealed ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
                   <span>
                     <strong>Trạng thái Màn LED:</strong>{' '}
                     {hasUnrevealedReg || isTieBreakUnrevealed ? (
-                      <span className="text-emerald-400 font-bold">Đang hiển thị Ô XANH LÁ TÍCH ✓ (BẢO MẬT PHIẾU BẦU)</span>
+                      <span className="text-emerald-700 font-bold">Đang hiển thị Ô XANH LÁ TÍCH ✓ (BẢO MẬT PHIẾU BẦU)</span>
                     ) : (
                       <span className="text-sky-300 font-bold">Đã công bố màu ĐỎ / XANH của Giám khảo</span>
                     )}
                   </span>
                 </div>
-                <span className="text-[11px] text-zinc-400 italic">
+                <span className="text-[11px] text-zinc-500 italic">
                   * Màn LED sân khấu chỉ hiển thị kết quả, không có nút bấm tương tác.
                 </span>
               </div>
@@ -278,11 +278,11 @@ export const BattleOperatorView: React.FC = () => {
               {hasUnrevealedReg && allRegVoted && (
                 <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/25 via-amber-400/35 to-amber-500/25 border-2 border-amber-400 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
                   <div className="space-y-1">
-                    <div className="font-condensed font-black text-xl text-amber-300 uppercase flex items-center gap-2">
-                      <Eye className="w-6 h-6 text-amber-300" />
+                    <div className="font-condensed font-black text-xl text-amber-700 uppercase flex items-center gap-2">
+                      <Eye className="w-6 h-6 text-amber-700" />
                       <span>CẢ 2 ROUND ĐÃ ĐỦ 9/9 PHIẾU BẦU · SẴN SÀNG CÔNG BỐ</span>
                     </div>
-                    <div className="text-xs text-zinc-200">
+                    <div className="text-xs text-zinc-800">
                       Ấn nút công bố để màn LED đồng loạt hiển thị màu sắc 9 Giám Khảo. Nếu hòa 1 - 1, hệ thống sẽ tự động xuất hiện dòng Round Tie-Break.
                     </div>
                   </div>
@@ -301,11 +301,11 @@ export const BattleOperatorView: React.FC = () => {
               {isTieBreakUnrevealed && (
                 <div className="p-4 rounded-xl bg-gradient-to-r from-red-600/30 via-amber-500/35 to-red-600/30 border-2 border-amber-400 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
                   <div className="space-y-1">
-                    <div className="font-condensed font-black text-xl text-amber-300 uppercase flex items-center gap-2">
-                      <Zap className="w-6 h-6 text-amber-300 fill-amber-300" />
+                    <div className="font-condensed font-black text-xl text-amber-700 uppercase flex items-center gap-2">
+                      <Zap className="w-6 h-6 text-amber-700 fill-amber-300" />
                       <span>ROUND TIE-BREAK (HIỆP PHỤ): {Object.keys(tieBreakRound.votes).length}/9 GK ĐÃ NỘP</span>
                     </div>
-                    <div className="text-xs text-zinc-200">
+                    <div className="text-xs text-zinc-800">
                       Trận đấu hòa {match.roundWinsRed} - {match.roundWinsBlue}. Sau khi các giám khảo chấm xong Tie-Break, Admin ấn công bố để trao cúp chiến thắng!
                     </div>
                   </div>
@@ -322,7 +322,7 @@ export const BattleOperatorView: React.FC = () => {
                             submitJudgeVote(match.id, tieBreakRound.roundNumber, j.id, sampleVotes[j.id]);
                           });
                         }}
-                        className="px-3.5 py-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400 text-amber-300 text-xs font-mono font-bold cursor-pointer transition-colors"
+                        className="px-3.5 py-2.5 rounded-lg bg-amber-100 hover:bg-amber-500/30 border border-amber-400 text-amber-700 text-xs font-mono font-bold cursor-pointer transition-colors"
                       >
                         + Mô phỏng 9 GK nộp phiếu Tie-Break
                       </button>
@@ -332,7 +332,7 @@ export const BattleOperatorView: React.FC = () => {
                       onClick={() => confirmRoundResult(match.id, tieBreakRound.roundNumber)}
                       className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:brightness-110 text-white font-condensed font-black text-base uppercase tracking-wider shadow-[0_0_25px_rgba(239,68,68,0.9)] border-2 border-amber-300 cursor-pointer flex items-center gap-2 transition-all transform hover:scale-102 active:scale-98 animate-pulse"
                     >
-                      <Zap className="w-5 h-5 text-amber-300 fill-amber-300" />
+                      <Zap className="w-5 h-5 text-amber-700 fill-amber-300" />
                       <span>⚡ ADMIN CÔNG BỐ KẾT QUẢ TIE-BREAK LÊN MÀN LED</span>
                     </button>
                   </div>
@@ -345,21 +345,21 @@ export const BattleOperatorView: React.FC = () => {
         {/* =========================================================================
             ADMIN VICTORY CONTROLS: CHỌN NGƯỜI THẮNG & KÍCH HOẠT HOẠT ẢNH MÀN LED
             ========================================================================= */}
-        <div className="p-4 rounded-xl bg-zinc-900 border-2 border-amber-500/70 space-y-3 shadow-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-800 pb-2.5">
+        <div className="p-4 rounded-xl bg-zinc-50 border-2 border-amber-500/70 space-y-3 shadow-lg">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 pb-2.5">
             <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-400 fill-amber-400" />
-              <span className="font-condensed font-black text-base uppercase text-white tracking-wide">
+              <Trophy className="w-5 h-5 text-amber-600 fill-amber-400" />
+              <span className="font-condensed font-black text-base uppercase text-zinc-900 tracking-wide">
                 ĐIỀU HÀNH KẾT QUẢ CHUNG CUỘC & KÍCH HOẠT HIỆU ỨNG CHIẾN THẮNG (MÀN LED)
               </span>
             </div>
             {match.status === 'finished' ? (
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-bold text-xs uppercase flex items-center gap-1.5 self-start sm:self-auto">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-700 font-bold text-xs uppercase flex items-center gap-1.5 self-start sm:self-auto">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 ĐÃ CHỌN THẮNG: {match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}
               </span>
             ) : (
-              <span className="text-[11px] text-zinc-400 font-mono italic">
+              <span className="text-[11px] text-zinc-500 font-mono italic">
                 * Tự động bật pháo hoa, âm thanh fanfare & khung vinh danh trên Màn LED
               </span>
             )}
@@ -371,8 +371,8 @@ export const BattleOperatorView: React.FC = () => {
               onClick={() => declareMatchWinner(match.id, 'red')}
               className={`p-3.5 rounded-xl border-2 flex items-center justify-between gap-3 text-left transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md ${
                 match.status === 'finished' && match.winnerSide === 'red'
-                  ? 'bg-red-600/30 border-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.5)] ring-2 ring-red-400'
-                  : 'bg-zinc-800/80 hover:bg-red-950/60 border-red-600/60 text-zinc-200 hover:text-white'
+                  ? 'bg-red-600/30 border-red-500 text-zinc-900 shadow-[0_0_20px_rgba(239,68,68,0.5)] ring-2 ring-red-400'
+                  : 'bg-zinc-100 hover:bg-red-50 border-red-600/60 text-zinc-800 hover:text-zinc-900'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -380,20 +380,20 @@ export const BattleOperatorView: React.FC = () => {
                   ĐỎ
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-mono text-red-400 uppercase font-black tracking-wider">
+                  <div className="text-[10px] font-mono text-red-600 uppercase font-black tracking-wider">
                     GÓC ĐỎ • RED CORNER
                   </div>
-                  <div className="font-condensed font-black text-lg text-white uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                  <div className="font-condensed font-black text-lg text-zinc-900 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                     {stripBreakerPrefix(match.sideRed.name)}
                   </div>
-                  <div className="text-xs text-zinc-400">
+                  <div className="text-xs text-zinc-500">
                     Tỉ số hiện tại: {match.roundWinsRed} rounds thắng
                   </div>
                 </div>
               </div>
 
               <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-condensed font-black text-xs uppercase tracking-wider">
-                <Trophy className="w-4 h-4 text-amber-300" />
+                <Trophy className="w-4 h-4 text-amber-700" />
                 <span>CHỌN THẮNG</span>
               </div>
             </button>
@@ -403,8 +403,8 @@ export const BattleOperatorView: React.FC = () => {
               onClick={() => declareMatchWinner(match.id, 'blue')}
               className={`p-3.5 rounded-xl border-2 flex items-center justify-between gap-3 text-left transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md ${
                 match.status === 'finished' && match.winnerSide === 'blue'
-                  ? 'bg-blue-600/30 border-blue-500 text-white shadow-[0_0_20px_rgba(59,130,246,0.5)] ring-2 ring-blue-400'
-                  : 'bg-zinc-800/80 hover:bg-blue-950/60 border-blue-600/60 text-zinc-200 hover:text-white'
+                  ? 'bg-blue-600/30 border-blue-500 text-zinc-900 shadow-[0_0_20px_rgba(59,130,246,0.5)] ring-2 ring-blue-400'
+                  : 'bg-zinc-100 hover:bg-blue-50 border-blue-600/60 text-zinc-800 hover:text-zinc-900'
               }`}
             >
               <div className="flex items-center gap-3 min-w-0">
@@ -412,28 +412,28 @@ export const BattleOperatorView: React.FC = () => {
                   XANH
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[10px] font-mono text-blue-400 uppercase font-black tracking-wider">
+                  <div className="text-[10px] font-mono text-blue-600 uppercase font-black tracking-wider">
                     GÓC XANH • BLUE CORNER
                   </div>
-                  <div className="font-condensed font-black text-lg text-white uppercase whitespace-nowrap overflow-hidden text-ellipsis">
+                  <div className="font-condensed font-black text-lg text-zinc-900 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
                     {stripBreakerPrefix(match.sideBlue.name)}
                   </div>
-                  <div className="text-xs text-zinc-400">
+                  <div className="text-xs text-zinc-500">
                     Tỉ số hiện tại: {match.roundWinsBlue} rounds thắng
                   </div>
                 </div>
               </div>
 
               <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-condensed font-black text-xs uppercase tracking-wider">
-                <Trophy className="w-4 h-4 text-amber-300" />
+                <Trophy className="w-4 h-4 text-amber-700" />
                 <span>CHỌN THẮNG</span>
               </div>
             </button>
           </div>
 
           {/* Quick trigger replay button for stage LED screen */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-800/80">
-            <span className="text-xs text-zinc-400">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200">
+            <span className="text-xs text-zinc-500">
               {match.status === 'finished'
                 ? `Đã chọn người chiến thắng: ${match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}`
                 : 'Chưa chốt người thắng chung cuộc. Có thể chọn ngay hoặc chờ chấm hết các round.'}
@@ -452,13 +452,13 @@ export const BattleOperatorView: React.FC = () => {
         {/* Live Status of 9 Judges for Active Round */}
         <div className="space-y-2.5 pt-1">
           <div className="flex items-center justify-between text-xs">
-            <div className="font-bold text-zinc-300 flex items-center gap-2">
+            <div className="font-bold text-zinc-700 flex items-center gap-2">
               <span>Trạng thái nhận phiếu 9 Giám khảo ({currentRound?.isTieBreak ? 'Hiệp phụ Tie-Break' : `Round ${activeRoundNum}`})</span>
-              <span className="font-mono text-xs font-bold text-emerald-400 bg-zinc-900 px-2 py-0.5 rounded border border-zinc-700">
+              <span className="font-mono text-xs font-bold text-emerald-700 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-300">
                 {totalVotesCount} / 9 đã gửi
               </span>
             </div>
-            <div className="text-[11px] text-zinc-400">
+            <div className="text-[11px] text-zinc-500">
               Quy tắc: từ 5/9 phiếu sẽ thắng round (không hòa round). Nếu hòa 1 - 1 sau 2 round sẽ đấu Tie-break.
             </div>
           </div>
@@ -473,31 +473,31 @@ export const BattleOperatorView: React.FC = () => {
                   key={j.id}
                   className={`p-2 rounded border text-center transition-colors ${
                     vote === 'red'
-                      ? 'bg-red-950/60 border-red-600 text-white'
+                      ? 'bg-red-50 border-red-600 text-zinc-900'
                       : vote === 'blue'
-                      ? 'bg-blue-950/60 border-blue-600 text-white'
-                      : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                      ? 'bg-blue-50 border-blue-600 text-zinc-900'
+                      : 'bg-zinc-50 border-zinc-200 text-zinc-500'
                   }`}
                 >
-                  <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-bold truncate text-amber-400">
+                  <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-bold truncate text-amber-600">
                     <span
                       className={`w-1.5 h-1.5 rounded-full shrink-0 ${onlineJudgeIds.has(j.id) ? 'bg-emerald-400' : 'bg-zinc-600'}`}
                       title={onlineJudgeIds.has(j.id) ? 'Giám khảo đang online' : 'Giám khảo offline'}
                     />
                     {j.code}
                   </div>
-                  <div className="text-[10px] text-zinc-300 font-bold truncate uppercase">{j.judgeName || j.name.split('•')[1]?.trim() || j.code}</div>
+                  <div className="text-[10px] text-zinc-700 font-bold truncate uppercase">{j.judgeName || j.name.split('•')[1]?.trim() || j.code}</div>
                   <div className="font-condensed font-black text-sm mt-0.5 uppercase">
                     {vote === 'red' ? (
-                      <span className="text-red-400">ĐỎ</span>
+                      <span className="text-red-600">ĐỎ</span>
                     ) : vote === 'blue' ? (
-                      <span className="text-blue-400">XANH</span>
+                      <span className="text-blue-600">XANH</span>
                     ) : (
                       <span className="text-zinc-500 font-sans text-xs">Chờ...</span>
                     )}
                   </div>
                   {/* Operator manual override buttons */}
-                  <div className="flex justify-center gap-1 mt-1 pt-1 border-t border-zinc-800">
+                  <div className="flex justify-center gap-1 mt-1 pt-1 border-t border-zinc-200">
                     <button
                       onClick={() => submitJudgeVote(match.id, activeRoundNum, j.id, 'red')}
                       className="px-1.5 py-0.5 rounded text-[10px] bg-red-800 hover:bg-red-700 text-white font-bold cursor-pointer"
@@ -520,21 +520,21 @@ export const BattleOperatorView: React.FC = () => {
         </div>
 
         {/* Round Tally & Control Actions */}
-        <div className="p-3.5 bg-zinc-900 rounded border border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="p-3.5 bg-zinc-50 rounded border border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4 text-xs font-semibold">
             <div>
-              Phiếu Đỏ: <span className="font-condensed font-black text-red-400 text-base tabular-nums">{currentRound?.redVotesCount || 0}</span>
+              Phiếu Đỏ: <span className="font-condensed font-black text-red-600 text-base tabular-nums">{currentRound?.redVotesCount || 0}</span>
             </div>
             <div>
-              Phiếu Xanh: <span className="font-condensed font-black text-blue-400 text-base tabular-nums">{currentRound?.blueVotesCount || 0}</span>
+              Phiếu Xanh: <span className="font-condensed font-black text-blue-600 text-base tabular-nums">{currentRound?.blueVotesCount || 0}</span>
             </div>
             {currentRound?.isConfirmed ? (
-              <span className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 font-bold text-[11px] border border-emerald-800 flex items-center gap-1">
+              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
                 Đã chốt {currentRound?.isTieBreak ? 'Tie-Break' : `Round ${activeRoundNum}`}
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded bg-zinc-800 text-zinc-400 font-bold text-[11px]">
+              <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-500 font-bold text-[11px]">
                 Chưa công bố ({totalVotesCount}/9 GK)
               </span>
             )}
@@ -559,8 +559,8 @@ export const BattleOperatorView: React.FC = () => {
               </button>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-xs bg-emerald-950/80 px-2.5 py-1 rounded border border-emerald-700">
-                  <Trophy className="w-4 h-4 text-amber-400" />
+                <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs bg-emerald-50 px-2.5 py-1 rounded border border-emerald-700">
+                  <Trophy className="w-4 h-4 text-amber-600" />
                   <span>Thắng: {match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}</span>
                 </div>
                 <button
@@ -591,7 +591,7 @@ export const BattleOperatorView: React.FC = () => {
                   resetMatch(match.id);
                 }
               }}
-              className="p-2 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+              className="p-2 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
               title="Đặt lại trận đấu về 0-0"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -600,27 +600,27 @@ export const BattleOperatorView: React.FC = () => {
         </div>
 
         {/* DJ & MC Quick Audio Deck */}
-        <div className="pt-2 border-t border-zinc-800 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="text-zinc-400 text-[11px] font-bold uppercase tracking-wider">
+        <div className="pt-2 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="text-zinc-500 text-[11px] font-bold uppercase tracking-wider">
             Âm thanh MC & DJ:
           </div>
 
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => playAudioEffect('airhorn')}
-              className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
             >
               🎺 Airhorn
             </button>
             <button
               onClick={() => playAudioEffect('roundWin')}
-              className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
             >
               🥊 Cồng Thắng Round
             </button>
             <button
               onClick={() => playAudioEffect('champion')}
-              className="px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 text-xs font-bold transition-colors cursor-pointer"
+              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
             >
               🏆 Kèn Vô Địch
             </button>

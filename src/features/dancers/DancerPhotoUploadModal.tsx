@@ -99,8 +99,8 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
       onClick={() => setGender(value)}
       className={`flex-1 rounded border px-3 py-2 text-xs font-bold transition-colors cursor-pointer ${
         gender === value
-          ? 'border-amber-500 bg-amber-500/15 text-amber-400'
-          : 'border-zinc-800 bg-zinc-950 text-zinc-500 hover:text-zinc-300'
+          ? 'border-amber-500 bg-amber-50 text-amber-600'
+          : 'border-zinc-200 bg-white text-zinc-500 hover:text-zinc-700'
       }`}
     >
       {label}
@@ -108,26 +108,26 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 select-none">
-      <div className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded border border-zinc-800 bg-zinc-950 p-5 text-white shadow-2xl">
-        <div className="flex items-start justify-between gap-3 border-b border-zinc-800 pb-3">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4 select-none">
+      <div className="max-h-[92vh] w-full max-w-xl space-y-4 overflow-y-auto rounded border border-zinc-200 bg-white p-5 text-zinc-900 shadow-xl">
+        <div className="flex items-start justify-between gap-3 border-b border-zinc-200 pb-3">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               {dancer.sbd && (
-                <span className="rounded border border-zinc-700 bg-zinc-800 px-2 py-0.5 font-mono text-xs font-bold text-zinc-300">
+                <span className="rounded border border-zinc-300 bg-zinc-100 px-2 py-0.5 font-mono text-xs font-bold text-zinc-700">
                   SBD {dancer.sbd}
                 </span>
               )}
               <h2 className="truncate font-condensed text-xl font-black uppercase tracking-tight">{dancer.name}</h2>
             </div>
-            <p className="mt-0.5 text-xs text-zinc-400">
+            <p className="mt-0.5 text-xs text-zinc-500">
               Tải 1 ảnh nửa người, rồi kéo / phóng to vòng tròn để chọn khuôn mặt làm avatar.
             </p>
           </div>
           <button
             onClick={onClose}
             aria-label="Đóng"
-            className="rounded bg-zinc-900 p-1 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white cursor-pointer"
+            className="rounded bg-zinc-50 p-1 text-zinc-500 transition-colors hover:bg-zinc-100 hover:text-zinc-900 cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -139,17 +139,17 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
         </div>
 
         {!MEDIA_URL && (
-          <div className="rounded border border-amber-700 bg-amber-950/40 p-2.5 text-xs text-amber-300">
+          <div className="rounded border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-700">
             Chưa cấu hình kho ảnh R2 (biến <code>VITE_MEDIA_URL</code>), nên chưa tải ảnh lên được. Xem HUONG-DAN-CHAY.md.
           </div>
         )}
         {errorMessage && (
-          <div className="rounded border border-red-800 bg-red-950/50 p-2.5 text-xs font-semibold text-red-300">{errorMessage}</div>
+          <div className="rounded border border-red-200 bg-red-50 p-2.5 text-xs font-semibold text-red-700">{errorMessage}</div>
         )}
 
         {source ? (
           <div className="space-y-2">
-            <div className="relative h-80 overflow-hidden rounded border border-zinc-800 bg-zinc-900 sm:h-96">
+            <div className="relative h-80 overflow-hidden rounded border border-zinc-200 bg-zinc-50 sm:h-96">
               <Cropper
                 image={source}
                 crop={crop}
@@ -164,7 +164,7 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
                 onCropComplete={(percent: Area) => setArea(percent)}
               />
             </div>
-            <label className="flex items-center gap-2 text-xs text-zinc-400">
+            <label className="flex items-center gap-2 text-xs text-zinc-500">
               <ZoomIn className="h-4 w-4 shrink-0" />
               <input
                 type="range"
@@ -182,11 +182,11 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
             </label>
           </div>
         ) : (
-          <div className="flex flex-col items-center gap-2 rounded border border-dashed border-zinc-700 bg-zinc-900 p-6 text-center">
+          <div className="flex flex-col items-center gap-2 rounded border border-dashed border-zinc-300 bg-zinc-50 p-6 text-center">
             <img
               src={getDancerAvatarUrl(cleared ? { gender } : { gender, avatarUrl: dancer.avatarUrl }, storageConfig.placeholders)}
               alt=""
-              className="h-20 w-20 rounded-full border-2 border-zinc-700 object-cover"
+              className="h-20 w-20 rounded-full border-2 border-zinc-300 object-cover"
             />
             <span className="text-xs text-zinc-500">
               {cleared ? 'Sẽ dùng ảnh mẫu theo giới tính' : 'Chưa có ảnh nửa người'}
@@ -196,7 +196,7 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
 
         <div className="flex flex-wrap gap-2">
           <label
-            className={`flex flex-1 items-center justify-center gap-1.5 rounded border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs font-bold uppercase transition-colors hover:bg-zinc-700 cursor-pointer ${
+            className={`flex flex-1 items-center justify-center gap-1.5 rounded border border-zinc-300 bg-zinc-100 px-3 py-2 text-xs font-bold uppercase transition-colors hover:bg-zinc-200 cursor-pointer ${
               MEDIA_URL ? '' : 'pointer-events-none opacity-50'
             }`}
           >
@@ -210,7 +210,7 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
                 setFile(null);
                 setCleared(true);
               }}
-              className="flex items-center gap-1.5 rounded border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-bold text-zinc-400 transition-colors hover:text-red-400 cursor-pointer"
+              className="flex items-center gap-1.5 rounded border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-bold text-zinc-500 transition-colors hover:text-red-400 cursor-pointer"
             >
               <Trash2 className="h-4 w-4" />
               Xoá ảnh
@@ -223,10 +223,10 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
           Ảnh được thu nhỏ (nửa người tối đa 1080×1440, avatar 320×320) và nén WebP trên máy này trước khi tải lên R2.
         </p>
 
-        <div className="flex items-center justify-end gap-2 border-t border-zinc-800 pt-3">
+        <div className="flex items-center justify-end gap-2 border-t border-zinc-200 pt-3">
           <button
             onClick={onClose}
-            className="rounded border border-zinc-700 bg-zinc-900 px-4 py-2 text-xs font-bold text-zinc-300 hover:bg-zinc-800 cursor-pointer"
+            className="rounded border border-zinc-300 bg-zinc-50 px-4 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
           >
             Huỷ
           </button>

@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Check, ChevronRight, Copy, QrCode, Search, X } from 'lucide-react';
+import { Check, ChevronRight, Search, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
-import { VIEW_PATHS } from '../../app/routes';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { GuestHeader } from './GuestBattleView';
 
 // Public prelim results (/ket-qua/prelim), phone first: one column, total score only; tap a dancer for details.
 // Reads the published copy: a dancer's scores appear only once all 4 prelim judges have scored (KG-06).
@@ -24,13 +24,12 @@ const Avatar: React.FC<{ dancer: Dancer; size: string }> = ({ dancer, size }) =>
   );
 
 export const PrelimGuestView: React.FC = () => {
-  const { activeCategory, setActiveCategory, newbieDancers, proDancers, prelimJudges, isNewbieTop32Locked, isProTop32Locked, navigate } =
+  const { activeCategory, setActiveCategory, newbieDancers, proDancers, prelimJudges, isNewbieTop32Locked, isProTop32Locked } =
     useTournament();
 
   const [scope, setScope] = useState<Scope>('top10');
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<Dancer | null>(null);
-  const [shareOpen, setShareOpen] = useState(false);
 
   const locked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
   const judgeCount = prelimJudges.length || 4;
@@ -65,27 +64,7 @@ export const PrelimGuestView: React.FC = () => {
 
   return (
     <div className="min-h-[100dvh] bg-zinc-50 text-zinc-900">
-      {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-2">
-          <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-10 w-auto" />
-          <button
-            onClick={() => setShareOpen(true)}
-            className="flex items-center gap-1.5 rounded-full border border-zinc-200 px-3 py-1.5 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
-          >
-            <QrCode className="h-4 w-4" />
-            Chia sẻ
-          </button>
-        </div>
-        <nav className="mx-auto flex max-w-2xl gap-5 px-4 text-sm font-bold" aria-label="Trang kết quả">
-          <span className="border-b-2 border-zinc-900 pb-2 text-zinc-900" aria-current="page">
-            Vòng loại
-          </span>
-          <button onClick={() => navigate(VIEW_PATHS.bracket_guest)} className="border-b-2 border-transparent pb-2 text-zinc-400 hover:text-zinc-700 cursor-pointer">
-            Nhánh đấu
-          </button>
-        </nav>
-      </header>
+      <GuestHeader current="prelim" />
 
       <main className="mx-auto max-w-2xl space-y-4 px-4 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         {/* Category */}
@@ -247,7 +226,6 @@ export const PrelimGuestView: React.FC = () => {
           onClose={() => setSelected(null)}
         />
       )}
-      {shareOpen && <ShareSheet url={`${window.location.origin}${VIEW_PATHS.prelim_guest}`} onClose={() => setShareOpen(false)} />}
     </div>
   );
 };
@@ -313,50 +291,6 @@ const DancerSheet: React.FC<{
             Điểm sẽ hiện khi cả {judges.length} giám khảo chấm xong.
           </p>
         )}
-      </div>
-    </div>
-  );
-};
-
-const ShareSheet: React.FC<{ url: string; onClose: () => void }> = ({ url, onClose }) => {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // clipboard blocked: the link is shown to copy by hand
-    }
-  };
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 sm:items-center" onClick={onClose}>
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Chia sẻ kết quả"
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-sm rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-center sm:rounded-3xl"
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="font-condensed text-xl font-black uppercase">Quét để xem kết quả</h2>
-          <button onClick={onClose} aria-label="Đóng" className="-m-1 rounded-full p-2 text-zinc-400 hover:bg-zinc-100 cursor-pointer">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <img
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`}
-          alt="Mã QR trang kết quả"
-          className="mx-auto mt-3 h-52 w-52"
-        />
-        <p className="mt-2 break-all font-mono text-xs text-zinc-500">{url}</p>
-        <button
-          onClick={copy}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-zinc-900 py-3 text-sm font-bold text-white hover:bg-zinc-700 cursor-pointer"
-        >
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? 'Đã sao chép link' : 'Sao chép link'}
-        </button>
       </div>
     </div>
   );

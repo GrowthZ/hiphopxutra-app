@@ -78,38 +78,38 @@ export const MediaStoragePanel: React.FC = () => {
 
   return (
     <div className="space-y-3 text-xs">
-      <div className="space-y-1.5 rounded border border-zinc-800 bg-zinc-900 p-3">
-        <div className="flex items-center gap-2 font-bold uppercase tracking-wide text-zinc-200">
-          <Cloud className="h-4 w-4 text-amber-400" />
+      <div className="space-y-1.5 rounded border border-zinc-200 bg-zinc-50 p-3">
+        <div className="flex items-center gap-2 font-bold uppercase tracking-wide text-zinc-800">
+          <Cloud className="h-4 w-4 text-amber-600" />
           Cloudflare R2 qua Worker ảnh
         </div>
         {MEDIA_URL ? (
-          <p className="flex items-center gap-1.5 text-emerald-400">
+          <p className="flex items-center gap-1.5 text-emerald-700">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span className="break-all font-mono">{MEDIA_URL}</span>
           </p>
         ) : (
-          <p className="flex items-start gap-1.5 text-amber-300">
+          <p className="flex items-start gap-1.5 text-amber-700">
             <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" />
             Chưa cấu hình. Deploy Worker trong thư mục <code>worker/</code> rồi đặt <code>VITE_MEDIA_URL</code> khi build
             (xem HUONG-DAN-CHAY.md).
           </p>
         )}
-        <p className="leading-relaxed text-zinc-400">
+        <p className="leading-relaxed text-zinc-500">
           Ảnh được thu nhỏ và nén WebP ngay trên máy admin, rồi lưu trên R2. Firestore chỉ giữ đường link, nên khán giả
           tải nhanh; ảnh được cache 1 năm ở trình duyệt và CDN Cloudflare.
         </p>
       </div>
 
-      <div className="space-y-2 rounded border border-zinc-800 bg-zinc-900 p-3">
-        <div className="font-bold uppercase tracking-wide text-zinc-200">Ảnh cũ còn nằm trong dữ liệu</div>
+      <div className="space-y-2 rounded border border-zinc-200 bg-zinc-50 p-3">
+        <div className="font-bold uppercase tracking-wide text-zinc-800">Ảnh cũ còn nằm trong dữ liệu</div>
         {jobs.length === 0 && !progress ? (
-          <p className="flex items-center gap-1.5 text-emerald-400">
+          <p className="flex items-center gap-1.5 text-emerald-700">
             <CheckCircle2 className="h-4 w-4" /> Không còn ảnh nào cần chuyển.
           </p>
         ) : (
           <>
-            <p className="text-zinc-400">
+            <p className="text-zinc-500">
               {jobs.length} ảnh (thí sinh, đội, giám khảo) đang lưu thẳng trong Firestore, làm khán giả tải chậm.
             </p>
             <button
@@ -123,12 +123,12 @@ export const MediaStoragePanel: React.FC = () => {
           </>
         )}
         {progress && !running && (
-          <p className="text-zinc-300">
+          <p className="text-zinc-700">
             Xong {progress.total - errors.length}/{progress.total} ảnh.
           </p>
         )}
         {errors.length > 0 && (
-          <ul className="max-h-32 list-disc space-y-0.5 overflow-y-auto pl-4 text-red-300">
+          <ul className="max-h-32 list-disc space-y-0.5 overflow-y-auto pl-4 text-red-700">
             {errors.map((e) => (
               <li key={e}>{e}</li>
             ))}

@@ -124,19 +124,19 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 select-none">
-      <div className="bg-zinc-950 border border-zinc-800 text-white w-full max-w-2xl rounded p-5 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-900/40 select-none">
+      <div className="bg-white border border-zinc-200 text-zinc-900 w-full max-w-2xl rounded p-5 shadow-xl space-y-4 max-h-[92vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+        <div className="flex items-center justify-between border-b border-zinc-200 pb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded bg-zinc-900 border border-zinc-800 text-zinc-200 flex items-center justify-center">
-              <Cloud className="w-4 h-4 text-emerald-400" />
+            <div className="w-8 h-8 rounded bg-zinc-50 border border-zinc-200 text-zinc-800 flex items-center justify-center">
+              <Cloud className="w-4 h-4 text-emerald-700" />
             </div>
             <div>
-              <h2 className="font-condensed font-black text-lg sm:text-xl tracking-tight text-white uppercase">
+              <h2 className="font-condensed font-black text-lg sm:text-xl tracking-tight text-zinc-900 uppercase">
                 Cài Đặt Lưu Trữ & Ảnh Mẫu (Placeholder)
               </h2>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[11px] text-zinc-500">
                 Kho ảnh Cloudflare R2 và ảnh mặc định theo giới tính
               </p>
             </div>
@@ -144,23 +144,23 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
 
           <button
             onClick={onClose}
-            className="p-1 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="p-1 rounded bg-zinc-50 hover:bg-zinc-100 text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Top Tab Switcher */}
-        <div className="flex items-center gap-2 bg-zinc-900 p-1 rounded border border-zinc-800 text-xs font-bold">
+        <div className="flex items-center gap-2 bg-zinc-100 p-1 rounded border border-zinc-200 text-xs font-bold">
           <button
             onClick={() => setActiveTab('storage')}
             className={`flex-1 py-1.5 px-3 rounded transition-colors text-center cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'storage'
-                ? 'bg-zinc-800 text-white shadow-xs'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-white text-zinc-900 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900'
             }`}
           >
-            <Database className="w-3.5 h-3.5 text-amber-400" />
+            <Database className="w-3.5 h-3.5 text-amber-600" />
             <span>1. Kho ảnh Cloudflare R2</span>
           </button>
 
@@ -168,11 +168,11 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
             onClick={() => setActiveTab('placeholders')}
             className={`flex-1 py-1.5 px-3 rounded transition-colors text-center cursor-pointer flex items-center justify-center gap-1.5 ${
               activeTab === 'placeholders'
-                ? 'bg-zinc-800 text-white shadow-xs'
-                : 'text-zinc-400 hover:text-white'
+                ? 'bg-white text-zinc-900 shadow-xs'
+                : 'text-zinc-500 hover:text-zinc-900'
             }`}
           >
-            <ImageIcon className="w-3.5 h-3.5 text-emerald-400" />
+            <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
             <span>2. Cài Đặt Ảnh Mẫu (Placeholder Nam / Nữ / 2v2)</span>
           </button>
         </div>
@@ -183,19 +183,19 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
         {/* TAB 2: Placeholders Setting */}
         {activeTab === 'placeholders' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between bg-zinc-900/80 p-3 rounded border border-zinc-800">
+            <div className="flex items-center justify-between bg-zinc-50 p-3 rounded border border-zinc-200">
               <div>
-                <div className="text-xs font-bold text-white uppercase tracking-wide">
+                <div className="text-xs font-bold text-zinc-900 uppercase tracking-wide">
                   Cấu Hình Ảnh Mẫu Khi Chưa Có Ảnh
                 </div>
-                <div className="text-[11px] text-zinc-400">
+                <div className="text-[11px] text-zinc-500">
                   Hệ thống tự động hiển thị ảnh mẫu theo giới tính (Nam / Nữ) và thể loại (1v1 / 2v2)
                 </div>
               </div>
 
               <button
                 onClick={resetAllPlaceholders}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs font-semibold cursor-pointer border border-zinc-700 transition-colors"
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs font-semibold cursor-pointer border border-zinc-300 transition-colors"
                 title="Khôi phục toàn bộ ảnh mẫu về đồ họa chuẩn WDSF"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -214,15 +214,15 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
                 return (
                   <div
                     key={slot.key}
-                    className="p-3 bg-zinc-900 rounded border border-zinc-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-zinc-700 transition-colors"
+                    className="p-3 bg-zinc-50 rounded border border-zinc-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-zinc-300 transition-colors"
                   >
                     {/* Left: Preview thumbnail & Label */}
                     <div className="flex items-center gap-3">
-                      <div className="relative shrink-0 flex items-center justify-center p-1 bg-zinc-950 rounded border border-zinc-800">
+                      <div className="relative shrink-0 flex items-center justify-center p-1 bg-white rounded border border-zinc-200">
                         <img
                           src={activeSrc}
                           alt={slot.label}
-                          className={`${slot.aspect} object-cover object-center border border-zinc-700`}
+                          className={`${slot.aspect} object-cover object-center border border-zinc-300`}
                         />
                         {isCustomized && (
                           <span
@@ -236,19 +236,19 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
 
                       <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
-                          <span className="font-condensed font-black text-sm text-white uppercase tracking-tight">
+                          <span className="font-condensed font-black text-sm text-zinc-900 uppercase tracking-tight">
                             {slot.label}
                           </span>
-                          <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-400 font-mono text-[10px] uppercase font-bold">
+                          <span className="px-1.5 py-0.2 rounded bg-zinc-100 text-zinc-500 font-mono text-[10px] uppercase font-bold">
                             {slot.category}
                           </span>
                         </div>
-                        <div className="text-[11px] text-zinc-400 leading-tight">
+                        <div className="text-[11px] text-zinc-500 leading-tight">
                           {slot.hint}
                         </div>
                         <div className="text-[10px] font-semibold text-zinc-500">
                           {isCustomized ? (
-                            <span className="text-emerald-400">Đang dùng ảnh tải lên của BTC</span>
+                            <span className="text-emerald-700">Đang dùng ảnh tải lên của BTC</span>
                           ) : (
                             <span>Đang dùng ảnh đồ họa mặc định giải đấu</span>
                           )}
@@ -259,8 +259,8 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
                     {/* Right: Actions */}
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
                       {/* Upload Button */}
-                      <label className="px-3 py-1.5 rounded bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-1.5 transition-colors">
-                        <Upload className="w-3.5 h-3.5 text-zinc-400" />
+                      <label className="px-3 py-1.5 rounded bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 text-zinc-900 font-bold text-xs uppercase cursor-pointer flex items-center justify-center gap-1.5 transition-colors">
+                        <Upload className="w-3.5 h-3.5 text-zinc-500" />
                         <span>{isCurrentUploading ? 'Đang tải...' : 'Tải ảnh lên'}</span>
                         <input
                           type="file"
@@ -285,7 +285,7 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
                             [slot.key]: convertGoogleDriveUrl(e.target.value),
                           }))
                         }
-                        className="px-2.5 py-1.5 rounded bg-zinc-950 border border-zinc-700 text-white font-mono text-[11px] outline-none w-full sm:w-40"
+                        className="px-2.5 py-1.5 rounded bg-white border border-zinc-300 text-zinc-900 font-mono text-[11px] outline-none w-full sm:w-40"
                       />
 
                       {/* Reset Single Slot */}
@@ -297,7 +297,7 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
                               [slot.key]: '',
                             }))
                           }
-                          className="p-1.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 transition-colors cursor-pointer"
+                          className="p-1.5 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-red-400 transition-colors cursor-pointer"
                           title="Xóa ảnh riêng, khôi phục ảnh đồ họa chuẩn"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -312,15 +312,15 @@ export const StorageConfigModal: React.FC<StorageConfigModalProps> = ({ isOpen, 
         )}
 
         {/* Footer Actions */}
-        <div className="pt-2 border-t border-zinc-800 flex items-center justify-between">
-          <div className="text-xs text-emerald-400 font-bold">
+        <div className="pt-2 border-t border-zinc-200 flex items-center justify-between">
+          <div className="text-xs text-emerald-700 font-bold">
             {saveSuccess && '✓ Đã lưu cấu hình thành công!'}
           </div>
 
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-3 py-1.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 font-bold text-xs cursor-pointer"
+              className="px-3 py-1.5 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-700 font-bold text-xs cursor-pointer"
             >
               Hủy
             </button>
