@@ -7,8 +7,9 @@ import { StageSceneType } from '../../domain/types';
 
 const LED_WIDTH = 1920;
 
-/** Live preview: the real /led page in an iframe, scaled down — identical to what the venue sees. */
-const LedPreview: React.FC = () => {
+/** Live preview: the real /led page in an iframe, scaled down — identical to what the venue sees.
+ *  `arch`: the stepped-arch wall layout with its cabinet grid (/led?khung=vom&luoi=1). */
+const LedPreview: React.FC<{ arch: boolean }> = ({ arch }) => {
   const boxRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.4);
 
@@ -23,7 +24,7 @@ const LedPreview: React.FC = () => {
   return (
     <div ref={boxRef} className="relative w-full aspect-video overflow-hidden rounded-lg border border-zinc-300 bg-black">
       <iframe
-        src={`${VIEW_PATHS.stage}?preview=1`}
+        src={`${VIEW_PATHS.stage}?preview=1${arch ? '&khung=vom&luoi=1' : ''}`}
         title="Xem trước màn LED"
         className="absolute top-0 left-0 origin-top-left border-0 pointer-events-none"
         style={{ width: LED_WIDTH, height: (LED_WIDTH * 9) / 16, transform: `scale(${scale})` }}
@@ -41,6 +42,7 @@ const SCENES: { id: StageSceneType; label: string; icon: React.ElementType }[] =
 export const StageControlView: React.FC = () => {
   const { authUser, matches, activeMatch, setActiveMatchId, judges, triggerTeamEntrance, triggerVictoryAnimation } =
     useTournament();
+  const [archPreview, setArchPreview] = useState(false);
   const { state, error, isScreenOnline, setScene, setCategory, setTheme, setBlackout } = useStageController(
     DEFAULT_SCREEN_ID,
     authUser?.email ?? ''
@@ -97,6 +99,20 @@ export const StageControlView: React.FC = () => {
             <ExternalLink className="w-3.5 h-3.5" />
             Mở /led
           </a>
+          <a
+            href={`${VIEW_PATHS.stage}?khung=vom`}
+            target="_blank"
+            rel="noreferrer"
+            title="Màn LED vòm bậc thang 10m × 5,5m (20 × 11 module), xuất HDMI 1920×1080"
+            className="flex items-center gap-1.5 rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 transition-colors focus-visible:outline-2 focus-visible:outline-amber-500"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            Mở LED vòm
+          </a>
+          <label className="flex items-center gap-1.5 text-xs font-bold text-zinc-700 cursor-pointer">
+            <input type="checkbox" checked={archPreview} onChange={(e) => setArchPreview(e.target.checked)} className="h-4 w-4 accent-zinc-900" />
+            Xem trước khung vòm
+          </label>
 
           <button
             onClick={() => setBlackout(!state.blackout)}
@@ -120,7 +136,7 @@ export const StageControlView: React.FC = () => {
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
         {/* Preview + live match status */}
         <div className="space-y-3">
-          <LedPreview />
+          <LedPreview arch={archPreview} />
           {state.blackout && (
             <p className="text-xs font-bold text-red-600">Đang Blackout: LED hiện màn logo, cảnh bên phải sẽ hiện lại khi bật lại.</p>
           )}

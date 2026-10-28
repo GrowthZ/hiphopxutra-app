@@ -60,6 +60,25 @@ và trả ảnh cho mọi người với cache 1 năm (trình duyệt + CDN Clou
 Tải ảnh thí sinh: chỉ cần **1 ảnh nửa người**; kéo/phóng vòng tròn để chọn khuôn mặt làm avatar
 (nửa người tối đa 1080×1440, avatar 320×320). Bấm vào ảnh thí sinh lần sau để cắt lại avatar, không cần tải lại.
 
+## 0c. Màn LED vòm bậc thang (sân khấu chính)
+
+Màn LED 10 m × 5,5 m dạng vòm bậc thang dùng bố cục riêng cho cảnh **Trận Battle**: mở `/led?khung=vom`
+trên máy nối LED qua HDMI (xuất 1920×1080), bấm vào màn hình để vào toàn màn hình. Hình được vẽ ở góc trên trái,
+chỉ trong phần có LED; tên + tỉ số nằm ở độ cao 2–3,1 m (trên đầu người đứng trên sàn), phần dưới 1,3 m chỉ có
+tên sự kiện vì thường bị che. Admin xem trước ở `/admin/led` → **Xem trước khung vòm**.
+
+Đang dùng số **ước lượng** từ bản vẽ: 20 cột × 11 hàng module 500 mm, chiều cao từng cột (từ ngoài vào giữa)
+5, 7, 8, 8, 9, 10, 10, 11, 11, 11 module, 96 px mỗi module. Khi bên LED gửi sơ đồ thật, chỉ cần sửa link:
+
+| Tham số | Ý nghĩa | Ví dụ |
+|---|---|---|
+| `cot` | Số module mỗi cột: nửa trái (tự lấy đối xứng) hoặc đủ 20 cột | `cot=5,7,8,8,9,10,10,11,11,11` |
+| `module` | Số pixel mỗi module trong khung HDMI | `module=96` |
+| `luoi=1` | Vẽ lưới module và vùng bị cắt, để căn với màn thật | `luoi=1` |
+
+Ví dụ: `/led?khung=vom&cot=6,7,8,9,9,10,10,11,11,11&module=96&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim**
+vẫn là bố cục 16:9.
+
 ## Yêu cầu
 
 - **Node.js 20+** (đã test với Node 24)

@@ -4,6 +4,8 @@ import { useStageState, DEFAULT_SCREEN_ID } from '../../state/useStage';
 import { IS_LED_PREVIEW } from '../../app/routes';
 import { soundFX } from '../../services/soundEffects';
 import { StageDisplayView } from './StageDisplayView';
+import { ArchBattleView } from './ArchBattleView';
+import { IS_ARCH_LED } from './archLayout';
 import { PrelimResultsView } from '../prelim/PrelimResultsView';
 
 const CURSOR_HIDE_MS = 3000;
@@ -22,6 +24,7 @@ const StageIdleScreen: React.FC = () => (
 /**
  * /led: what the venue screen shows, driven entirely by admins from /admin/led.
  * Kiosk mode: no operator controls, no clicks reach the views, cursor hides when idle.
+ * /led?khung=vom: the battle scene laid out for the stepped-arch LED wall (see archLayout.ts).
  */
 export const LedScreen: React.FC = () => {
   const { setActiveCategory } = useTournament();
@@ -66,7 +69,7 @@ export const LedScreen: React.FC = () => {
     <div className={`relative min-h-screen bg-black ${cursorHidden ? 'cursor-none' : ''}`}>
       <div className="kiosk">
         {scene === 'idle' && <StageIdleScreen />}
-        {scene === 'battle' && <StageDisplayView theme={state.theme} />}
+        {scene === 'battle' && (IS_ARCH_LED ? <ArchBattleView /> : <StageDisplayView theme={state.theme} />)}
         {scene === 'prelim_leaderboard' && <PrelimResultsView />}
       </div>
 
