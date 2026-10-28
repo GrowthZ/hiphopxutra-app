@@ -41,8 +41,8 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
 
   await judge.getByRole('button', { name: /VÀO BÀN CHẤM ĐIỂM NGAY/ }).click();
   await judge.getByRole('button', { name: /Chấm Prelim/ }).click();
-  await judge.getByRole('button', { name: '70', exact: true }).click();
-  await judge.getByRole('button', { name: /XÁC NHẬN CHẤM: 70 ĐIỂM/ }).click();
+  for (const key of '70') await judge.getByRole('button', { name: key, exact: true }).click();
+  await judge.getByRole('button', { name: /Lưu 70 điểm/ }).click();
 
   // The score lands in the raw (admin-only) dancer doc, written by the judge's own account.
   await expect
