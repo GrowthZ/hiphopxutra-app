@@ -1,6 +1,6 @@
 // Service worker for the installable judge app. Keeps the app shell and its hashed assets cached so the app
 // opens instantly and survives a flaky venue Wi-Fi; live data still comes from Firestore (never cached here).
-const CACHE = 'hhxt-shell-v1';
+const CACHE = 'hhxt-shell-v2';
 const SHELL = '/index.html';
 
 self.addEventListener('install', (event) => {
