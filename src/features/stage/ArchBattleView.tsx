@@ -96,6 +96,11 @@ export const ArchBattleView: React.FC = () => {
   const round = shownRound(match);
   const roundOpen = round ? isRoundOpen(round) : false;
   const roundLabel = (r?: BattleRound) => (!r ? '' : r.isTieBreak ? 'Tie-break' : `Round ${r.roundNumber}`);
+  // Announced result: the match winner once it's over, else the round just revealed (until the next votes come in).
+  const winner =
+    match.status === 'finished' && match.winnerSide ? match.winnerSide : roundOpen && round?.winner ? round.winner : null;
+  const lost = (side: 'red' | 'blue') => winner !== null && winner !== side;
+  const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35 transition-all duration-700' : 'transition-all duration-700');
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black">
@@ -120,30 +125,47 @@ export const ArchBattleView: React.FC = () => {
           </div>
 
           {/* Corner photos, inside the steps */}
-          <div key={`r-${match.id}`} style={box(0.2, 0.47, PHOTO.top, PHOTO.bottom)} className="led-rise">
+          <div key={`r-${match.id}`} style={box(0.2, 0.47, PHOTO.top, PHOTO.bottom)} className={`led-rise ${dim('red')}`}>
             {photo(match.sideRed, 'red')}
           </div>
-          <div key={`b-${match.id}`} style={box(0.53, 0.8, PHOTO.top, PHOTO.bottom)} className="led-rise">
+          <div key={`b-${match.id}`} style={box(0.53, 0.8, PHOTO.top, PHOTO.bottom)} className={`led-rise ${dim('blue')}`}>
             {photo(match.sideBlue, 'blue')}
           </div>
 
-          {/* VS + round, between the photos */}
-          <div style={box(0.455, 0.545, 0.84, 0.6)} className="flex flex-col items-center justify-center gap-3">
-            <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">VS</span>
-            <span className="rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
-              {roundLabel(match.rounds.find((r) => r.roundNumber === match.currentRound))}
-            </span>
-          </div>
+          {/* Centre: VS + round, or the announced winner */}
+          {winner ? (
+            <div key={`win-${winner}-${round?.roundNumber}`} style={box(0.3, 0.7, 0.86, 0.58)} className="led-pop flex flex-col items-center justify-center">
+              <span
+                className={`font-condensed text-[230px] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
+                  winner === 'red'
+                    ? 'drop-shadow-[0_0_50px_rgba(239,68,68,0.95)] [-webkit-text-stroke:6px_#dc2626]'
+                    : 'drop-shadow-[0_0_50px_rgba(59,130,246,0.95)] [-webkit-text-stroke:6px_#2563eb]'
+                }`}
+              >
+                {winner === 'red' ? 'Red' : 'Blue'} win
+              </span>
+              <span className={`mt-3 rounded-full px-6 py-2 font-condensed text-[36px] font-black uppercase leading-none ${winner === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}>
+                {match.status === 'finished' ? 'Chung cuộc' : roundLabel(round)}
+              </span>
+            </div>
+          ) : (
+            <div style={box(0.455, 0.545, 0.84, 0.6)} className="flex flex-col items-center justify-center gap-3">
+              <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">VS</span>
+              <span className="rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
+                {roundLabel(match.rounds.find((r) => r.roundNumber === match.currentRound))}
+              </span>
+            </div>
+          )}
 
           {/* Names + score: 2.0–3.1 m, above the dancers */}
-          <NameBoard color="red" name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} style={box(0.05, 0.445, BAND.top, BAND.bottom)} />
-          <div style={box(0.45, 0.497, BAND.top - 0.015, BAND.bottom + 0.015)} className="flex items-center justify-center rounded-2xl bg-red-600 ring-4 ring-red-300/60 shadow-[0_0_50px_rgba(239,68,68,0.6)]">
+          <NameBoard color="red" lost={lost('red')} name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} style={box(0.05, 0.445, BAND.top, BAND.bottom)} />
+          <div style={box(0.45, 0.497, BAND.top - 0.015, BAND.bottom + 0.015)} className={`flex items-center justify-center rounded-2xl transition-all duration-700 ${lost('red') ? 'bg-zinc-600 opacity-50' : 'bg-red-600 ring-4 ring-red-300/60 shadow-[0_0_50px_rgba(239,68,68,0.6)]'}`}>
             <span className="font-condensed text-[150px] font-black tabular-nums leading-none">{match.roundWinsRed}</span>
           </div>
-          <div style={box(0.503, 0.55, BAND.top - 0.015, BAND.bottom + 0.015)} className="flex items-center justify-center rounded-2xl bg-blue-600 ring-4 ring-blue-300/60 shadow-[0_0_50px_rgba(59,130,246,0.6)]">
+          <div style={box(0.503, 0.55, BAND.top - 0.015, BAND.bottom + 0.015)} className={`flex items-center justify-center rounded-2xl transition-all duration-700 ${lost('blue') ? 'bg-zinc-600 opacity-50' : 'bg-blue-600 ring-4 ring-blue-300/60 shadow-[0_0_50px_rgba(59,130,246,0.6)]'}`}>
             <span className="font-condensed text-[150px] font-black tabular-nums leading-none">{match.roundWinsBlue}</span>
           </div>
-          <NameBoard color="blue" name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} style={box(0.555, 0.95, BAND.top, BAND.bottom)} />
+          <NameBoard color="blue" lost={lost('blue')} name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} style={box(0.555, 0.95, BAND.top, BAND.bottom)} />
 
           {/* One strip with the 9 judges */}
           <div style={box(0.05, 0.95, JUDGES.top, JUDGES.bottom)} className="flex items-stretch gap-3 rounded-2xl bg-black/50 p-2.5 ring-1 ring-white/15">
@@ -165,14 +187,14 @@ export const ArchBattleView: React.FC = () => {
                 <div
                   key={j.id}
                   className={`flex flex-1 flex-col items-center justify-center gap-2 rounded-xl ${
-                    shown ? (vote === 'red' ? 'bg-red-600' : 'bg-blue-600') : vote ? 'bg-amber-400/20 ring-2 ring-amber-400' : 'bg-white/10'
+                    shown ? (vote === 'red' ? 'bg-red-600' : 'bg-blue-600') : vote ? 'bg-emerald-600 shadow-[0_0_24px_rgba(16,185,129,0.5)]' : 'bg-white/10'
                   }`}
                 >
                   <span className="font-condensed text-[22px] font-black uppercase leading-none text-white/70">
                     {j.judgeName || j.code}
                   </span>
                   <span className="font-condensed text-[38px] font-black uppercase leading-none">
-                    {shown ? (vote === 'red' ? 'Đỏ' : 'Xanh') : vote ? <Check className="h-9 w-9 text-amber-300" strokeWidth={4} /> : '·'}
+                    {shown ? (vote === 'red' ? 'Đỏ' : 'Xanh') : vote ? <Check className="h-9 w-9 text-white" strokeWidth={4} /> : '·'}
                   </span>
                 </div>
               );
@@ -193,13 +215,21 @@ export const ArchBattleView: React.FC = () => {
   );
 };
 
-const NameBoard: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; style: React.CSSProperties }> = ({ color, name, sub, style }) => (
+const NameBoard: React.FC<{ color: 'red' | 'blue'; lost: boolean; name: string; sub: string; style: React.CSSProperties }> = ({
+  color,
+  lost,
+  name,
+  sub,
+  style,
+}) => (
   <div
     style={style}
-    className={`led-rise flex flex-col justify-center gap-2 rounded-2xl px-8 ${
-      color === 'red'
-        ? 'items-start bg-gradient-to-r from-red-700 to-red-500 shadow-[0_0_60px_rgba(239,68,68,0.45)]'
-        : 'items-end bg-gradient-to-l from-blue-700 to-blue-500 text-right shadow-[0_0_60px_rgba(59,130,246,0.45)]'
+    className={`led-rise flex flex-col justify-center gap-2 rounded-2xl px-8 transition-all duration-700 ${color === 'red' ? 'items-start' : 'items-end text-right'} ${
+      lost
+        ? 'bg-zinc-700 opacity-45 grayscale'
+        : color === 'red'
+          ? 'bg-gradient-to-r from-red-700 to-red-500 shadow-[0_0_60px_rgba(239,68,68,0.45)]'
+          : 'bg-gradient-to-l from-blue-700 to-blue-500 shadow-[0_0_60px_rgba(59,130,246,0.45)]'
     }`}
   >
     <span className="text-[22px] font-black uppercase tracking-[0.3em] text-white/70">{color === 'red' ? 'Góc đỏ' : 'Góc xanh'}</span>

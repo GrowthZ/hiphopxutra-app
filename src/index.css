@@ -194,3 +194,14 @@
 @media (prefers-reduced-motion: reduce) {
   .led-rise, .led-shine, .led-flash, .led-ticker-in { animation: none; }
 }
+
+/* Arch LED: RED WIN / BLUE WIN pops in when a result is announced */
+@keyframes led-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: none; }
+}
+.led-pop { animation: led-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+@media (prefers-reduced-motion: reduce) {
+  .led-pop { animation: none; }
+}
