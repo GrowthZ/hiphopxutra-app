@@ -52,8 +52,8 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
   // Battle vote for the active match, round 1 (goes through the votes rule).
   const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
   await judge.getByRole('button', { name: /Chấm Battle/ }).click();
-  await judge.getByText('GÓC ĐỎ').click();
-  await judge.getByRole('button', { name: 'Xác nhận chọn đội đỏ' }).click();
+  await judge.getByRole('button', { name: /Chọn góc đỏ/ }).click();
+  await judge.getByRole('button', { name: /Gửi phiếu: Đỏ/ }).click();
   await waitForDoc<{ r1?: Record<string, string> }>(`votes/${activeMatchId}`, (v) => v?.r1?.['gk-1'] === 'red');
   await expect(judge.getByRole('alert')).toBeHidden(); // no sync error banner
   await context.close();

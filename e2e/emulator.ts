@@ -31,18 +31,22 @@ export const createJudge = (judgeId: string, pin: string) =>
 /** Signs in through the Auth emulator's fake Google popup. */
 export async function signInAdmin(page: Page, path = '/admin/prelim') {
   await page.goto(path);
-  const popupPromise = page.waitForEvent('popup');
-  await page.getByRole('button', { name: 'Đăng nhập bằng Google' }).click();
-  const popup = await popupPromise;
-  await popup.waitForLoadState('networkidle');
-  // The emulator page wires its buttons after load; click until the account form shows.
+  const googleButton = page.getByRole('button', { name: 'Đăng nhập bằng Google' });
+  // The emulator's popup sometimes closes without handing the result back; start over when it does.
   await expect(async () => {
-    await popup.getByText('Add new account').click({ timeout: 2_000 });
-    await expect(popup.locator('#email-input')).toBeVisible({ timeout: 1_000 });
-  }).toPass({ timeout: 15_000 });
-  await popup.locator('#email-input').fill(ADMIN_EMAIL);
-  await popup.getByRole('button', { name: /Sign in with Google/i }).click();
-  await expect(page.getByRole('button', { name: 'Đăng nhập bằng Google' })).toBeHidden();
+    const popupPromise = page.waitForEvent('popup');
+    await googleButton.click();
+    const popup = await popupPromise;
+    await popup.waitForLoadState('networkidle');
+    // The emulator page wires its buttons after load; click until the account form shows.
+    await expect(async () => {
+      await popup.getByText('Add new account').click({ timeout: 2_000 });
+      await expect(popup.locator('#email-input')).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await popup.locator('#email-input').fill(ADMIN_EMAIL);
+    await popup.getByRole('button', { name: /Sign in with Google/i }).click();
+    await expect(googleButton).toBeHidden({ timeout: 8_000 });
+  }).toPass({ timeout: 45_000 });
 }
 
 /** Waits until a Firestore doc satisfies `check` (the app writes asynchronously). */
