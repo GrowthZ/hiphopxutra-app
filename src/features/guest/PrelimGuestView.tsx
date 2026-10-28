@@ -11,11 +11,11 @@ import { GuestHeader } from './GuestBattleView';
 // in a shuffled order without scores, so nobody can tell who came last.
 
 type Scope = 'top10' | 'top32' | 'all';
-const QUALIFY = 32;
+export const QUALIFY = 32;
 const RANKED_UNTIL = 40;
-const LIVE_LIMIT = 10;
+export const LIVE_LIMIT = 10;
 // Gold, silver, bronze: row tint and rank badge.
-const PODIUM = [
+export const PODIUM = [
   { row: 'bg-amber-50', badge: 'bg-amber-400 text-amber-950' },
   { row: 'bg-zinc-100', badge: 'bg-zinc-300 text-zinc-800' },
   { row: 'bg-orange-50', badge: 'bg-orange-300 text-orange-950' },
@@ -26,12 +26,21 @@ const CHEERS = [
   'Hiphop là hành trình, không phải một trận đấu. Giữ lửa đam mê, lần sau bạn sẽ còn bùng nổ hơn nữa!',
 ];
 
-const isScored = (d: Dancer, judges: number) => Object.keys(d.prelimScores ?? {}).length >= judges;
+export const isScored = (d: Dancer, judges: number) => Object.keys(d.prelimScores ?? {}).length >= judges;
+
+/** Public ranking: fully scored dancers by total; those still being scored go last, by SBD. */
+export const rankForDisplay = (list: Dancer[], judges: number) =>
+  [...list].sort(
+    (a, b) =>
+      Number(isScored(b, judges)) - Number(isScored(a, judges)) ||
+      b.prelimScoreTotal - a.prelimScoreTotal ||
+      a.sbd.localeCompare(b.sbd)
+  );
 
 /** Stable pseudo-random number per dancer: the 40+ group keeps one shuffled order across renders. */
 const hashOf = (id: string) => [...id].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 7) >>> 0;
 
-const GenderBadge: React.FC<{ dancer: Dancer }> = ({ dancer }) =>
+export const GenderBadge: React.FC<{ dancer: Dancer }> = ({ dancer }) =>
   dancer.gender === 'female' ? (
     <span className="shrink-0 rounded-full bg-pink-100 px-2 py-0.5 text-[10px] font-black uppercase text-pink-700">BGirl</span>
   ) : (
@@ -50,7 +59,7 @@ const RankBadge: React.FC<{ rank: number; scored: boolean }> = ({ rank, scored }
     </span>
   );
 
-const Avatar: React.FC<{ dancer: Dancer; size: string }> = ({ dancer, size }) =>
+export const Avatar: React.FC<{ dancer: Dancer; size: string }> = ({ dancer, size }) =>
   dancer.avatarUrl ? (
     <img src={dancer.avatarUrl} alt="" loading="lazy" decoding="async" className={`${size} shrink-0 rounded-full object-cover bg-zinc-100`} />
   ) : (
@@ -71,15 +80,10 @@ export const PrelimGuestView: React.FC = () => {
   const judgeCount = prelimJudges.length || 4;
 
   // Ranked by total; dancers still being scored go last, by SBD.
-  const ranked = useMemo(() => {
-    const list = activeCategory === 'newbie_1v1' ? newbieDancers : proDancers;
-    return [...list].sort(
-      (a, b) =>
-        Number(isScored(b, judgeCount)) - Number(isScored(a, judgeCount)) ||
-        b.prelimScoreTotal - a.prelimScoreTotal ||
-        a.sbd.localeCompare(b.sbd)
-    );
-  }, [activeCategory, newbieDancers, proDancers, judgeCount]);
+  const ranked = useMemo(
+    () => rankForDisplay(activeCategory === 'newbie_1v1' ? newbieDancers : proDancers, judgeCount),
+    [activeCategory, newbieDancers, proDancers, judgeCount]
+  );
   const scoredCount = ranked.filter((d) => isScored(d, judgeCount)).length;
 
   // While judging is on, only the provisional top 10 is public (search included).

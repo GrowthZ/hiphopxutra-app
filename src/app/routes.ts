@@ -3,6 +3,7 @@ import { ActiveViewType } from '../domain/types';
 export const VIEW_PATHS: Record<ActiveViewType, string> = {
   prelim_guest: '/ket-qua/prelim',
   prelim_results: '/ket-qua/bang-xep-hang',
+  prelim_screen: '/ket-qua/trinh-chieu',
   bracket_guest: '/ket-qua/nhanh-dau',
   match_guest: '/ket-qua/tran', // + '/{matchSlug}'
   judge: '/giam-khao',

@@ -15,6 +15,7 @@ import { JudgePortalView } from './features/judge/JudgePortalView';
 import { InstallAppButton } from './features/judge/InstallAppButton';
 import { PrelimResultsView } from './features/prelim/PrelimResultsView';
 import { PrelimGuestView } from './features/guest/PrelimGuestView';
+import { PrelimScreenView } from './features/guest/PrelimScreenView';
 import { GuestBracketView, GuestMatchView } from './features/guest/GuestBattleView';
 import { DancersListView } from './features/dancers/DancersListView';
 import { GoogleSheetSyncModal } from './features/settings/GoogleSheetSyncModal';
@@ -66,6 +67,7 @@ const MainContent: React.FC = () => {
   if (activeView === 'prelim_guest') {
     return <PrelimGuestView />;
   }
+  if (activeView === 'prelim_screen') return <PrelimScreenView />;
   if (activeView === 'bracket_guest') return <GuestBracketView />;
   if (activeView === 'match_guest') return <GuestMatchView />;
 
