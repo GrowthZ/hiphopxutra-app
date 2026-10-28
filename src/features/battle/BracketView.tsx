@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TeamThumb } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
 import {
   Swords,
@@ -173,14 +174,13 @@ export const BracketView: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <img
-                      src={
-                        m.category === 'pro_2v2'
-                          ? getTeamPhotoUrl(m.sideRed, storageConfig.placeholders)
-                          : getDancerAvatarUrl(m.sideRed.dancers[0], storageConfig.placeholders)
-                      }
+                    <TeamThumb
+                      photoUrl={m.category === 'pro_2v2' ? m.sideRed.teamPhotoUrl : getDancerAvatarUrl(m.sideRed.dancers[0], storageConfig.placeholders)}
+                      dancers={m.category === 'pro_2v2' ? m.sideRed.dancers : []}
+                      placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                       alt={m.sideRed.name}
                       className="w-7 h-7 rounded-full object-cover border border-red-500 shrink-0"
+                      overlapClassName="-ml-3"
                     />
                     <div className="truncate">
                       <div className="font-condensed font-black text-sm text-zinc-900 truncate uppercase">
@@ -207,14 +207,13 @@ export const BracketView: React.FC = () => {
                   }`}
                 >
                   <div className="flex items-center gap-2 truncate">
-                    <img
-                      src={
-                        m.category === 'pro_2v2'
-                          ? getTeamPhotoUrl(m.sideBlue, storageConfig.placeholders)
-                          : getDancerAvatarUrl(m.sideBlue.dancers[0], storageConfig.placeholders)
-                      }
+                    <TeamThumb
+                      photoUrl={m.category === 'pro_2v2' ? m.sideBlue.teamPhotoUrl : getDancerAvatarUrl(m.sideBlue.dancers[0], storageConfig.placeholders)}
+                      dancers={m.category === 'pro_2v2' ? m.sideBlue.dancers : []}
+                      placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                       alt={m.sideBlue.name}
                       className="w-7 h-7 rounded-full object-cover border border-blue-500 shrink-0"
+                      overlapClassName="-ml-3"
                     />
                     <div className="truncate">
                       <div className="font-condensed font-black text-sm text-zinc-900 truncate uppercase">

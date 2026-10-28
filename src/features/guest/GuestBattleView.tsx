@@ -5,6 +5,7 @@ import { matchSlugFromPath, VIEW_PATHS } from '../../app/routes';
 import { BattleMatch, BattleSide, CategoryType, RoundStage } from '../../domain/types';
 import { getDancerAvatarUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { QrImage } from '../../shared/QrImage';
+import { TeamThumb } from '../../shared/TeamPhoto';
 import { ArrowLeft, Check, ChevronRight, Copy, QrCode, Radio, Swords, X } from 'lucide-react';
 
 // Public battle pages: /ket-qua/nhanh-dau (bracket) and /ket-qua/tran/{slug} (one match).
@@ -105,11 +106,15 @@ const SideAvatar: React.FC<{ match: BattleMatch; side: BattleSide; ring: string;
   size = 'h-8 w-8',
 }) => {
   const { storageConfig } = useTournament();
-  const src =
-    match.category === 'pro_2v2'
-      ? getTeamPhotoUrl(side, storageConfig.placeholders)
-      : getDancerAvatarUrl(side.dancers[0], storageConfig.placeholders);
-  return <img loading="lazy" decoding="async" src={src} alt="" className={`${size} shrink-0 rounded-full border-2 object-cover ${ring}`} />;
+  return (
+    <TeamThumb
+      photoUrl={match.category === 'pro_2v2' ? side.teamPhotoUrl : getDancerAvatarUrl(side.dancers[0], storageConfig.placeholders)}
+      dancers={match.category === 'pro_2v2' ? side.dancers : []}
+      placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
+      className={`${size} shrink-0 rounded-full border-2 object-cover ${ring}`}
+      overlapClassName={size.includes('h-8') ? '-ml-3' : '-ml-7'}
+    />
+  );
 };
 
 const StatusBadge: React.FC<{ match: BattleMatch; live: boolean }> = ({ match, live }) =>

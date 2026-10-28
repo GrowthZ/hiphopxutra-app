@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { TeamPhoto } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
 import {
   Maximize2,
@@ -547,12 +548,24 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
           }`}>
             {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
             <div className="w-full h-56 sm:h-72 md:h-80 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none">
-              {redPhotoUrl && (
-                <img
-                  src={redPhotoUrl}
+              {match?.category === 'pro_2v2' ? (
+                <TeamPhoto
+                  photoUrl={match.sideRed.teamPhotoUrl}
+                  dancers={match.sideRed.dancers}
+                  placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                   alt={redBreakerName}
                   className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
+                  boxClassName="h-full w-[92%]"
+                  cutoutClassName="filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
                 />
+              ) : (
+                redPhotoUrl && (
+                  <img
+                    src={redPhotoUrl}
+                    alt={redBreakerName}
+                    className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
+                  />
+                )
               )}
             </div>
 
@@ -609,12 +622,24 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
           }`}>
             {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
             <div className="w-full h-56 sm:h-72 md:h-84 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none">
-              {bluePhotoUrl && (
-                <img
-                  src={bluePhotoUrl}
+              {match?.category === 'pro_2v2' ? (
+                <TeamPhoto
+                  photoUrl={match.sideBlue.teamPhotoUrl}
+                  dancers={match.sideBlue.dancers}
+                  placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                   alt={blueBreakerName}
                   className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
+                  boxClassName="h-full w-[92%]"
+                  cutoutClassName="filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
                 />
+              ) : (
+                bluePhotoUrl && (
+                  <img
+                    src={bluePhotoUrl}
+                    alt={blueBreakerName}
+                    className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
+                  />
+                )
               )}
             </div>
 

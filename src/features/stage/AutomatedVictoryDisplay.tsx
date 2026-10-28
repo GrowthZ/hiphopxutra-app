@@ -8,6 +8,7 @@ import {
   getTeamPhotoUrl,
   stripBreakerPrefix,
 } from '../../shared/placeholderAssets';
+import { TeamPhoto, TeamThumb } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
 
 interface AutomatedVictoryDisplayProps {
@@ -182,12 +183,15 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
         >
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="relative shrink-0">
-              <img
-                src={winnerPhotoUrl}
+              <TeamThumb
+                photoUrl={match.category === 'pro_2v2' ? winningSideData.teamPhotoUrl : winnerPhotoUrl}
+                dancers={match.category === 'pro_2v2' ? winningSideData.dancers ?? [] : []}
+                placeholder={winnerPhotoUrl}
                 alt={breakerName}
                 className={`w-12 h-12 rounded-full object-cover border-2 ${
                   isRedWinner ? 'border-red-400' : 'border-blue-400'
                 } shadow-md`}
+                overlapClassName="-ml-5"
               />
               <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 flex items-center justify-center text-black font-black text-[10px] shadow">
                 <Trophy className="w-3 h-3 text-black fill-black" />
@@ -309,10 +313,13 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
             <div className="absolute -inset-1 rounded-full bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-500 animate-spin-slow" />
 
             <div className="relative w-40 h-40 sm:w-56 sm:h-56 rounded-full overflow-hidden border-4 border-amber-300 shadow-2xl bg-zinc-950">
-              <img
-                src={winnerPhotoUrl}
+              <TeamPhoto
+                photoUrl={match.category === 'pro_2v2' ? winningSideData.teamPhotoUrl : winnerPhotoUrl}
+                dancers={match.category === 'pro_2v2' ? winningSideData.dancers ?? [] : []}
+                placeholder={winnerPhotoUrl}
                 alt={breakerName}
                 className="w-full h-full object-cover object-center transform hover:scale-105 transition-transform duration-500"
+                boxClassName="w-full h-full pt-4"
               />
             </div>
 

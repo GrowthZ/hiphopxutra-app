@@ -5,6 +5,7 @@ import { CheckCircle2, X, Link as LinkIcon, Cloud, Trash2 } from 'lucide-react';
 import { convertGoogleDriveUrl } from '../../services/storageService';
 import { MEDIA_URL, uploadPhoto } from '../../services/media';
 import { getTeamPhotoUrl } from '../../shared/placeholderAssets';
+import { TeamPhoto } from '../../shared/TeamPhoto';
 
 interface TeamPhotoUploadModalProps {
   team: Team2v2 | null;
@@ -100,16 +101,23 @@ export const TeamPhotoUploadModal: React.FC<TeamPhotoUploadModalProps> = ({
         {/* Preview Box with placeholder fallback */}
         <div className="flex flex-col items-center justify-center p-4 bg-zinc-50 rounded border border-zinc-200 min-h-[180px]">
           <div className="relative text-center">
-            <img
-              src={teamPhotoPreview || getTeamPhotoUrl(team, storageConfig.placeholders)}
+            <TeamPhoto
+              photoUrl={teamPhotoPreview}
+              dancers={[team.dancer1, team.dancer2]}
+              placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
               alt={team.name}
               className="max-h-48 w-auto object-contain rounded border-2 border-zinc-300 shadow-lg mx-auto"
+              boxClassName="h-48 w-72 mx-auto rounded border-2 border-zinc-300 bg-zinc-800 pt-3"
             />
             <div className="text-[11px] mt-2 font-medium">
               {teamPhotoPreview ? (
                 <span className="text-emerald-700 font-bold">✓ Ảnh đội đã tải lên (Hiển thị LED 16:9)</span>
               ) : (
-                <span className="text-zinc-500">Đang hiển thị ảnh mẫu (Placeholder 2vs2 Pro)</span>
+                <span className="text-zinc-500">
+                  {team.dancer1?.halfBodyUrl && team.dancer2?.halfBodyUrl
+                    ? 'Chưa có ảnh đội: LED tự ghép ảnh nửa người của 2 thí sinh'
+                    : 'Đang hiển thị ảnh mẫu (Placeholder 2vs2 Pro)'}
+                </span>
               )}
             </div>
           </div>

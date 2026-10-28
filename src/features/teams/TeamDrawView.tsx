@@ -17,6 +17,7 @@ import confetti from 'canvas-confetti';
 import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { TeamPhotoUploadModal } from './TeamPhotoUploadModal';
 import { getTeamPhotoUrl, getDancerAvatarUrl } from '../../shared/placeholderAssets';
+import { TeamPhoto } from '../../shared/TeamPhoto';
 
 export const TeamDrawView: React.FC = () => {
   const {
@@ -192,10 +193,13 @@ export const TeamDrawView: React.FC = () => {
 
             {/* Team Photo Banner with Placeholder Fallback */}
             <div className="relative rounded overflow-hidden h-28 bg-zinc-900 border border-zinc-200">
-              <img
-                src={getTeamPhotoUrl(team, storageConfig.placeholders)}
+              <TeamPhoto
+                photoUrl={team.teamPhotoUrl}
+                dancers={[team.dancer1, team.dancer2]}
+                placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                 alt={team.name}
                 className="w-full h-full object-cover object-center"
+                boxClassName="w-full h-full pt-2"
               />
               <button
                 onClick={() => setSelectedTeamForPhoto(team)}

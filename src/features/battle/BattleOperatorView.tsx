@@ -1,4 +1,5 @@
 import React from 'react';
+import { TeamThumb } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
 import {
   Swords,
@@ -160,14 +161,13 @@ export const BattleOperatorView: React.FC = () => {
           {/* GÓC ĐỎ */}
           <div className="bg-zinc-50 border border-red-600/70 rounded p-4 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
-              <img
-                src={
-                  match.category === 'pro_2v2'
-                    ? getTeamPhotoUrl(match.sideRed, storageConfig.placeholders)
-                    : getDancerAvatarUrl(match.sideRed.dancers[0], storageConfig.placeholders)
-                }
+              <TeamThumb
+                photoUrl={match.category === 'pro_2v2' ? match.sideRed.teamPhotoUrl : getDancerAvatarUrl(match.sideRed.dancers[0], storageConfig.placeholders)}
+                dancers={match.category === 'pro_2v2' ? match.sideRed.dancers : []}
+                placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                 alt={match.sideRed.name}
                 className="w-14 h-14 rounded object-cover border-2 border-red-600 shrink-0"
+                overlapClassName="-ml-7"
               />
               <div className="space-y-0.5">
                 <span className="text-[10px] font-condensed font-black text-red-600 uppercase tracking-widest">
@@ -207,14 +207,13 @@ export const BattleOperatorView: React.FC = () => {
                     : [match.sideBlue.dancers[0]?.crew, match.sideBlue.sbdText].filter(Boolean).join(' · ')}
                 </div>
               </div>
-              <img
-                src={
-                  match.category === 'pro_2v2'
-                    ? getTeamPhotoUrl(match.sideBlue, storageConfig.placeholders)
-                    : getDancerAvatarUrl(match.sideBlue.dancers[0], storageConfig.placeholders)
-                }
+              <TeamThumb
+                photoUrl={match.category === 'pro_2v2' ? match.sideBlue.teamPhotoUrl : getDancerAvatarUrl(match.sideBlue.dancers[0], storageConfig.placeholders)}
+                dancers={match.category === 'pro_2v2' ? match.sideBlue.dancers : []}
+                placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
                 alt={match.sideBlue.name}
                 className="w-14 h-14 rounded object-cover border-2 border-blue-600 shrink-0"
+                overlapClassName="-ml-7"
               />
             </div>
           </div>
