@@ -4,6 +4,7 @@ import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { VIEW_PATHS } from '../../app/routes';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { QrImage } from '../../shared/QrImage';
 import { Avatar, GenderBadge, isScored, LIVE_LIMIT, QUALIFY, rankForDisplay } from './PrelimGuestView';
 
 // Landscape prelim leaderboard for the audience: /ket-qua/trinh-chieu (light, TV / projector) and
@@ -270,13 +271,13 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' 
               Live · {scored.length}/{ranked.length}
             </span>
           )}
-          <div className={`flex items-center gap-4 rounded-2xl p-3 ${t.qr}`}>
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=240x240&margin=8&data=${encodeURIComponent(guestUrl)}`}
-              alt=""
-              className="h-[104px] w-[104px] rounded-lg bg-white"
-            />
-            <p className={`w-32 text-lg font-bold leading-tight ${t.qrText}`}>Quét xem trên điện thoại</p>
+          {/* Top-right corner: QR to the phone page */}
+          <div className={`flex items-center gap-4 rounded-2xl p-2.5 ${t.qr}`}>
+            <QrImage value={guestUrl} label="Mã QR trang kết quả trên điện thoại" className="h-[118px] w-[118px] rounded-lg bg-white" />
+            <div className={`w-44 leading-tight ${t.qrText}`}>
+              <p className="text-xl font-black uppercase">Xem trên điện thoại</p>
+              <p className="mt-1 text-base font-semibold opacity-80">{guestUrl.replace(/^https?:\/\//, '')}</p>
+            </div>
           </div>
         </header>
 

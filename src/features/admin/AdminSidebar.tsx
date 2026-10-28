@@ -17,7 +17,9 @@ import {
   KeyRound,
   UserCog,
   MonitorPlay,
+  ExternalLink,
 } from 'lucide-react';
+import { openInNewTab, SCREEN_VIEWS } from '../../app/routes';
 
 export const AdminSidebar: React.FC = () => {
   const {
@@ -33,8 +35,8 @@ export const AdminSidebar: React.FC = () => {
     { id: 'prelim', label: 'Bàn chấm Prelim (4 GK)', icon: FileSpreadsheet },
     { id: 'prelim_results', label: 'Bảng Kết quả Prelim (LED)', icon: Trophy },
     { id: 'prelim_guest', label: 'Khách xem Prelim (Mobile)', icon: Eye },
-    { id: 'prelim_screen', label: 'Màn chiếu Prelim (16:9)', icon: MonitorPlay },
-    { id: 'prelim_screen_led', label: 'Màn chiếu Prelim (LED tối)', icon: MonitorPlay },
+    { id: 'prelim_screen', label: 'Màn chiếu TV', icon: MonitorPlay },
+    { id: 'prelim_screen_led', label: 'Màn chiếu LED', icon: MonitorPlay },
     { id: 'teams', label: 'Ghép đội 2vs2', icon: Shuffle },
     { id: 'bracket', label: 'Nhánh đấu', icon: GitFork },
     { id: 'battle', label: 'Điều hành Battle (9 GK)', icon: Swords },
@@ -58,10 +60,12 @@ export const AdminSidebar: React.FC = () => {
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeView === item.id;
+            const newTab = (SCREEN_VIEWS as readonly string[]).includes(item.id);
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveView(item.id)}
+                onClick={() => (newTab ? openInNewTab(item.id) : setActiveView(item.id))}
+                title={newTab ? 'Mở ở tab mới' : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold transition-colors text-left cursor-pointer ${
                   isActive
                     ? 'bg-zinc-900 text-white font-bold'
@@ -73,7 +77,8 @@ export const AdminSidebar: React.FC = () => {
                     isActive ? 'text-white' : 'text-zinc-400'
                   }`}
                 />
-                <span className="truncate">{item.label}</span>
+                <span className="truncate flex-1">{item.label}</span>
+                {newTab && <ExternalLink className="w-3.5 h-3.5 shrink-0 text-zinc-400" />}
               </button>
             );
           })}

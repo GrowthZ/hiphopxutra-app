@@ -4,6 +4,7 @@ import { isRoundOpen, matchSlug } from '../../domain/model';
 import { matchSlugFromPath, VIEW_PATHS } from '../../app/routes';
 import { BattleMatch, BattleSide, CategoryType, RoundStage } from '../../domain/types';
 import { getDancerAvatarUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { QrImage } from '../../shared/QrImage';
 import { ArrowLeft, Check, ChevronRight, Copy, QrCode, Radio, Swords, X } from 'lucide-react';
 
 // Public battle pages: /ket-qua/nhanh-dau (bracket) and /ket-qua/tran/{slug} (one match).
@@ -82,11 +83,7 @@ const ShareModal: React.FC<{ url: string; onClose: () => void }> = ({ url, onClo
             <X className="h-5 w-5" />
           </button>
         </div>
-        <img loading="lazy" decoding="async"
-          src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(url)}`}
-          alt="Mã QR"
-          className="mx-auto h-52 w-52 rounded-lg bg-white p-2"
-        />
+        <QrImage value={url} className="mx-auto h-52 w-52 rounded-lg bg-white" />
         <p className="mt-3 break-all font-mono text-[11px] text-zinc-500">{url}</p>
         <button
           onClick={copy}

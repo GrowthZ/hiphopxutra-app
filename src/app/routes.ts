@@ -22,6 +22,10 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   staff_accounts: '/admin/cai-dat/nguoi-dung',
 };
 
+/** Audience screens open in a new tab from the admin pages. */
+export const SCREEN_VIEWS = ['prelim_screen', 'prelim_screen_led'] as const;
+export const openInNewTab = (view: ActiveViewType) => window.open(VIEW_PATHS[view], '_blank', 'noopener');
+
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */
 export const IS_LED_PREVIEW = new URLSearchParams(window.location.search).has('preview');
 

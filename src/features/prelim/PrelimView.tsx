@@ -11,7 +11,8 @@ import {
   Download,
   AlertTriangle,
   Award,
-  Trophy,
+  MonitorPlay,
+  ExternalLink,
   Camera,
   Eye,
   Zap,
@@ -20,6 +21,7 @@ import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from '../dancers/DancerPhotoUploadModal';
 import { BankingScoreKeypadModal } from './BankingScoreKeypadModal';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
+import { openInNewTab } from '../../app/routes';
 
 export const PrelimView: React.FC = () => {
   const {
@@ -176,12 +178,23 @@ export const PrelimView: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setActiveView('prelim_results')}
+            onClick={() => openInNewTab('prelim_screen_led')}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-amber-500 hover:bg-amber-400 text-zinc-950 text-xs font-black shadow-xs transition-colors cursor-pointer"
-            title="Mở màn hình kết quả Prelim cho khán giả và màn LED (Top 10/15 hoặc toàn bộ khi kết thúc)"
+            title="Mở màn kết quả cho LED (nền tối) ở tab mới"
           >
-            <Trophy className="w-3.5 h-3.5 text-black" />
-            <span>Màn LED Kết Quả Prelim</span>
+            <MonitorPlay className="w-3.5 h-3.5 text-black" />
+            <span>Màn LED</span>
+            <ExternalLink className="w-3 h-3 text-black/60" />
+          </button>
+
+          <button
+            onClick={() => openInNewTab('prelim_screen')}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-zinc-300 text-zinc-800 hover:bg-zinc-50 text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            title="Mở màn kết quả cho TV / máy chiếu (nền sáng) ở tab mới"
+          >
+            <MonitorPlay className="w-3.5 h-3.5 text-zinc-500" />
+            <span>Màn chiếu TV</span>
+            <ExternalLink className="w-3 h-3 text-zinc-400" />
           </button>
 
           <button
