@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Search, UserCheck, Undo2, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { Search, UserCheck, Undo2, Loader2, X, CheckCircle2, UserPlus } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
-import { checkInDancer, undoCheckIn, isIssuedSbd } from '../../services/firestore';
+import { checkInDancer, undoCheckIn, isIssuedSbd, registerWalkIn } from '../../services/firestore';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
 import { CategoryType, Dancer } from '../../domain/types';
 
 type StatusFilter = 'all' | 'pending' | 'done';
+type WalkInCategory = CategoryType | 'both';
 
 // Diacritic-insensitive search: "minh nhat" matches "Minh Nhật".
 const normalize = (s = '') =>
@@ -21,8 +22,12 @@ export const CheckInView: React.FC = () => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [lastIssued, setLastIssued] = useState<{ id: string; name: string; sbd: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [walkInOpen, setWalkInOpen] = useState(false);
+  const [walkIn, setWalkIn] = useState({ name: '', realName: '', crew: '', category: 'newbie_1v1' as WalkInCategory, checkIn: true });
+  const [walkInBusy, setWalkInBusy] = useState(false);
 
-  const dancers = category === 'newbie_1v1' ? newbieDancers : proDancers;
+  const listOf = (cat: CategoryType) => (cat === 'newbie_1v1' ? newbieDancers : proDancers);
+  const dancers = listOf(category);
   const countDone = (list: Dancer[]) => list.filter((d) => d.checkedInAt).length;
 
   const visible = useMemo(() => {
@@ -33,15 +38,51 @@ export const CheckInView: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   }, [dancers, status, query]);
 
+  const issueSbd = (cat: CategoryType, dancerId: string) => {
+    const highestIssued = Math.max(0, ...listOf(cat).filter((d) => isIssuedSbd(cat, d.sbd)).map((d) => Number(d.sbd.slice(1))));
+    return checkInDancer(cat, dancerId, highestIssued);
+  };
+
+  // Walk-in: a dancer who didn't pre-register signs up at the desk (and usually gets a number right away).
+  const handleWalkIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cats: CategoryType[] = walkIn.category === 'both' ? ['newbie_1v1', 'pro_2v2'] : [walkIn.category];
+    const key = normalize(walkIn.name).replace(/\s+/g, ' ');
+    const duplicate = cats.find((cat) => listOf(cat).some((d) => normalize(d.name) === key));
+    if (duplicate) {
+      setError(`${walkIn.name.toUpperCase()} đã có trong danh sách ${duplicate === 'newbie_1v1' ? 'Newbie' : 'Pro'}: tìm tên để check-in.`);
+      setCategory(duplicate);
+      setStatus('all');
+      setQuery(walkIn.name);
+      return;
+    }
+    setWalkInBusy(true);
+    setError(null);
+    try {
+      const sbds: string[] = [];
+      let firstId = '';
+      for (const cat of cats) {
+        const id = await registerWalkIn(cat, walkIn);
+        firstId ||= id;
+        if (walkIn.checkIn) sbds.push(await issueSbd(cat, id));
+      }
+      const name = walkIn.name.trim().toUpperCase();
+      setLastIssued(sbds.length ? { id: firstId, name, sbd: sbds.join(' · ') } : null);
+      if (!sbds.length) setQuery(name);
+      setWalkIn((w) => ({ ...w, name: '', realName: '', crew: '' }));
+      setWalkInOpen(false);
+    } catch (err) {
+      setError(`Không đăng ký được: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setWalkInBusy(false);
+    }
+  };
+
   const handleCheckIn = async (dancer: Dancer) => {
     setBusyId(dancer.id);
     setError(null);
     try {
-      const highestIssued = Math.max(
-        0,
-        ...dancers.filter((d) => isIssuedSbd(category, d.sbd)).map((d) => Number(d.sbd.slice(1)))
-      );
-      const sbd = await checkInDancer(category, dancer.id, highestIssued);
+      const sbd = await issueSbd(category, dancer.id);
       setLastIssued({ id: dancer.id, name: dancer.name, sbd });
       setQuery('');
     } catch (e) {
@@ -82,15 +123,103 @@ export const CheckInView: React.FC = () => {
             Check-in thí sinh
           </h1>
         </div>
-        <div className="flex gap-3 text-xs font-bold text-zinc-600 tabular-nums">
-          <span>
-            Newbie <span className="text-zinc-900">{countDone(newbieDancers)}</span>/{newbieDancers.length}
-          </span>
-          <span>
-            Pro <span className="text-zinc-900">{countDone(proDancers)}</span>/{proDancers.length}
-          </span>
+        <div className="flex items-center gap-4">
+          <div className="flex gap-3 text-xs font-bold text-zinc-600 tabular-nums">
+            <span>
+              Newbie <span className="text-zinc-900">{countDone(newbieDancers)}</span>/{newbieDancers.length}
+            </span>
+            <span>
+              Pro <span className="text-zinc-900">{countDone(proDancers)}</span>/{proDancers.length}
+            </span>
+          </div>
+          <button
+            onClick={() => setWalkInOpen((o) => !o)}
+            aria-expanded={walkInOpen}
+            className="flex items-center gap-1.5 rounded bg-amber-500 px-3 py-2 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
+          >
+            <UserPlus className="w-4 h-4" />
+            Đăng ký tại chỗ
+          </button>
         </div>
       </div>
+
+      {walkInOpen && (
+        <form onSubmit={handleWalkIn} className="rounded-lg border border-amber-300 bg-amber-50/50 p-4 space-y-3">
+          <h2 className="text-sm font-black uppercase text-zinc-900">Đăng ký thí sinh tại chỗ</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ['name', 'Tên thi đấu *', 'vd. Bboy Kenz'],
+                ['realName', 'Họ và tên', 'không bắt buộc'],
+                ['crew', 'CLB / Đội', 'không bắt buộc'],
+              ] as const
+            ).map(([key, label, placeholder]) => (
+              <label key={key} className="space-y-1">
+                <span className="text-xs font-bold text-zinc-600">{label}</span>
+                <input
+                  value={walkIn[key]}
+                  onChange={(e) => setWalkIn((w) => ({ ...w, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  required={key === 'name'}
+                  maxLength={60}
+                  autoFocus={key === 'name'}
+                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
+                />
+              </label>
+            ))}
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex rounded border border-zinc-300 bg-white p-0.5" role="radiogroup" aria-label="Hạng mục đăng ký">
+              {(
+                [
+                  ['newbie_1v1', 'Newbie'],
+                  ['pro_2v2', 'Pro'],
+                  ['both', 'Cả 2'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={walkIn.category === id}
+                  onClick={() => setWalkIn((w) => ({ ...w, category: id }))}
+                  className={`rounded px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                    walkIn.category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={walkIn.checkIn}
+                onChange={(e) => setWalkIn((w) => ({ ...w, checkIn: e.target.checked }))}
+                className="w-4 h-4 accent-zinc-900"
+              />
+              Check-in và cấp SBD luôn
+            </label>
+            <div className="flex gap-2 sm:ml-auto">
+              <button
+                type="button"
+                onClick={() => setWalkInOpen(false)}
+                className="rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+              >
+                Huỷ
+              </button>
+              <button
+                type="submit"
+                disabled={walkInBusy}
+                className="flex items-center gap-1.5 rounded bg-zinc-900 px-4 py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                {walkInBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                Đăng ký
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Last issued SBD: big enough to copy onto the bib */}
       {lastIssued && (

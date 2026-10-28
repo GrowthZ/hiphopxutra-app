@@ -66,7 +66,7 @@ Nếu đã cài `gcloud`, có thể dùng `gcloud auth application-default login
 | `bun run db admin:remove <email>` | Xoá admin (không cho xoá admin cuối cùng) |
 | `bun run db backup [file]` | Sao lưu toàn bộ dữ liệu giải ra `backups/<project>-<thời gian>.json` |
 | `bun run db restore <file>` | Ghi lại dữ liệu từ file sao lưu (ghi đè document cùng id) |
-| `bun run db reset` | Xoá dữ liệu giải, **giữ lại** `admins` và `judgeSecrets` (PIN giám khảo) |
+| `bun run db reset` | Xoá dữ liệu giải, **giữ lại** `admins` (người dùng BTC), `judgeSecrets` (PIN giám khảo) và `staffSecrets` (mật khẩu BTC) |
 | `bun run db dancer:list [newbie|pro]` | Danh sách thí sinh kèm id (`newbie-001`, `pro-001`...) |
 | `bun run db dancer:import <file>` | Nhập thí sinh từ file TSV/CSV (xem bên dưới). Chạy lại với file đã sửa thì **cập nhật** theo tên, không tạo trùng |
 | `bun run db dancer:set <id> trường=giá trị ...` | Sửa `name`, `realName`, `crew`, `gender`. Để trống giá trị (`crew=`) là xoá trường đó |

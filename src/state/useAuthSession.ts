@@ -4,32 +4,32 @@ import { onSnapshot } from 'firebase/firestore';
 import { ActiveViewType } from '../domain/types';
 import { IS_LED_PREVIEW } from '../app/routes';
 import { auth } from '../services/firebase';
-import { checkIsAdmin, eventDoc } from '../services/firestore';
+import { eventDoc, getStaffRole, StaffRole } from '../services/firestore';
 import { currentSessionId, judgeIdFromEmail } from '../services/judgeAccounts';
 
 /**
- * Who is on this device: admins sign in with Google (whitelisted in Firestore), judges with their GK account,
- * the LED PC with an anonymous session (for its heartbeat).
+ * Who is on this device: organizers (Google or BTC username accounts, whitelisted with a role in Firestore),
+ * judges with their GK account, the LED PC with an anonymous session (for its heartbeat).
  */
 export function useAuthSession(activeView: ActiveViewType, reportError: (message: string) => void) {
   const [authUser, setAuthUser] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [staffRole, setStaffRole] = useState<StaffRole | null>(null);
   const [judgeNotice, setJudgeNotice] = useState<string | null>(null);
 
   useEffect(
     () =>
       onAuthStateChanged(auth, async (user) => {
         setAuthUser(user);
-        let admin = false;
+        let role: StaffRole | null = null;
         if (user?.email) {
           try {
-            admin = await checkIsAdmin(user.email);
+            role = await getStaffRole(user.email);
           } catch (err) {
             reportError(`Không kết nối được Firestore: ${err instanceof Error ? err.message : String(err)}`);
           }
         }
-        setIsAdmin(admin);
+        setStaffRole(role);
         setAuthReady(true);
       }),
     [reportError]
@@ -61,5 +61,6 @@ export function useAuthSession(activeView: ActiveViewType, reportError: (message
     return signOut(auth);
   }, []);
 
-  return { authUser, authReady, isAdmin, judgeAccountId, judgeNotice, judgeSignOut };
+  const isAdmin = staffRole === 'admin';
+  return { authUser, authReady, isAdmin, staffRole, judgeAccountId, judgeNotice, judgeSignOut };
 }

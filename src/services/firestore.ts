@@ -41,7 +41,9 @@ export type SyncedCollection =
   | 'counters'
   | 'judgeSecrets'
   | 'judgeSessions'
-  | 'judgePresence';
+  | 'judgePresence'
+  | 'admins'
+  | 'staffSecrets';
 
 export const eventCollection = (name: SyncedCollection) => collection(db, 'events', EVENT_ID, name);
 export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', EVENT_ID, name, id);
@@ -63,9 +65,13 @@ export function stableStringify(value: unknown): string {
 }
 
 /** Throws when Firestore is unreachable, so callers can tell "not an admin" from "can't check". */
-export async function checkIsAdmin(email: string): Promise<boolean> {
+export type StaffRole = 'admin' | 'checkin';
+
+/** Organizer role from admins/{email}; entries without a role are full admins (older entries, Google admins). */
+export async function getStaffRole(email: string): Promise<StaffRole | null> {
   const snap = await getDoc(doc(db, 'events', EVENT_ID, 'admins', email.toLowerCase()));
-  return snap.exists();
+  if (!snap.exists()) return null;
+  return snap.data().role === 'checkin' ? 'checkin' : 'admin';
 }
 
 // Judge writes touch a single field so 9 judges scoring at once never overwrite each other.
@@ -105,6 +111,31 @@ export async function checkInDancer(category: CategoryType, dancerId: string, hi
     tx.update(dancerRef, { sbd, checkedInAt: Date.now() });
     return sbd;
   });
+}
+
+export interface WalkInDancer {
+  name: string;
+  realName?: string;
+  crew?: string;
+}
+
+/**
+ * Registers a dancer at the desk (check-in staff or admin). The id is random so two desks never collide,
+ * and its letter prefix keeps `bun run db dancer:import` numbering (newbie-001...) unaffected.
+ */
+export async function registerWalkIn(category: CategoryType, dancer: WalkInDancer): Promise<string> {
+  const id = `${category === 'newbie_1v1' ? 'newbie' : 'pro'}-w${crypto.randomUUID().slice(0, 8)}`;
+  const name = dancer.name.replace(/s*-s*/g, '-').replace(/s+/g, ' ').trim().toUpperCase();
+  await setDoc(eventDoc(dancersCollectionOf(category), id), {
+    sbd: '',
+    name,
+    gender: /^BGIRL/.test(name) ? 'female' : 'male',
+    category,
+    prelimScores: {},
+    ...(dancer.realName?.trim() ? { realName: dancer.realName.trim() } : {}),
+    ...(dancer.crew?.trim() ? { crew: dancer.crew.trim() } : {}),
+  });
+  return id;
 }
 
 export const undoCheckIn = (category: CategoryType, dancerId: string) =>

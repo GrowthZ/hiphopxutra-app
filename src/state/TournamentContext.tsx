@@ -37,7 +37,7 @@ import {
 import * as battle from '../domain/battle';
 import { IS_PUBLIC_SOURCE } from '../app/routes';
 import { getSavedStorageConfig, saveStorageConfig } from '../services/storageService';
-import { clearVotes, eventDoc, writeBattleVote, writePrelimScore } from '../services/firestore';
+import { clearVotes, eventDoc, StaffRole, writeBattleVote, writePrelimScore } from '../services/firestore';
 import { soundFX } from '../services/soundEffects';
 import * as cues from '../services/stageCues';
 import { useSyncedCollection } from './useSyncedCollection';
@@ -131,6 +131,8 @@ interface TournamentContextType {
   authUser: User | null;
   authReady: boolean;
   isAdmin: boolean;
+  /** 'checkin' = check-in desk staff: sees dancers, checks them in, registers walk-ins; nothing else. */
+  staffRole: StaffRole | null;
   syncError: string | null;
   /** Judge id when this device is signed in with a judge account, else null. */
   judgeAccountId: string | null;
@@ -147,7 +149,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const sound = useSoundSettings();
   const [actionError, setActionError] = useState<string | null>(null);
   const auth = useAuthSession(navigation.activeView, setActionError);
-  const { isAdmin, judgeAccountId } = auth;
+  const { isAdmin, staffRole, judgeAccountId } = auth;
 
   // ---------- Local UI state ----------
   const [selectedJudgeId, setSelectedJudgeId] = useState('gk-1');
@@ -264,9 +266,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
   );
   const privateOnly = { enabled: canWrite }; // raw scores and votes: admins only
+  // Check-in staff read the dancer lists (to check in / register), but never write through the sync.
+  const dancerRead = { enabled: canWrite || (staffRole === 'checkin' && !IS_PUBLIC_SOURCE) };
   const syncStates = [
-    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
-    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc, ...privateOnly }),
+    useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc, ...dancerRead }),
+    useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc, ...dancerRead }),
     useSyncedCollection('teams', teamsBase, (list: Team2v2[]) => setProTeams(sortTeams(list)), {
       canWrite,
       toDoc: teamToDoc,

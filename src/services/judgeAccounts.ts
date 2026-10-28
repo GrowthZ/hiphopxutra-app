@@ -25,8 +25,8 @@ export const judgeEmail = (judgeId: string) => `${judgeId}@${JUDGE_EMAIL_DOMAIN}
 export const judgeIdFromEmail = (email?: string | null) =>
   email?.endsWith(`@${JUDGE_EMAIL_DOMAIN}`) ? email.split('@')[0] : null;
 
-// Separate in-memory auth so creating/updating judge accounts never signs the admin out.
-const accountsAuth = initializeAuth(initializeApp(firebaseConfig, 'judge-accounts'), {
+// Separate in-memory auth so creating/updating judge and staff accounts never signs the admin out.
+export const accountsAuth = initializeAuth(initializeApp(firebaseConfig, 'judge-accounts'), {
   persistence: inMemoryPersistence,
 });
 if (USE_EMULATORS) connectAuthEmulator(accountsAuth, AUTH_EMULATOR_URL, { disableWarnings: true });

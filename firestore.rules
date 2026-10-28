@@ -1,19 +1,44 @@
 rules_version = '2';
 
-// Admins: Google or BTC email/password accounts listed in events/{eventId}/admins/{email}.
+// Organizers: Google or BTC username accounts listed in events/{eventId}/admins/{email} with a role:
+//   'admin' (or no role) = everything; 'checkin' = check-in desk: read dancers, check in, register walk-ins.
 // Judges: email/password accounts gk-N@giamkhao.hiphopxutra.vn (see src/services/judgeAccounts.ts);
 //         each judge may only write their own prelim score / battle vote, never other judges'.
 // LED PC: anonymous session, heartbeat only.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /events/{eventId} {
+      function staffEntry() {
+        return /databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower());
+      }
+
       // BTC accounts (email/password on the made-up btc.hiphopxutra.vn domain) can't verify their email;
       // only an admin creates them, and they still need an entry in admins/.
-      function isAdmin() {
+      function isStaff() {
         return request.auth != null
+          && request.auth.token.email is string
           && (request.auth.token.email_verified == true
             || request.auth.token.email.matches('^[a-z0-9._-]+@btc[.]hiphopxutra[.]vn$'))
-          && exists(/databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower()));
+          && exists(staffEntry());
+      }
+
+      function isAdmin() {
+        return isStaff() && get(staffEntry()).data.get('role', 'admin') == 'admin';
+      }
+
+      // Check-in desk: hand out an SBD / mark arrival, nothing else on an existing dancer.
+      function validCheckIn() {
+        return isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sbd', 'checkedInAt']);
+      }
+
+      // Walk-in registration: a fresh, unscored dancer with only the desk's fields.
+      function validWalkIn(category) {
+        let d = request.resource.data;
+        return isStaff()
+          && d.keys().hasOnly(['sbd', 'name', 'realName', 'crew', 'gender', 'category', 'prelimScores'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+          && d.sbd == '' && d.prelimScores == {} && d.category == category
+          && d.gender in ['male', 'female'];
       }
 
       function isJudge() {
@@ -91,11 +116,20 @@ service cloud.firestore {
       }
 
       match /newbieDancers/{dancerId} {
-        allow update: if validOwnPrelimScore('isNewbieTop32Locked');
+        allow read: if isStaff();
+        allow create: if validWalkIn('newbie_1v1');
+        allow update: if validOwnPrelimScore('isNewbieTop32Locked') || validCheckIn();
       }
 
       match /proDancers/{dancerId} {
-        allow update: if validOwnPrelimScore('isProTop32Locked');
+        allow read: if isStaff();
+        allow create: if validWalkIn('pro_2v2');
+        allow update: if validOwnPrelimScore('isProTop32Locked') || validCheckIn();
+      }
+
+      // SBD counter, shared by every check-in desk (transaction in checkInDancer).
+      match /counters/sbd {
+        allow read, write: if isStaff();
       }
 
       match /votes/{matchId} {

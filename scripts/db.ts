@@ -7,7 +7,7 @@
 //   bun run db admin:list | admin:add <email> [name] | admin:remove <email>
 //   bun run db backup [file]
 //   bun run db restore <file>          (overwrites docs with the same ids)
-//   bun run db reset                   (deletes event data, keeps admins + judgeSecrets)
+//   bun run db reset                   (deletes event data, keeps admins + judge/staff passwords)
 //   bun run db dancer:list [newbie|pro]
 //   bun run db dancer:import <file.tsv|csv>   (header row: Tên thi đấu, Họ và tên, CLB, Hạng mục; upserts by name)
 //   bun run db dancer:set <id> field=value ...  (name, realName, crew, gender; empty value removes the field)
@@ -24,7 +24,7 @@ const ROOT = path.resolve(import.meta.dir, '..');
 const EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts
 const EMULATOR_PROJECT_ID = 'demo-hiphopxutra'; // keep in sync with src/services/firebase.ts
 const KEY_FILE = path.join(ROOT, 'secrets', 'service-account.json');
-const KEEP_ON_RESET = ['admins', 'judgeSecrets'];
+const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'staffSecrets'];
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));

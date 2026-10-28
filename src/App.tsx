@@ -21,6 +21,8 @@ import { GoogleSheetSyncModal } from './features/settings/GoogleSheetSyncModal';
 import { StorageConfigModal } from './features/settings/StorageConfigModal';
 import { JudgeConfigModal } from './features/judge/JudgeConfigModal';
 import { AdminLoginGate } from './features/admin/AdminLoginGate';
+import { StaffAccountsView } from './features/admin/StaffAccountsView';
+import { CheckInDesk } from './features/dancers/CheckInDesk';
 import { isAdminView } from './app/routes';
 import { ArrowLeft, LayoutDashboard, Tv, CloudOff, LogOut } from 'lucide-react';
 
@@ -43,6 +45,7 @@ const MainContent: React.FC = () => {
     activeView,
     setActiveView,
     isAdmin,
+    staffRole,
     authReady,
     judgeAccountId,
     judgeSignOut,
@@ -53,6 +56,8 @@ const MainContent: React.FC = () => {
     setIsJudgeConfigModalOpen,
   } = useTournament();
 
+  // Check-in staff get only the check-in desk, whatever /admin page they open.
+  if (isAdminView(activeView) && staffRole === 'checkin') return <CheckInDesk />;
   if (isAdminView(activeView) && !isAdmin) {
     return <AdminLoginGate />;
   }
@@ -162,6 +167,7 @@ const MainContent: React.FC = () => {
           {activeView === 'stage_control' && <StageControlView />}
           {activeView === 'checkin' && <CheckInView />}
           {activeView === 'judge_accounts' && <JudgeAccountsView />}
+          {activeView === 'staff_accounts' && <StaffAccountsView />}
         </main>
       </div>
 

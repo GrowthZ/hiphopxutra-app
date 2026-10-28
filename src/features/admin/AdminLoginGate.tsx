@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { LogIn, LogOut, ShieldAlert, Loader2 } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { EVENT_ID } from '../../services/firestore';
 import { auth } from '../../services/firebase';
+import { loginEmail } from '../../services/staffAccounts';
 
-/** Shown instead of /admin/* until a whitelisted Google account is signed in. */
+/** Shown instead of /admin/* until an organizer (BTC username or whitelisted Google account) is signed in. */
 export const AdminLoginGate: React.FC = () => {
   const { authReady, authUser, syncError, handleGoogleLogin, handleGoogleLogout } = useTournament();
   const [error, setError] = useState<string | null>(null);
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -22,18 +22,18 @@ export const AdminLoginGate: React.FC = () => {
     }
   };
 
-  // Organizer accounts (BTC): email/password, created by an admin and whitelisted like Google admins.
+  // Organizer accounts (BTC): username + password, created by an admin on /admin/cai-dat/nguoi-dung.
   const signInWithPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
     setBusy(true);
     try {
-      await signInWithEmailAndPassword(auth, email.trim(), password);
+      await signInWithEmailAndPassword(auth, loginEmail(username), password);
     } catch (err) {
       const code = (err as { code?: string }).code ?? '';
       setError(
         code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found'
-          ? 'Sai email hoặc mật khẩu.'
+          ? 'Sai tên đăng nhập hoặc mật khẩu.'
           : code === 'auth/too-many-requests'
             ? 'Thử sai quá nhiều lần. Đợi một lúc rồi thử lại.'
             : err instanceof Error ? err.message : 'Đăng nhập thất bại'
@@ -59,16 +59,16 @@ export const AdminLoginGate: React.FC = () => {
             <span>Đang kiểm tra đăng nhập…</span>
           </div>
         ) : signedInNonAdmin && syncError ? (
-          <p className="text-sm text-red-300">
+          <p className="text-sm text-red-700">
             Không kiểm tra được quyền admin vì chưa kết nối được Firestore. Xem mục “Firestore” trong HUONG-DAN-CHAY.md.
           </p>
         ) : signedInNonAdmin ? (
           <div className="space-y-4">
-            <div className="flex gap-2 rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-800">
-              <ShieldAlert className="w-5 h-5 shrink-0 text-red-400" />
+            <div className="flex gap-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+              <ShieldAlert className="w-5 h-5 shrink-0 text-red-600" />
               <p>
-                Tài khoản <b>{authUser.email}</b> chưa có quyền admin. Nhờ admin thêm email này vào{' '}
-                <code className="text-xs">events/{EVENT_ID}/admins</code> trên Firestore.
+                Tài khoản <b>{authUser.email}</b> chưa được cấp quyền vào bảng điều hành. Nhờ quản trị cấp ở trang{' '}
+                <b>Người dùng BTC</b>.
               </p>
             </div>
             <button
@@ -83,11 +83,14 @@ export const AdminLoginGate: React.FC = () => {
           <div className="space-y-4">
             <form onSubmit={signInWithPassword} className="space-y-2">
               <input
-                type="email"
+                type="text"
                 autoComplete="username"
-                placeholder="Email BTC"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                autoCapitalize="none"
+                spellCheck={false}
+                placeholder="Tên đăng nhập"
+                aria-label="Tên đăng nhập"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 required
                 className="w-full rounded border border-zinc-300 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
               />
@@ -124,7 +127,7 @@ export const AdminLoginGate: React.FC = () => {
           </div>
         )}
 
-        {error && <p className="text-sm text-red-300">{error}</p>}
+        {error && <p className="text-sm text-red-700">{error}</p>}
       </div>
     </div>
   );

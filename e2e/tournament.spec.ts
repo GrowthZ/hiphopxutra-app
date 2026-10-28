@@ -98,3 +98,35 @@ test('LED follows the scene chosen at /admin/led', async ({ browser }) => {
   await expect(led.getByText('Breaking U16')).toBeVisible();
   await context.close();
 });
+
+test('admin gives a BTC member a check-in account', async () => {
+  await admin.goto('/admin/cai-dat/nguoi-dung');
+  await admin.getByLabel('Tên đăng nhập', { exact: true }).fill('checkin1');
+  await admin.getByLabel('Mật khẩu', { exact: true }).fill('desk-pass-1');
+  await admin.getByRole('button', { name: 'Cấp tài khoản' }).click();
+  await expect(admin.getByRole('status')).toContainText('checkin1');
+  await waitForDoc<{ role: string }>('admins/checkin1@btc.hiphopxutra.vn', (a) => a?.role === 'checkin');
+});
+
+test('check-in staff registers a walk-in and hands out an SBD, nothing else', async ({ browser }) => {
+  const context = await browser.newContext();
+  const desk = await context.newPage();
+  await desk.goto('/admin/battle');
+  await desk.getByLabel('Tên đăng nhập').fill('checkin1');
+  await desk.getByPlaceholder('Mật khẩu').fill('desk-pass-1');
+  await desk.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+
+  // Whatever /admin page they open, check-in staff only get the desk.
+  await expect(desk.getByText('Bàn check-in', { exact: true })).toBeVisible();
+  await expect(desk.getByRole('button', { name: /Công Bố & Xác Nhận/ })).toBeHidden();
+
+  await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
+  await desk.getByLabel('Tên thi đấu *').fill('Bboy Walk In');
+  await desk.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+  await expect(desk.getByText('Đã check-in BBOY WALK IN')).toBeVisible();
+
+  const snap = await event.collection('newbieDancers').where('name', '==', 'BBOY WALK IN').get();
+  expect(snap.size).toBe(1);
+  expect(snap.docs[0].get('sbd')).toMatch(/^N\d{3}$/);
+  await context.close();
+});
