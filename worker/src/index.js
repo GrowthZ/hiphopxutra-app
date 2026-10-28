@@ -1,10 +1,13 @@
 // Media Worker in front of the R2 bucket.
-//   PUT /upload/{folder}/{name}.webp  admin-only (Firebase ID token), stores the image
-//   GET /{folder}/{name}.webp         public, cached at the edge and in browsers for a year
+//   PUT /upload/{folder}/{name}.webp|.jpg  admin-only (Firebase ID token), stores the image
+//   GET /{folder}/{name}.webp|.jpg         public, cached at the edge and in browsers for a year
+// (.jpg: Safari can't encode WebP, so iPhones upload JPEG instead.)
 // File names are content hashes, so a URL never changes meaning and can be cached as immutable.
 
 const FOLDERS = ['dancers', 'teams', 'judges', 'placeholders'];
-const KEY_PATTERN = new RegExp(`^(${FOLDERS.join('|')})/[A-Za-z0-9_-]{1,80}\\.webp$`);
+const KEY_PATTERN = new RegExp(`^(${FOLDERS.join('|')})/[A-Za-z0-9_-]{1,80}\\.(webp|jpg)$`);
+const TYPES = { webp: 'image/webp', jpg: 'image/jpeg' };
+const BTC_DOMAIN = '@btc.hiphopxutra.vn';
 const MAX_BYTES = 3 * 1024 * 1024;
 const ADMIN_CACHE_MS = 5 * 60 * 1000;
 
@@ -31,7 +34,8 @@ function tokenPayload(token) {
 }
 
 /**
- * Admin = the same check firestore.rules makes: a verified email listed in events/{EVENT_ID}/admins.
+ * Admin = the same check firestore.rules makes: a verified email (or a BTC username account) listed in
+ * events/{EVENT_ID}/admins with the admin role (no role = admin; check-in staff can't upload).
  * Reading that doc *with the caller's token* lets Firestore verify the token; a forged one is rejected.
  */
 async function isAdmin(token, env) {
@@ -39,21 +43,33 @@ async function isAdmin(token, env) {
   if (cached && cached > Date.now()) return true;
 
   const payload = tokenPayload(token);
-  if (!payload?.email || payload.email_verified !== true || payload.aud !== env.FIREBASE_PROJECT_ID) return false;
+  const email = String(payload?.email || '').toLowerCase();
+  const trusted = payload?.email_verified === true || email.endsWith(BTC_DOMAIN);
+  if (!email || !trusted || payload.aud !== env.FIREBASE_PROJECT_ID) return false;
 
-  const email = encodeURIComponent(payload.email.toLowerCase());
+  // FIRESTORE_URL points at the emulator in local tests (wrangler dev --var).
+  const base = env.FIRESTORE_URL || 'https://firestore.googleapis.com';
   const res = await fetch(
-    `https://firestore.googleapis.com/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/events/${env.EVENT_ID}/admins/${email}`,
+    `${base}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/events/${env.EVENT_ID}/admins/${encodeURIComponent(email)}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
   if (!res.ok) return false;
+  const { fields } = await res.json();
+  if (fields?.role?.stringValue === 'checkin') return false;
   adminTokens.set(token, Math.min(Date.now() + ADMIN_CACHE_MS, payload.exp * 1000));
   return true;
 }
 
+/** Checks the file really is what its name says (a mislabelled PNG would be served with the wrong type). */
+function matchesType(bytes, ext) {
+  const ascii = (from, to) => String.fromCharCode(...bytes.subarray(from, to));
+  return ext === 'webp' ? ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP' : bytes[0] === 0xff && bytes[1] === 0xd8;
+}
+
 async function upload(request, env, key) {
   if (!KEY_PATTERN.test(key)) return json(400, { error: 'Tên file không hợp lệ.' });
-  if (request.headers.get('Content-Type') !== 'image/webp') return json(415, { error: 'Chỉ nhận ảnh WebP.' });
+  const ext = key.split('.').pop();
+  if (request.headers.get('Content-Type') !== TYPES[ext]) return json(415, { error: 'Chỉ nhận ảnh WebP hoặc JPEG.' });
 
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
   if (!token || !(await isAdmin(token, env))) return json(403, { error: 'Chỉ admin được tải ảnh lên.' });
@@ -61,7 +77,14 @@ async function upload(request, env, key) {
   const body = await request.arrayBuffer();
   if (body.byteLength === 0 || body.byteLength > MAX_BYTES) return json(413, { error: 'Ảnh rỗng hoặc lớn hơn 3MB.' });
 
-  await env.MEDIA.put(key, body, { httpMetadata: { contentType: 'image/webp' } });
+  if (!matchesType(new Uint8Array(body), ext)) return json(415, { error: 'Nội dung file không phải ảnh WebP/JPEG.' });
+
+  // Names are content hashes: the same key means the same bytes, so a retry or re-upload is free.
+  if (!(await env.MEDIA.head(key))) {
+    await env.MEDIA.put(key, body, {
+      httpMetadata: { contentType: TYPES[ext], cacheControl: 'public, max-age=31536000, immutable' },
+    });
+  }
   return json(200, { key });
 }
 
@@ -77,7 +100,7 @@ async function serve(request, env, ctx, key) {
   const response = new Response(object.body, {
     headers: {
       ...CORS,
-      'Content-Type': object.httpMetadata?.contentType || 'image/webp',
+      'Content-Type': object.httpMetadata?.contentType || TYPES[key.split('.').pop()],
       'Cache-Control': 'public, max-age=31536000, immutable',
       ETag: object.httpEtag,
     },

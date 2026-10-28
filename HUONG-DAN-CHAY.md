@@ -37,7 +37,8 @@ Chưa làm bước này thì app vẫn mở được nhưng hiện banner đỏ 
 qua một Cloudflare Worker (thư mục `worker/`). Worker chỉ nhận ảnh từ admin (kiểm tra bằng đăng nhập Firebase)
 và trả ảnh cho mọi người với cache 1 năm (trình duyệt + CDN Cloudflare). R2 không tính phí băng thông tải ra.
 
-1. Cloudflare Dashboard → **R2** → **Create bucket** tên `hiphopxutra-media` (giữ private, không cần bật public).
+1. Cloudflare Dashboard → **R2** → **Create bucket** tên `hiphopxutra` (đã tạo; giữ private, không cần bật public). Tên bucket nằm trong `worker/wrangler.toml`.
+   Lưu ý: link `https://<account>.r2.cloudflarestorage.com/...` là API S3 cần chữ ký, **không** dùng làm `VITE_MEDIA_URL`.
 2. Deploy Worker:
    ```bash
    cd worker
@@ -47,7 +48,8 @@ và trả ảnh cho mọi người với cache 1 năm (trình duyệt + CDN Clou
    Wrangler in ra link dạng `https://hiphopxutra-media.<tên>.workers.dev`.
 3. **Nên** gắn tên miền riêng (Workers → `hiphopxutra-media` → Settings → Domains & Routes → Custom domain,
    vd `anh.hiphopxutra.vn`): cache CDN của Worker chỉ chạy trên tên miền riêng, không chạy trên `workers.dev`.
-4. Tạo file `.env.local` ở thư mục gốc (cho cả `bun run dev` và `bun run build`):
+4. Đặt `VITE_MEDIA_URL` = link Worker: trên **Vercel** (Project → Settings → Environment Variables, rồi Redeploy)
+   và trong file `.env.local` ở thư mục gốc (cho `bun run dev`):
    ```
    VITE_MEDIA_URL=https://anh.hiphopxutra.vn
    ```

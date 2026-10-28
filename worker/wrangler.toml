@@ -5,7 +5,7 @@ compatibility_date = "2025-06-01"
 
 [[r2_buckets]]
 binding = "MEDIA"
-bucket_name = "hiphopxutra-media"
+bucket_name = "hiphopxutra"
 
 [vars]
 FIREBASE_PROJECT_ID = "hiphopxutra2026"

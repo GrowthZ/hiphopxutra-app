@@ -37,8 +37,18 @@ export function loadImage(src: Blob | string): Promise<HTMLImageElement> {
   });
 }
 
-/** Draws `crop` (or the whole image) scaled to fit `max`, encoded as WebP. */
-export function renderWebp(
+const MAX_UPLOAD_BYTES = 2.8 * 1024 * 1024; // the Worker refuses > 3MB
+
+const encode = (canvas: HTMLCanvasElement, type: string, quality: number) =>
+  new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Không nén được ảnh.'))), type, quality)
+  );
+
+/**
+ * Draws `crop` (or the whole image) scaled to fit `max`, encoded as WebP, or JPEG where the browser can't
+ * encode WebP (Safari hands back a PNG instead). Lowers the quality until it fits the upload limit.
+ */
+export async function renderWebp(
   img: HTMLImageElement,
   max: { width: number; height: number },
   crop?: CropArea,
@@ -54,13 +64,16 @@ export function renderWebp(
   canvas.width = Math.max(1, Math.round(sw * scale));
   canvas.height = Math.max(1, Math.round(sh * scale));
   const ctx = canvas.getContext('2d');
-  if (!ctx) return Promise.reject(new Error('Trình duyệt không hỗ trợ canvas.'));
+  if (!ctx) throw new Error('Trình duyệt không hỗ trợ canvas.');
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
 
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Không nén được ảnh.'))), 'image/webp', quality)
-  );
+  let blob = await encode(canvas, 'image/webp', quality);
+  const type = blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg';
+  if (type === 'image/jpeg') blob = await encode(canvas, type, quality);
+  for (let q = quality - 0.15; blob.size > MAX_UPLOAD_BYTES && q > 0.3; q -= 0.15) blob = await encode(canvas, type, q);
+  if (blob.size > MAX_UPLOAD_BYTES) throw new Error('Ảnh quá lớn sau khi nén, hãy chọn ảnh khác.');
+  return blob;
 }
 
 async function contentHash(blob: Blob) {
@@ -68,24 +81,46 @@ async function contentHash(blob: Blob) {
   return [...new Uint8Array(digest).slice(0, 12)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/** Uploads a WebP blob through the media Worker (admin login required). Returns its public URL. */
+const UPLOAD_ATTEMPTS = 3;
+const UPLOAD_TIMEOUT_MS = 30_000;
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Uploads a WebP/JPEG blob through the media Worker (admin login required). Returns its public URL.
+ * Retries network errors, timeouts and server hiccups; the key is a content hash, so a retry can't duplicate.
+ */
 export async function uploadImage(blob: Blob, folder: MediaFolder, name: string): Promise<string> {
   if (!MEDIA_URL) throw new Error('Chưa cấu hình VITE_MEDIA_URL (link Worker ảnh R2). Xem HUONG-DAN-CHAY.md.');
   const user = auth.currentUser;
   if (!user) throw new Error('Cần đăng nhập admin để tải ảnh lên.');
 
+  const type = blob.type === 'image/jpeg' ? 'image/jpeg' : 'image/webp';
   const safeName = name.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 40);
-  const key = `${folder}/${safeName}-${await contentHash(blob)}.webp`;
-  const res = await fetch(`${MEDIA_URL}/upload/${key}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${await user.getIdToken()}`, 'Content-Type': 'image/webp' },
-    body: blob,
-  });
-  if (!res.ok) {
-    const { error } = await res.json().catch(() => ({ error: '' }));
-    throw new Error(error || `Tải ảnh lên R2 thất bại (mã ${res.status}).`);
+  const key = `${folder}/${safeName}-${await contentHash(blob)}.${type === 'image/jpeg' ? 'jpg' : 'webp'}`;
+
+  for (let attempt = 1; ; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(`${MEDIA_URL}/upload/${key}`, {
+        method: 'PUT',
+        // A 403 on the first try may be an expired token: the retry forces a fresh one.
+        headers: { Authorization: `Bearer ${await user.getIdToken(attempt > 1)}`, 'Content-Type': type },
+        body: blob,
+        signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+      });
+    } catch (err) {
+      if (attempt >= UPLOAD_ATTEMPTS) {
+        throw new Error(`Không kết nối được kho ảnh (${(err as Error).name === 'TimeoutError' ? 'quá thời gian' : 'lỗi mạng'}). Thử lại.`);
+      }
+    }
+    if (res?.ok) return `${MEDIA_URL}/${key}`;
+    const retryable = !res || res.status >= 500 || res.status === 429 || (res.status === 403 && attempt === 1);
+    if (res && (!retryable || attempt >= UPLOAD_ATTEMPTS)) {
+      const { error } = await res.json().catch(() => ({ error: '' }));
+      throw new Error(error || `Tải ảnh lên R2 thất bại (mã ${res.status}).`);
+    }
+    await wait(700 * attempt);
   }
-  return `${MEDIA_URL}/${key}`;
 }
 
 /** One photo, resized to `max`, straight to R2. */
