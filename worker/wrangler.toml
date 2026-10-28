@@ -10,3 +10,5 @@ bucket_name = "hiphopxutra"
 [vars]
 FIREBASE_PROJECT_ID = "hiphopxutra2026"
 EVENT_ID = "hiphopxutra-2026"
+# Pages allowed to upload (comma separated); localhost is always allowed for development.
+ALLOWED_ORIGINS = "https://hiphopxutra.vercel.app"

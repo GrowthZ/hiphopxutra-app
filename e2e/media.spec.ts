@@ -99,5 +99,11 @@ test('Worker refuses non-admins, check-in staff and mislabelled files', async ()
   expect((await put('teams/no-4.webp', admin, JPEG)).status).toBe(415); // JPEG bytes named .webp
   expect([400, 405]).toContain((await put('../etc/x.webp', admin, WEBP)).status); // path tricks never reach R2
   expect((await put('teams/a%2Fb.webp', admin, WEBP)).status).toBe(400);
+  const fromOtherSite = await fetch(`${MEDIA_URL}/upload/teams/ok-3.webp`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${admin}`, 'Content-Type': 'image/webp', Origin: 'https://evil.example' },
+    body: WEBP,
+  });
+  expect(fromOtherSite.status).toBe(403); // uploads only from the app's own pages
   expect(PROJECT_ID).toBe('demo-hiphopxutra');
 });

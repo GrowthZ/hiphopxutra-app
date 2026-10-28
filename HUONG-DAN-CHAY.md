@@ -45,7 +45,8 @@ và trả ảnh cho mọi người với cache 1 năm (trình duyệt + CDN Clou
    npx wrangler login
    npx wrangler deploy
    ```
-   Wrangler in ra link dạng `https://hiphopxutra-media.<tên>.workers.dev`.
+   Wrangler in ra link dạng `https://hiphopxutra-media.<tên>.workers.dev` (hiện tại: `https://hiphopxutra-media.hoangdu-tpg.workers.dev`).
+   Trang được phép tải ảnh lên: `ALLOWED_ORIGINS` trong `worker/wrangler.toml` (localhost luôn được phép).
 3. **Nên** gắn tên miền riêng (Workers → `hiphopxutra-media` → Settings → Domains & Routes → Custom domain,
    vd `anh.hiphopxutra.vn`): cache CDN của Worker chỉ chạy trên tên miền riêng, không chạy trên `workers.dev`.
 4. Đặt `VITE_MEDIA_URL` = link Worker: trên **Vercel** (Project → Settings → Environment Variables, rồi Redeploy)

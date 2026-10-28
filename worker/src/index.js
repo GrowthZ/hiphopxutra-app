@@ -109,11 +109,22 @@ async function serve(request, env, ctx, key) {
   return request.method === 'HEAD' ? new Response(null, response) : response;
 }
 
+/**
+ * Uploads come only from the app (ALLOWED_ORIGINS) or local dev; reading stays open to every page.
+ * A missing Origin (scripts, curl) still needs an admin token like any upload.
+ */
+function uploadOriginAllowed(request, env) {
+  const origin = request.headers.get('Origin');
+  if (!origin || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return true;
+  return (env.ALLOWED_ORIGINS || '').split(',').map((o) => o.trim()).includes(origin);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     if (request.method === 'PUT' && pathname.startsWith('/upload/')) {
+      if (!uploadOriginAllowed(request, env)) return json(403, { error: 'Trang này không được phép tải ảnh lên.' });
       return upload(request, env, pathname.slice('/upload/'.length));
     }
     if (request.method === 'GET' || request.method === 'HEAD') return serve(request, env, ctx, pathname.slice(1));
