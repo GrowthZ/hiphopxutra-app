@@ -16,6 +16,8 @@ import {
   MatchVotes,
   Votes,
   recalculateDancers,
+  DEFAULT_PANELS,
+  PrelimPanels,
   dancerToDoc,
   teamToDoc,
   teamFromDoc,
@@ -53,7 +55,11 @@ type Side = 'red' | 'blue';
 interface TournamentContextType {
   // Judges
   judges: Judge[];
+  /** The 8 prelim judges: panel A, then panel B. */
   prelimJudges: Judge[];
+  /** Prelim panels: who scores the odd / even SBDs (meta/current). */
+  prelimPanels: PrelimPanels;
+  setPrelimPanels: (panels: PrelimPanels) => void;
   selectedJudgeId: string;
   setSelectedJudgeId: (id: string) => void;
   activeJudge: Judge;
@@ -175,6 +181,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [teamsBase, setProTeams] = useState<Team2v2[]>(() => legacy.teams(IS_PUBLIC_SOURCE));
   const [matchesBase, setMatchesBase] = useState<BattleMatch[]>(() => legacy.matches(IS_PUBLIC_SOURCE));
   const [activeMatchId, setActiveMatchId] = useState(legacy.activeMatchId);
+  const [prelimPanels, setPrelimPanels] = useState<PrelimPanels>(DEFAULT_PANELS);
 
   const [votes, setVotes] = useState<Record<string, Votes>>({});
   const votesRef = useRef(votes);
@@ -244,8 +251,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // ---------- Derived views exposed to components ----------
-  const newbieDancers = useMemo(() => recalculateDancers(withOwnScores(newbieBase)), [newbieBase, withOwnScores]);
-  const proDancers = useMemo(() => recalculateDancers(withOwnScores(proBase)), [proBase, withOwnScores]);
+  const newbieDancers = useMemo(
+    () => recalculateDancers(withOwnScores(newbieBase), prelimPanels),
+    [newbieBase, withOwnScores, prelimPanels]
+  );
+  const proDancers = useMemo(() => recalculateDancers(withOwnScores(proBase), prelimPanels), [proBase, withOwnScores, prelimPanels]);
   const dancersById = useMemo(
     () => new Map([...newbieDancers, ...proDancers].map((d) => [d.id, d])),
     [newbieDancers, proDancers]
@@ -262,8 +272,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   // Public pages (/ket-qua/*, /led and its admin preview iframe) only read the published copies, never write.
   const canWrite = isAdmin && !IS_PUBLIC_SOURCE;
   const meta = useMemo(
-    () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked }],
-    [activeMatchId, isNewbieTop32Locked, isProTop32Locked]
+    () => [{ id: 'current', activeMatchId, isNewbieTop32Locked, isProTop32Locked, prelimPanels }],
+    [activeMatchId, isNewbieTop32Locked, isProTop32Locked, prelimPanels]
   );
   const privateOnly = { enabled: canWrite }; // raw scores and votes: admins only
   // Check-in staff read the dancer lists (to check in / register), but never write through the sync.
@@ -296,10 +306,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const canPublish = canWrite && syncStates.every((s) => s.hydrated);
   const publicDancers = useMemo(
     () => [
-      ...newbieBase.map((d) => ({ ...toPublicDancer(d, isNewbieTop32Locked), id: d.id }) as Dancer),
-      ...proBase.map((d) => ({ ...toPublicDancer(d, isProTop32Locked), id: d.id }) as Dancer),
+      ...newbieBase.map((d) => ({ ...toPublicDancer(d, isNewbieTop32Locked, prelimPanels), id: d.id }) as Dancer),
+      ...proBase.map((d) => ({ ...toPublicDancer(d, isProTop32Locked, prelimPanels), id: d.id }) as Dancer),
     ],
-    [newbieBase, proBase, isNewbieTop32Locked, isProTop32Locked]
+    [newbieBase, proBase, isNewbieTop32Locked, isProTop32Locked, prelimPanels]
   );
   const publicVotes = useMemo(
     () => matchesBase.filter((m) => votes[m.id]).map((m) => toPublicVotes(m, votes[m.id])),
@@ -336,6 +346,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActiveMatchId(m.activeMatchId);
     setIsNewbieTop32Locked(Boolean(m.isNewbieTop32Locked));
     setIsProTop32Locked(Boolean(m.isProTop32Locked));
+    if (m.prelimPanels?.A && m.prelimPanels?.B) setPrelimPanels(m.prelimPanels);
   }
   function applyRemoteVotes(list: MatchVotes[]) {
     setVotes(Object.fromEntries(list.map((v) => [v.id, v.rounds])));
@@ -545,7 +556,11 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     <TournamentContext.Provider
       value={{
         judges,
-        prelimJudges: judges.slice(0, 4),
+        prelimJudges: [...prelimPanels.A, ...prelimPanels.B]
+          .map((id) => judges.find((j) => j.id === id))
+          .filter((j): j is Judge => Boolean(j)),
+        prelimPanels,
+        setPrelimPanels,
         selectedJudgeId,
         setSelectedJudgeId,
         activeJudge,

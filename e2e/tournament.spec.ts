@@ -59,6 +59,49 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
   await context.close();
 });
 
+test('prelim panels: a panel B judge scores even SBDs only; panel A cannot touch them', async ({ browser }) => {
+  await createJudge('gk-5', '555555');
+  const context = await browser.newContext();
+  const judge = await context.newPage();
+  await judge.goto('/giam-khao');
+  await judge.getByRole('button', { name: /GK 05/ }).click();
+  for (const digit of '555555') await judge.getByRole('button', { name: digit, exact: true }).click();
+  await judge.getByRole('button', { name: /VÀO BÀN CHẤM ĐIỂM NGAY/ }).click();
+  await judge.getByRole('button', { name: /Chấm Prelim/ }).click();
+  await expect(judge.getByText('Bảng B · SBD chẵn')).toBeVisible();
+  for (const key of '75') await judge.getByRole('button', { name: key, exact: true }).click();
+  await judge.getByRole('button', { name: /Lưu 75 điểm/ }).click();
+
+  await expect
+    .poll(async () => {
+      const snap = await event.collection('proDancers').where('prelimScores.gk-5', '==', 75).get();
+      return snap.docs.map((d) => d.get('sbd') as string);
+    })
+    .toEqual([expect.stringMatching(/[02468]$/)]);
+  await context.close();
+
+  // A panel A judge writing a score for an even (panel B) dancer is refused by firestore.rules.
+  await createJudge('gk-2', '222222');
+  const { idToken } = await (
+    await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'gk-2@giamkhao.hiphopxutra.vn', password: '222222', returnSecureToken: true }),
+    })
+  ).json();
+  const even = (await event.collection('proDancers').get()).docs.find((d) => /[02468]$/.test(d.get('sbd')))!;
+  const res = await fetch(
+    `http://127.0.0.1:8080/v1/${even.ref.path.replace(/^/, 'projects/demo-hiphopxutra/databases/(default)/documents/')}?updateMask.fieldPaths=${encodeURIComponent('prelimScores.`gk-2`')}`,
+    {
+      method: 'PATCH',
+      signal: AbortSignal.timeout(10_000),
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { prelimScores: { mapValue: { fields: { 'gk-2': { integerValue: '80' } } } } } }),
+    }
+  );
+  expect(res.status).toBe(403);
+});
+
 test('admin announces a battle round and the result is published', async () => {
   const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
   // The other 8 judges vote red too, as their phones would.
@@ -128,5 +171,8 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
   const snap = await event.collection('newbieDancers').where('name', '==', 'BBOY WALK IN').get();
   expect(snap.size).toBe(1);
   expect(snap.docs[0].get('sbd')).toMatch(/^N\d{3}$/);
+  // Check-in also puts the dancer in a prelim panel: A for odd numbers, B for even (default).
+  expect(snap.docs[0].get('panel')).toBe(Number(snap.docs[0].get('sbd').slice(1)) % 2 === 1 ? 'A' : 'B');
+  await expect(desk.getByText(/Bảng [AB]/).first()).toBeVisible();
   await context.close();
 });

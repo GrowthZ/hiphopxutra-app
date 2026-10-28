@@ -1,4 +1,5 @@
 import { Dancer, Judge, BattleMatch, Team2v2 } from './types';
+import { DEFAULT_PANELS, PANEL_SIZE, panelOf, prelimJudgeIdsFor } from './model';
 
 // 9 Judges for Main Battle (Updated Official List)
 export const DEFAULT_JUDGES: Judge[] = [
@@ -14,7 +15,6 @@ export const DEFAULT_JUDGES: Judge[] = [
 ];
 
 // 4 Judges for Prelims (solo scoring)
-export const DEFAULT_PRELIM_JUDGES: Judge[] = DEFAULT_JUDGES.slice(0, 4);
 
 const NEWBIE_NAMES = [
   'BBOY THUNDER', 'BBOY T-REX', 'BGIRL SAKURA', 'BBOY DRAGON', 'BGIRL RUBY',
@@ -52,9 +52,9 @@ function generateDancers(category: 'newbie_1v1' | 'pro_2v2', names: string[]): D
     if (name === 'BBOY H') baseScore = 82;
     if (name === 'BBOY I') baseScore = 81;
 
-    // 4 Prelim Judges scoring integers
+    // The 4 judges of the dancer's panel (odd SBD: A, even: B) score integers
     const scores: Record<string, number> = {};
-    DEFAULT_PRELIM_JUDGES.forEach((j, jIdx) => {
+    prelimJudgeIdsFor({ sbd }, DEFAULT_PANELS).forEach((judgeId, jIdx) => {
       let offset = 0;
       if (jIdx === 0) offset = index % 2 === 0 ? 0 : 1;
       else if (jIdx === 1) offset = index % 3 === 0 ? -1 : 0;
@@ -70,16 +70,17 @@ function generateDancers(category: 'newbie_1v1' | 'pro_2v2', names: string[]): D
       if (name === 'BBOY I') offset = [1, 2, 2, 1][jIdx]; // total 330, avg 83
 
       const score = Math.min(100, Math.max(50, Math.round(baseScore + offset)));
-      scores[j.id] = score;
+      scores[judgeId] = score;
     });
 
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
-    const avg = Math.round(total / DEFAULT_PRELIM_JUDGES.length);
+    const avg = Math.round(total / PANEL_SIZE);
     const isFemale = name.startsWith('BGIRL');
 
     return {
       id: `${category}-dancer-${index + 1}`,
       sbd,
+      panel: panelOf(sbd, DEFAULT_PANELS) ?? undefined, // as check-in would assign
       name,
       realName: isFemale
         ? `Nguyễn Thị ${String.fromCharCode(65 + (index % 26))}`

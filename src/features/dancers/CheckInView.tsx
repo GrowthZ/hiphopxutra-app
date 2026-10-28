@@ -15,7 +15,7 @@ const normalize = (s = '') =>
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
 export const CheckInView: React.FC = () => {
-  const { newbieDancers, proDancers, storageConfig } = useTournament();
+  const { newbieDancers, proDancers, storageConfig, prelimPanels } = useTournament();
   const [category, setCategory] = useState<CategoryType>('newbie_1v1');
   const [status, setStatus] = useState<StatusFilter>('pending');
   const [query, setQuery] = useState('');
@@ -54,9 +54,11 @@ export const CheckInView: React.FC = () => {
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
   }, [dancers, status, query, crew]);
 
-  const issueSbd = (cat: CategoryType, dancerId: string) => {
+  // Check-in hands out the SBD and the prelim panel (A / B by the number's parity) together.
+  const issueSbd = async (cat: CategoryType, dancerId: string) => {
     const highestIssued = Math.max(0, ...listOf(cat).filter((d) => isIssuedSbd(cat, d.sbd)).map((d) => Number(d.sbd.slice(1))));
-    return checkInDancer(cat, dancerId, highestIssued);
+    const { sbd, panel } = await checkInDancer(cat, dancerId, highestIssued, prelimPanels.aIsOdd);
+    return `${sbd} · Bảng ${panel}`;
   };
 
   // Walk-in: a dancer who didn't pre-register signs up at the desk (and usually gets a number right away).
@@ -356,7 +358,18 @@ export const CheckInView: React.FC = () => {
 
               <div className="w-20 text-center shrink-0">
                 {d.checkedInAt ? (
-                  <span className="font-condensed font-black text-2xl text-zinc-900 tabular-nums">{d.sbd}</span>
+                  <>
+                    <span className="block font-condensed font-black text-2xl leading-none text-zinc-900 tabular-nums">{d.sbd}</span>
+                    {d.panel && (
+                      <span
+                        className={`mt-0.5 inline-block rounded px-1.5 text-[11px] font-black ${
+                          d.panel === 'A' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
+                        }`}
+                      >
+                        Bảng {d.panel}
+                      </span>
+                    )}
+                  </>
                 ) : hasNumber ? (
                   <span className="text-[11px] font-bold text-zinc-400" title="Đã huỷ check-in, check-in lại sẽ dùng lại số này">
                     giữ số {d.sbd}

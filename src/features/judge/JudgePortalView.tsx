@@ -124,7 +124,7 @@ export const JudgePortalView: React.FC = () => {
         {canScorePrelim && (
           <nav className="grid grid-cols-2 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shrink-0" aria-label="Chế độ chấm">
             {([
-              ['prelim', 'Chấm Prelim', '4 GK', ListChecks],
+              ['prelim', 'Chấm Prelim', '8 GK · 2 bảng', ListChecks],
               ['battle', 'Chấm Battle', '9 GK', Swords],
             ] as const).map(([mode, label, sub, Icon]) => (
               <button

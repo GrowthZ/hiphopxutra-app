@@ -21,6 +21,8 @@ import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from '../dancers/DancerPhotoUploadModal';
 import { BankingScoreKeypadModal } from './BankingScoreKeypadModal';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
+import { PANEL_SIZE, panelOfDancer, prelimJudgeIdsFor } from '../../domain/model';
+import { PrelimPanelsCard } from './PrelimPanelsCard';
 import { openInNewTab } from '../../app/routes';
 
 export const PrelimView: React.FC = () => {
@@ -29,7 +31,8 @@ export const PrelimView: React.FC = () => {
     setActiveCategory,
     newbieDancers,
     proDancers,
-    prelimJudges,
+    judges,
+    prelimPanels,
     updatePrelimScore,
     isNewbieTop32Locked,
     isProTop32Locked,
@@ -47,14 +50,15 @@ export const PrelimView: React.FC = () => {
   const [keypadTarget, setKeypadTarget] = useState<{ dancerId: string; judgeId: string } | null>(null);
 
   const currentDancers = activeCategory === 'newbie_1v1' ? newbieDancers : proDancers;
+  const judgeIdsOf = (d: Dancer) => prelimJudgeIdsFor(d, prelimPanels);
+  const judgeById = (id?: string) => judges.find((j) => j.id === id);
   const isLocked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
 
   const targetDancer = keypadTarget
     ? currentDancers.find((d) => d.id === keypadTarget.dancerId) || null
     : null;
-  const targetJudge = keypadTarget
-    ? prelimJudges.find((j) => j.id === keypadTarget.judgeId) || null
-    : null;
+  const targetJudge = keypadTarget ? judgeById(keypadTarget.judgeId) || null : null;
+  const targetPanelJudges = targetDancer ? judgeIdsOf(targetDancer) : [];
   const currentCellScore =
     targetDancer && targetJudge ? targetDancer.prelimScores[targetJudge.id] ?? 80 : 80;
 
@@ -72,54 +76,35 @@ export const PrelimView: React.FC = () => {
   const handleSaveAndNextJudge = (score: number) => {
     if (!keypadTarget) return;
     updatePrelimScore(activeCategory, keypadTarget.dancerId, keypadTarget.judgeId, score);
-    const jIdx = prelimJudges.findIndex((j) => j.id === keypadTarget.judgeId);
-    if (jIdx < prelimJudges.length - 1) {
-      setKeypadTarget({
-        dancerId: keypadTarget.dancerId,
-        judgeId: prelimJudges[jIdx + 1].id,
-      });
+    const jIdx = targetPanelJudges.indexOf(keypadTarget.judgeId);
+    if (jIdx >= 0 && jIdx < targetPanelJudges.length - 1) {
+      setKeypadTarget({ dancerId: keypadTarget.dancerId, judgeId: targetPanelJudges[jIdx + 1] });
     } else {
-      // Move to first judge of next dancer
+      // First judge of the next dancer that has a panel
       const dIdx = currentDancers.findIndex((d) => d.id === keypadTarget.dancerId);
-      if (dIdx < currentDancers.length - 1) {
-        setKeypadTarget({
-          dancerId: currentDancers[dIdx + 1].id,
-          judgeId: prelimJudges[0].id,
-        });
-      } else {
-        setKeypadTarget(null);
-      }
+      const next = currentDancers.slice(dIdx + 1).find((d) => judgeIdsOf(d).length > 0);
+      setKeypadTarget(next ? { dancerId: next.id, judgeId: judgeIdsOf(next)[0] } : null);
     }
   };
 
   const handleSaveAndNextDancer = (score: number) => {
     if (!keypadTarget) return;
     updatePrelimScore(activeCategory, keypadTarget.dancerId, keypadTarget.judgeId, score);
+    // Same column (judge position) for the next dancer, in that dancer's panel
+    const col = Math.max(0, targetPanelJudges.indexOf(keypadTarget.judgeId));
     const dIdx = currentDancers.findIndex((d) => d.id === keypadTarget.dancerId);
-    if (dIdx < currentDancers.length - 1) {
-      setKeypadTarget({
-        dancerId: currentDancers[dIdx + 1].id,
-        judgeId: keypadTarget.judgeId,
-      });
-    } else {
-      setKeypadTarget(null);
-    }
+    const next = currentDancers.slice(dIdx + 1).find((d) => judgeIdsOf(d).length > 0);
+    setKeypadTarget(next ? { dancerId: next.id, judgeId: judgeIdsOf(next)[col] } : null);
   };
 
-  // Stats calculation (Strictly 4 Judges for Prelim)
+  // Stats: each checked-in dancer expects the 4 scores of their panel
   const totalDancers = currentDancers.length;
-  const gradedDancers = currentDancers.filter((d) =>
-    prelimJudges.some((j) => d.prelimScores[j.id] !== undefined)
-  ).length;
-
-  const totalVotesReceived = currentDancers.reduce((acc, d) => {
-    let count = 0;
-    prelimJudges.forEach((j) => {
-      if (d.prelimScores[j.id] !== undefined) count++;
-    });
-    return acc + count;
-  }, 0);
-  const totalExpectedVotes = totalDancers * prelimJudges.length; // 40 * 4 = 160
+  const gradedDancers = currentDancers.filter((d) => judgeIdsOf(d).some((j) => d.prelimScores[j] !== undefined)).length;
+  const totalVotesReceived = currentDancers.reduce(
+    (acc, d) => acc + judgeIdsOf(d).filter((j) => d.prelimScores[j] !== undefined).length,
+    0
+  );
+  const totalExpectedVotes = currentDancers.filter((d) => judgeIdsOf(d).length > 0).length * PANEL_SIZE;
 
   // Tie-breaker check at boundary Rank 32 vs 33
   const rank32Dancer = currentDancers[31];
@@ -137,10 +122,11 @@ export const PrelimView: React.FC = () => {
 
   // Export CSV
   const handleExportCSV = () => {
-    const judgeHeaders = prelimJudges.map((j) => j.code);
+    const judgeHeaders = Array.from({ length: PANEL_SIZE }, (_, i) => [`GK ${i + 1}`, `Điểm ${i + 1}`]).flat();
     const header = [
       'Hạng',
       'SBD',
+      'Bảng',
       'Thí sinh',
       'CLB / Đội',
       ...judgeHeaders,
@@ -151,9 +137,10 @@ export const PrelimView: React.FC = () => {
     const rows = currentDancers.map((d, index) => [
       index + 1,
       d.sbd,
+      panelOfDancer(d, prelimPanels) ?? '',
       d.name,
       d.crew || '',
-      ...prelimJudges.map((j) => Math.round(d.prelimScores[j.id] ?? 0)),
+      ...judgeIdsOf(d).flatMap((j) => [judgeById(j)?.code ?? j, Math.round(d.prelimScores[j] ?? 0)]),
       Math.round(d.prelimScoreTotal),
       Math.round(d.prelimScoreAvg),
       d.isQualifiedTop32 ? 'Top 32' : 'Ngoài Top 32',
@@ -171,7 +158,7 @@ export const PrelimView: React.FC = () => {
             Kết quả prelim
           </h1>
           <p className="text-xs text-zinc-500 font-medium mt-0.5">
-            Vòng sơ loại Solo · Thang điểm 0–100 (Số nguyên) · 4 Giám khảo chấm mỗi thể loại
+            Vòng sơ loại Solo · Thang điểm 0–100 · 8 giám khảo chia 2 bảng theo SBD, mỗi thí sinh 4 GK (tối đa 400)
           </p>
         </div>
 
@@ -225,18 +212,11 @@ export const PrelimView: React.FC = () => {
         </div>
       </div>
 
+      <PrelimPanelsCard />
+
       {/* Category Segmented Tabs */}
       <div className="flex items-center gap-1 bg-zinc-200 p-1 rounded w-fit text-xs font-bold">
-        <button
-          onClick={() => setActiveCategory('newbie_1v1')}
-          className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
-            activeCategory === 'newbie_1v1'
-              ? 'bg-zinc-900 text-white shadow-xs'
-              : 'text-zinc-600 hover:text-zinc-900'
-          }`}
-        >
-          Kid Newbie • 1vs1
-        </button>
+        {/* Prelim runs Pro first, then Newbie */}
         <button
           onClick={() => setActiveCategory('pro_2v2')}
           className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
@@ -246,6 +226,16 @@ export const PrelimView: React.FC = () => {
           }`}
         >
           Kid Pro • 2vs2
+        </button>
+        <button
+          onClick={() => setActiveCategory('newbie_1v1')}
+          className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
+            activeCategory === 'newbie_1v1'
+              ? 'bg-zinc-900 text-white shadow-xs'
+              : 'text-zinc-600 hover:text-zinc-900'
+          }`}
+        >
+          Kid Newbie • 1vs1
         </button>
       </div>
 
@@ -271,7 +261,7 @@ export const PrelimView: React.FC = () => {
             <div className="font-condensed font-black text-xl text-zinc-900 tabular-nums">
               {totalVotesReceived}/{totalExpectedVotes}
             </div>
-            <div className="text-[11px] text-zinc-500 font-medium">phiếu đã nhận (4 GK)</div>
+            <div className="text-[11px] text-zinc-500 font-medium">phiếu đã nhận (4 GK / thí sinh)</div>
           </div>
         </div>
 
@@ -323,7 +313,7 @@ export const PrelimView: React.FC = () => {
               </p>
             </div>
             <div className="text-xs text-zinc-500 font-mono">
-              4 Giám khảo chấm solo · Thang điểm 400
+              Bảng A: {prelimPanels.aIsOdd ? 'SBD lẻ' : 'SBD chẵn'} · Bảng B: {prelimPanels.aIsOdd ? 'SBD chẵn' : 'SBD lẻ'} · 4 GK mỗi thí sinh
             </div>
           </div>
 
@@ -335,11 +325,14 @@ export const PrelimView: React.FC = () => {
                   <th className="py-2.5 px-3 w-14">SBD</th>
                   <th className="py-2.5 px-3">Thí sinh</th>
                   <th className="py-2.5 px-3 hidden sm:table-cell">CLB / Đội</th>
-                  {prelimJudges.map((j) => (
-                    <th key={j.id} className="py-2.5 px-2 text-center w-20" title={j.name}>
-                      <div className="font-mono text-[9px] text-zinc-500 leading-none">{j.code}</div>
-                      <div className="text-zinc-900 font-bold text-[11px] truncate max-w-[75px] mt-0.5">
-                        {j.judgeName || j.name.split('•')[1]?.trim() || j.code}
+                  <th className="py-2.5 px-2 text-center w-12">Bảng</th>
+                  {Array.from({ length: PANEL_SIZE }, (_, i) => (
+                    <th key={i} className="py-2.5 px-2 text-center w-24" title="Giám khảo thứ i của bảng A / bảng B">
+                      <div className="font-mono text-[9px] text-zinc-500 leading-none">GK {i + 1}</div>
+                      <div className="mt-0.5 text-[10px] font-bold leading-tight text-zinc-900 normal-case">
+                        <span className="text-amber-700">A</span> {judgeById(prelimPanels.A[i])?.judgeName ?? '—'}
+                        <br />
+                        <span className="text-sky-700">B</span> {judgeById(prelimPanels.B[i])?.judgeName ?? '—'}
                       </div>
                     </th>
                   ))}
@@ -428,18 +421,33 @@ export const PrelimView: React.FC = () => {
                           {dancer.crew}
                         </td>
 
-                        {/* 4 Prelim Judges Scores */}
-                        {prelimJudges.map((j) => {
-                          const score = Math.round(dancer.prelimScores[j.id] ?? 0);
-                          const isTarget =
-                            keypadTarget?.dancerId === dancer.id && keypadTarget?.judgeId === j.id;
+                        {/* Panel + the 4 judges of the dancer's panel */}
+                        <td className="py-2 px-2 text-center">
+                          {panelOfDancer(dancer, prelimPanels) ? (
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[11px] font-black ${
+                                panelOfDancer(dancer, prelimPanels) === 'A' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
+                              }`}
+                            >
+                              {panelOfDancer(dancer, prelimPanels)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-zinc-400" title="Chưa check-in, chưa có SBD">—</span>
+                          )}
+                        </td>
+                        {Array.from({ length: PANEL_SIZE }, (_, i) => {
+                          const judgeId = judgeIdsOf(dancer)[i];
+                          if (!judgeId) return <td key={i} className="py-1.5 px-2 text-center text-zinc-300">—</td>;
+                          const j = judgeById(judgeId);
+                          const score = Math.round(dancer.prelimScores[judgeId] ?? 0);
+                          const isTarget = keypadTarget?.dancerId === dancer.id && keypadTarget?.judgeId === judgeId;
 
                           return (
                             <td
-                              key={j.id}
-                              onClick={() => handleOpenKeypad(dancer.id, j.id)}
+                              key={i}
+                              onClick={() => handleOpenKeypad(dancer.id, judgeId)}
                               className="py-1.5 px-2 text-center cursor-pointer hover:bg-amber-50 transition-colors group/cell"
-                              title={`Chạm để mở bàn phím bấm số chấm điểm cho ${j.judgeName || j.code}`}
+                              title={`Chạm để mở bàn phím bấm số chấm điểm cho ${j?.judgeName || j?.code || judgeId}`}
                             >
                               <div
                                 className={`inline-flex items-center justify-center min-w-[40px] px-2 py-1 rounded-md font-mono text-xs font-black transition-all shadow-2xs ${
@@ -483,7 +491,7 @@ export const PrelimView: React.FC = () => {
                       {/* Threshold separator line after Rank 32 */}
                       {rank === 32 && (
                         <tr className="bg-red-500 text-white font-mono text-[10px] font-bold">
-                          <td colSpan={10} className="py-1 px-3 tracking-widest text-center uppercase">
+                          <td colSpan={12} className="py-1 px-3 tracking-widest text-center uppercase">
                             --- NGƯỠNG CẮT TOP 32 (RANH GIỚI ĐI TIẾP VÀO VÒNG TRONG) ---
                           </td>
                         </tr>
@@ -512,7 +520,7 @@ export const PrelimView: React.FC = () => {
             <div className="space-y-2.5 text-xs">
               <div className="flex items-center gap-2 text-emerald-700 font-medium">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-                <span>4/4 Giám khảo đã nộp điểm</span>
+                <span>{totalVotesReceived}/{totalExpectedVotes} phiếu của 2 bảng</span>
               </div>
               <div className="flex items-center gap-2 text-emerald-700 font-medium">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
@@ -609,10 +617,7 @@ export const PrelimView: React.FC = () => {
         onSave={handleSaveKeypadScore}
         onSaveAndNextJudge={handleSaveAndNextJudge}
         onSaveAndNextDancer={handleSaveAndNextDancer}
-        hasNextJudge={Boolean(
-          targetJudge &&
-          prelimJudges.findIndex((j) => j.id === targetJudge.id) < prelimJudges.length - 1
-        )}
+        hasNextJudge={Boolean(targetJudge && targetPanelJudges.indexOf(targetJudge.id) < targetPanelJudges.length - 1)}
         hasNextDancer={Boolean(
           targetDancer &&
           currentDancers.findIndex((d) => d.id === targetDancer.id) < currentDancers.length - 1

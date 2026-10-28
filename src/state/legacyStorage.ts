@@ -1,5 +1,4 @@
 import { BattleMatch, Dancer, Judge, Team2v2 } from '../domain/types';
-import { PRELIM_JUDGE_IDS } from '../domain/model';
 import {
   DEFAULT_JUDGES,
   INITIAL_NEWBIE_DANCERS,
@@ -23,27 +22,17 @@ function read<T>(suffix: string, parse: (raw: unknown) => T, fallback: T): T {
   }
 }
 
-/** Old saves may hold partial or out-of-range prelim scores: clamp them and recompute the totals. */
+/** Old saves may hold out-of-range prelim scores: keep the numeric ones, clamped (totals are recomputed per panel). */
 function sanitizeDancers(raw: unknown, fallback: Dancer[]): Dancer[] {
   if (!Array.isArray(raw) || raw.length === 0) return fallback;
-  return (raw as Dancer[]).map((d, idx) => {
-    const fallbackDancer = fallback[idx] || fallback[0];
-    const scores: Record<string, number> = {};
-    PRELIM_JUDGE_IDS.forEach((jId) => {
-      const val = d.prelimScores?.[jId];
-      scores[jId] =
-        typeof val === 'number' && !isNaN(val)
-          ? Math.min(100, Math.max(50, Math.round(val)))
-          : (fallbackDancer?.prelimScores?.[jId] ?? 80);
-    });
-    const total = PRELIM_JUDGE_IDS.reduce((acc, jId) => acc + (scores[jId] || 0), 0);
-    return {
-      ...d,
-      prelimScores: scores,
-      prelimScoreTotal: Math.min(400, Math.round(total)),
-      prelimScoreAvg: Math.round(total / PRELIM_JUDGE_IDS.length),
-    };
-  });
+  return (raw as Dancer[]).map((d) => ({
+    ...d,
+    prelimScores: Object.fromEntries(
+      Object.entries(d.prelimScores ?? {})
+        .filter(([, v]) => typeof v === 'number' && !isNaN(v))
+        .map(([jId, v]) => [jId, Math.min(100, Math.max(0, Math.round(v)))])
+    ),
+  }));
 }
 
 /** Saved names/photos laid over the default judge list. */

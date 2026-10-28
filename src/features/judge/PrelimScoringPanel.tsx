@@ -2,17 +2,15 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Delete, Loader2, Lock } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { soundFX } from '../../services/soundEffects';
-import { isIssuedSbd } from '../../services/firestore';
-import { CategoryType, Dancer } from '../../domain/types';
+import { Dancer } from '../../domain/types';
+import { panelOfDancer, panelOfJudge, PrelimPanels } from '../../domain/model';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'] as const;
 
-/** Running order: checked-in dancers by SBD (the order they come on); before check-in, everyone by name. */
-function scoringOrder(category: CategoryType, list: Dancer[]) {
-  const issued = list.filter((d) => isIssuedSbd(category, d.sbd));
-  return issued.length
-    ? issued.sort((a, b) => a.sbd.localeCompare(b.sbd))
-    : [...list].sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+/** This judge's dancers in running order: checked in (an SBD) and of the judge's panel's parity, by SBD. */
+function scoringOrder(list: Dancer[], judgeId: string, panels: PrelimPanels) {
+  const panel = panelOfJudge(judgeId, panels);
+  return list.filter((d) => panel && panelOfDancer(d, panels) === panel).sort((a, b) => a.sbd.localeCompare(b.sbd));
 }
 
 /**
@@ -29,11 +27,13 @@ export const PrelimScoringPanel: React.FC = () => {
     updatePrelimScore,
     isNewbieTop32Locked,
     isProTop32Locked,
+    prelimPanels,
   } = useTournament();
 
+  const myPanel = panelOfJudge(selectedJudgeId, prelimPanels);
   const dancers = useMemo(
-    () => scoringOrder(activeCategory, activeCategory === 'newbie_1v1' ? newbieDancers : proDancers),
-    [activeCategory, newbieDancers, proDancers]
+    () => scoringOrder(activeCategory === 'newbie_1v1' ? newbieDancers : proDancers, selectedJudgeId, prelimPanels),
+    [activeCategory, newbieDancers, proDancers, selectedJudgeId, prelimPanels]
   );
   // Tracked by id: the list re-sorts as scores arrive, an index would jump to someone else.
   const [dancerId, setDancerId] = useState<string | null>(null);
@@ -141,8 +141,8 @@ export const PrelimScoringPanel: React.FC = () => {
         <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Hạng mục">
           {(
             [
-              ['newbie_1v1', 'Newbie'],
               ['pro_2v2', 'Pro'],
+              ['newbie_1v1', 'Newbie'],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -160,8 +160,13 @@ export const PrelimScoringPanel: React.FC = () => {
             </button>
           ))}
         </div>
+        {myPanel && (
+          <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
+            Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
+          </span>
+        )}
         <label className="relative flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums">
-          Đã chấm <span className="text-zinc-900">{scoredCount}</span>/{dancers.length}
+          {scoredCount}/{dancers.length}
           <ChevronRight className="w-3.5 h-3.5 rotate-90 text-zinc-400" />
           <select
             value={dancer?.id ?? ''}
@@ -211,7 +216,9 @@ export const PrelimScoringPanel: React.FC = () => {
           </div>
         </section>
       ) : (
-        <p className="rounded-2xl border border-zinc-200 p-6 text-center text-sm text-zinc-500 shrink-0">Chưa có thí sinh trong hạng mục này.</p>
+        <p className="rounded-2xl border border-zinc-200 p-6 text-center text-sm text-zinc-500 shrink-0">{myPanel
+            ? 'Chưa có thí sinh bảng này: thí sinh hiện ra sau khi check-in và có số báo danh.'
+            : 'Giám khảo này không chấm Prelim.'}</p>
       )}
 
       {error && (

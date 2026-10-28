@@ -32,7 +32,7 @@ export const AdminSidebar: React.FC = () => {
 
   const menuItems = [
     { id: 'checkin', label: 'Check-in thí sinh', icon: UserCheck },
-    { id: 'prelim', label: 'Bàn chấm Prelim (4 GK)', icon: FileSpreadsheet },
+    { id: 'prelim', label: 'Bàn chấm Prelim (8 GK)', icon: FileSpreadsheet },
     { id: 'prelim_results', label: 'Bảng Kết quả Prelim (LED)', icon: Trophy },
     { id: 'prelim_guest', label: 'Khách xem Prelim (Mobile)', icon: Eye },
     { id: 'prelim_screen', label: 'Màn chiếu TV', icon: MonitorPlay },

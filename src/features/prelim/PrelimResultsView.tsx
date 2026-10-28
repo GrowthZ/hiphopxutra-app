@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTournament } from '../../state/TournamentContext';
-import { CategoryType, Dancer } from '../../domain/types';
+import { CategoryType, Dancer, Judge } from '../../domain/types';
+import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 import {
   Trophy,
   Medal,
@@ -37,7 +38,8 @@ export const PrelimResultsView: React.FC = () => {
     setActiveCategory,
     newbieDancers,
     proDancers,
-    prelimJudges,
+    judges,
+    prelimPanels,
     isNewbieTop32Locked,
     isProTop32Locked,
     lockTop32,
@@ -45,6 +47,10 @@ export const PrelimResultsView: React.FC = () => {
     playAudioEffect,
     storageConfig,
   } = useTournament();
+
+  // Each dancer is scored by the 4 judges of their panel (A / B by SBD parity).
+  const panelJudges = (d?: Dancer) =>
+    d ? prelimJudgeIdsFor(d, prelimPanels).map((id) => judges.find((j) => j.id === id)).filter((j): j is Judge => Boolean(j)) : [];
 
   // Mode overrides: 'auto' follows isLocked (ongoing: show top 10/15; finished: show all 40)
   // Can be manually forced to 'top10', 'top15', or 'all'
@@ -479,7 +485,7 @@ export const PrelimResultsView: React.FC = () => {
                   </div>
                   {/* 4 Judges mini breakdown */}
                   <div className="grid grid-cols-4 gap-1 mt-2.5">
-                    {prelimJudges.map((j) => (
+                    {panelJudges(top2).map((j) => (
                       <div key={j.id} className="bg-zinc-800/80 rounded px-1 py-1 text-center border border-zinc-700/60">
                         <div className="text-[9px] font-mono text-zinc-400 truncate font-semibold">
                           {j.judgeName || j.code}
@@ -557,7 +563,7 @@ export const PrelimResultsView: React.FC = () => {
                   </div>
                   {/* 4 Judges mini breakdown */}
                   <div className="grid grid-cols-4 gap-1 mt-2.5">
-                    {prelimJudges.map((j) => (
+                    {panelJudges(top1).map((j) => (
                       <div key={j.id} className="bg-amber-950/40 rounded px-1 py-1 text-center border border-amber-800/50">
                         <div className="text-[9px] font-mono text-amber-300/80 truncate font-semibold">
                           {j.judgeName || j.code}
@@ -635,7 +641,7 @@ export const PrelimResultsView: React.FC = () => {
                   </div>
                   {/* 4 Judges mini breakdown */}
                   <div className="grid grid-cols-4 gap-1 mt-2.5">
-                    {prelimJudges.map((j) => (
+                    {panelJudges(top3).map((j) => (
                       <div key={j.id} className="bg-zinc-800/80 rounded px-1 py-1 text-center border border-zinc-700/60">
                         <div className="text-[9px] font-mono text-zinc-400 truncate font-semibold">
                           {j.judgeName || j.code}
@@ -703,12 +709,10 @@ export const PrelimResultsView: React.FC = () => {
                     <th className="py-3 px-3 text-center w-16">SBD</th>
                     <th className="py-3 px-4 min-w-[200px]">THÍ SINH (BBOY / BGIRL)</th>
                     <th className="py-3 px-3 text-center w-24">CLB / ĐỘI</th>
-                    {prelimJudges.map((j) => (
-                      <th key={j.id} className="py-2.5 px-2 text-center w-20 text-zinc-300" title={j.name}>
-                        <div className="font-mono text-[9px] text-zinc-400">{j.code}</div>
-                        <div className="font-bold text-amber-300 text-[11px] truncate uppercase">
-                          {j.judgeName || j.name.split('•')[1]?.trim() || j.code}
-                        </div>
+                    {Array.from({ length: PANEL_SIZE }, (_, i) => (
+                      <th key={i} className="py-2.5 px-2 text-center w-20 text-zinc-300" title="Giám khảo thứ i của bảng thí sinh">
+                        <div className="font-mono text-[9px] text-zinc-400">BẢNG A/B</div>
+                        <div className="font-bold text-amber-300 text-[11px] uppercase">GK {i + 1}</div>
                       </th>
                     ))}
                     <th className="py-3 px-3 text-center w-20 text-zinc-300">ĐIỂM TB</th>
@@ -804,11 +808,13 @@ export const PrelimResultsView: React.FC = () => {
                           </td>
 
                           {/* 4 Judges' Scores */}
-                          {prelimJudges.map((j) => {
-                            const score = dancer.prelimScores[j.id];
+                          {Array.from({ length: PANEL_SIZE }, (_, i) => {
+                            const j = panelJudges(dancer)[i];
+                            const score = j ? dancer.prelimScores[j.id] : undefined;
                             return (
                               <td
-                                key={j.id}
+                                key={i}
+                                title={j?.judgeName || j?.code}
                                 className="py-3 px-2 text-center font-mono text-zinc-300"
                               >
                                 {score !== undefined ? (
@@ -865,7 +871,7 @@ export const PrelimResultsView: React.FC = () => {
                         {/* Cut-off Divider Bar between Rank 32 and Rank 33 when showing all */}
                         {effectiveMode === 'all' && isRank32 && (
                           <tr className="bg-gradient-to-r from-amber-950/80 via-zinc-900 to-amber-950/80 border-y-2 border-amber-500">
-                            <td colSpan={8 + prelimJudges.length} className="py-2.5 px-4 text-center">
+                            <td colSpan={8 + PANEL_SIZE} className="py-2.5 px-4 text-center">
                               <div className="flex items-center justify-center gap-3 text-amber-400 font-bold text-xs uppercase tracking-wider">
                                 <Award className="w-4 h-4 text-amber-400 animate-pulse" />
                                 <span>

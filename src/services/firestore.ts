@@ -89,7 +89,15 @@ export const isIssuedSbd = (category: CategoryType, sbd: string) => new RegExp(`
  * checking in at once never get the same number. A dancer who already had a number keeps it.
  * `highestIssued` covers a missing/reset counter when numbers were already handed out.
  */
-export async function checkInDancer(category: CategoryType, dancerId: string, highestIssued: number): Promise<string> {
+/** Prelim panel for a freshly issued number: A takes odd numbers when `aIsOdd`, else the even ones. */
+const panelForNumber = (n: number, aIsOdd: boolean): 'A' | 'B' => ((n % 2 === 1) === aIsOdd ? 'A' : 'B');
+
+export async function checkInDancer(
+  category: CategoryType,
+  dancerId: string,
+  highestIssued: number,
+  aIsOdd = true
+): Promise<{ sbd: string; panel: 'A' | 'B' }> {
   const prefix = sbdPrefixOf(category);
   const counterRef = eventDoc('counters', 'sbd');
   const dancerRef = eventDoc(dancersCollectionOf(category), dancerId);
@@ -101,15 +109,18 @@ export async function checkInDancer(category: CategoryType, dancerId: string, hi
 
     const currentSbd = String(dancer.data().sbd ?? '');
     if (isIssuedSbd(category, currentSbd)) {
-      tx.update(dancerRef, { checkedInAt: Date.now() });
-      return currentSbd;
+      // Back again: same number, same panel (one is given if an older check-in had none).
+      const panel = dancer.data().panel ?? panelForNumber(Number(currentSbd.slice(1)), aIsOdd);
+      tx.update(dancerRef, { checkedInAt: Date.now(), panel });
+      return { sbd: currentSbd, panel };
     }
 
     const next = Math.max(Number(counter.data()?.[prefix] ?? 0), highestIssued) + 1;
     const sbd = `${prefix}${String(next).padStart(3, '0')}`;
+    const panel = panelForNumber(next, aIsOdd);
     tx.set(counterRef, { [prefix]: next }, { merge: true });
-    tx.update(dancerRef, { sbd, checkedInAt: Date.now() });
-    return sbd;
+    tx.update(dancerRef, { sbd, panel, checkedInAt: Date.now() });
+    return { sbd, panel };
   });
 }
 

@@ -26,9 +26,11 @@ service cloud.firestore {
         return isStaff() && get(staffEntry()).data.get('role', 'admin') == 'admin';
       }
 
-      // Check-in desk: hand out an SBD / mark arrival, nothing else on an existing dancer.
+      // Check-in desk: hand out an SBD and the prelim panel, mark arrival; nothing else on an existing dancer.
       function validCheckIn() {
-        return isStaff() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sbd', 'checkedInAt']);
+        return isStaff()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sbd', 'checkedInAt', 'panel'])
+          && request.resource.data.get('panel', 'A') in ['A', 'B'];
       }
 
       // Walk-in registration: a fresh, unscored dancer with only the desk's fields.
@@ -55,17 +57,31 @@ service cloud.firestore {
         return get(/databases/$(database)/documents/events/$(eventId)/$(collection)/$(id)).data;
       }
 
-      // Prelim: only the 4 prelim judges, only their own score, 0-100, while Top 32 isn't locked.
+      // Prelim: 8 judges in two panels of 4 (meta/current.prelimPanels). Each dancer has the panel given at check-in
+      // (dancer.panel; older docs fall back to their SBD's parity). A judge writes only their own score, 0-100, for a
+      // checked-in dancer of their panel, while Top 32 isn't locked.
+      function panelJudges(meta) {
+        let panels = meta.get('prelimPanels', {
+          'A': ['gk-1', 'gk-2', 'gk-3', 'gk-4'], 'B': ['gk-5', 'gk-6', 'gk-7', 'gk-8'], 'aIsOdd': true
+        });
+        let odd = resource.data.sbd.matches('.*[13579]$');
+        let panel = resource.data.get('panel', odd == panels.get('aIsOdd', true) ? 'A' : 'B');
+        return panel == 'A' ? panels.A : panels.B;
+      }
+
       function validOwnPrelimScore(lockField) {
         let before = resource.data.get('prelimScores', {});
         let after = request.resource.data.prelimScores;
+        let meta = eventData('meta', 'current');
         return isJudge()
-          && judgeId() in ['gk-1', 'gk-2', 'gk-3', 'gk-4']
+          && resource.data.get('sbd', '') is string
+          && resource.data.get('sbd', '').matches('.*[0-9]$')
+          && judgeId() in panelJudges(meta)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['prelimScores'])
           && after.diff(before).affectedKeys().hasOnly([judgeId()])
           && after[judgeId()] is number
           && after[judgeId()] >= 0 && after[judgeId()] <= 100
-          && eventData('meta', 'current').get(lockField, false) == false;
+          && meta.get(lockField, false) == false;
       }
 
       // Battle: votes/{matchId} = { r1: { gk-1: 'red', ... }, ... }. A judge changes one round,

@@ -50,6 +50,7 @@ export interface Dancer {
   id: string;
   sbd: string; // Số báo danh, cấp khi check-in: 'N001' (Newbie), 'P001' (Pro)
   checkedInAt?: number; // Thời điểm check-in tại bàn BTC
+  panel?: 'A' | 'B'; // Bảng chấm Prelim, gán lúc check-in theo SBD chẵn/lẻ
   name: string; // e.g., 'BBOY T-REX'
   realName?: string;
   gender: 'male' | 'female'; // 'male' (Nam) hoặc 'female' (Nữ)

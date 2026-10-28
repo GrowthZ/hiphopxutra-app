@@ -4,6 +4,7 @@ import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { VIEW_PATHS } from '../../app/routes';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { PANEL_SIZE } from '../../domain/model';
 import { QrImage } from '../../shared/QrImage';
 import { Avatar, GenderBadge, isScored, LIVE_LIMIT, QUALIFY, rankForDisplay } from './PrelimGuestView';
 
@@ -176,8 +177,8 @@ interface Fresh {
 
 export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' }) => {
   const t = THEMES[theme];
-  const { newbieDancers, proDancers, prelimJudges, isNewbieTop32Locked, isProTop32Locked } = useTournament();
-  const judgeCount = prelimJudges.length || 4;
+  const { newbieDancers, proDancers, isNewbieTop32Locked, isProTop32Locked } = useTournament();
+  const judgeCount = PANEL_SIZE; // the 4 judges of each dancer's panel
   const scale = useStageScale();
   const idle = useIdle();
 

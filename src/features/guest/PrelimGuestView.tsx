@@ -4,6 +4,7 @@ import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { GuestHeader } from './GuestBattleView';
+import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 
 // Public prelim results (/ket-qua/prelim), phone first: one column, total score only; tap a dancer for details.
 // Reads the published copy: a dancer's scores appear only once all 4 prelim judges have scored (KG-06).
@@ -79,7 +80,7 @@ export const Avatar: React.FC<{ dancer: Dancer; size: string; dark?: boolean }> 
   );
 
 export const PrelimGuestView: React.FC = () => {
-  const { activeCategory, setActiveCategory, newbieDancers, proDancers, prelimJudges, isNewbieTop32Locked, isProTop32Locked } =
+  const { activeCategory, setActiveCategory, newbieDancers, proDancers, judges, prelimPanels, isNewbieTop32Locked, isProTop32Locked } =
     useTournament();
 
   const [scope, setScope] = useState<Scope>('top10');
@@ -87,7 +88,8 @@ export const PrelimGuestView: React.FC = () => {
   const [selected, setSelected] = useState<Dancer | null>(null);
 
   const locked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
-  const judgeCount = prelimJudges.length || 4;
+  // Each dancer is scored by the 4 judges of their panel (A: one SBD parity, B: the other).
+  const judgeCount = PANEL_SIZE;
 
   // Ranked by total; dancers still being scored go last, by SBD.
   const ranked = useMemo(
@@ -285,7 +287,7 @@ export const PrelimGuestView: React.FC = () => {
           dancer={selected}
           rank={ranked.findIndex((d) => d.id === selected.id) + 1}
           cheer={CHEERS[hashOf(selected.id) % CHEERS.length]}
-          judges={prelimJudges.map((j) => ({ id: j.id, code: j.code }))}
+          judges={prelimJudgeIdsFor(selected, prelimPanels).map((id) => ({ id, code: judges.find((j) => j.id === id)?.code ?? id }))}
           locked={locked}
           onClose={() => setSelected(null)}
         />
@@ -303,7 +305,7 @@ const DancerSheet: React.FC<{
   locked: boolean;
   onClose: () => void;
 }> = ({ dancer, rank, cheer, judges, locked, onClose }) => {
-  const scored = isScored(dancer, judges.length || 4);
+  const scored = isScored(dancer, PANEL_SIZE);
   const unranked = scored && rank > RANKED_UNTIL;
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 sm:items-center" onClick={onClose}>

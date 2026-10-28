@@ -5,7 +5,51 @@ import { BattleMatch, BattleRound, BattleSide, Dancer, Judge, RoundStage, Team2v
 // Teams and matches store dancer ids only (photos live once, on the dancer doc, keeping docs under 1MB);
 // battle votes live in their own `votes` collection so judges never write match documents.
 
-export const PRELIM_JUDGE_IDS = ['gk-1', 'gk-2', 'gk-3', 'gk-4'];
+// ---------- Prelim panels ----------
+// 8 judges score a category in two panels of 4. A dancer gets their panel (dancer.panel) at check-in, from the
+// parity of the SBD they're given; the 4 judges of that panel score them (total /400) and the ranking is one list
+// for the whole category. Who sits on A / B and which parity A takes: meta/current.prelimPanels (firestore.rules
+// reads it too), editable on the admin prelim page.
+
+export type PanelId = 'A' | 'B';
+export interface PrelimPanels {
+  A: string[];
+  B: string[];
+  /** true: panel A scores odd SBDs (N001, N003…), B the even ones. */
+  aIsOdd: boolean;
+}
+export const PANEL_SIZE = 4;
+export const DEFAULT_PANELS: PrelimPanels = {
+  A: ['gk-1', 'gk-2', 'gk-3', 'gk-4'],
+  B: ['gk-5', 'gk-6', 'gk-7', 'gk-8'],
+  aIsOdd: true,
+};
+
+/** Panel an SBD gets at check-in, by its last digit; null without a number. */
+export function panelOf(sbd: string | undefined, panels: PrelimPanels): PanelId | null {
+  const digit = /(\d)$/.exec(sbd ?? '')?.[1];
+  if (digit === undefined) return null;
+  return (Number(digit) % 2 === 1) === panels.aIsOdd ? 'A' : 'B';
+}
+
+/** The dancer's panel: the one set at check-in, else what their SBD would give. */
+export const panelOfDancer = (d: Pick<Dancer, 'sbd' | 'panel'>, panels: PrelimPanels): PanelId | null =>
+  d.panel ?? panelOf(d.sbd, panels);
+
+/** The judges who score this dancer. */
+export const prelimJudgeIdsFor = (d: Pick<Dancer, 'sbd' | 'panel'>, panels: PrelimPanels) => {
+  const panel = panelOfDancer(d, panels);
+  return panel ? panels[panel] : [];
+};
+
+/** Panel a judge sits on (a judge is on at most one). */
+export const panelOfJudge = (judgeId: string, panels: PrelimPanels): PanelId | null =>
+  panels.A.includes(judgeId) ? 'A' : panels.B.includes(judgeId) ? 'B' : null;
+
+export const isPrelimComplete = (d: Dancer, panels: PrelimPanels) => {
+  const ids = prelimJudgeIdsFor(d, panels);
+  return ids.length > 0 && ids.every((j) => typeof d.prelimScores?.[j] === 'number');
+};
 
 export type Votes = Record<string, Record<string, 'red' | 'blue' | 'hidden'>>; // `r{round}` -> judgeId -> side
 export interface MatchVotes {
@@ -13,15 +57,15 @@ export interface MatchVotes {
   rounds: Votes;
 }
 
-// Recalculate dancer ranks and scores (Strictly 4 Prelim Judges, Max 400 points)
-export function recalculateDancers(list: Dancer[]): Dancer[] {
+// Recalculate dancer ranks and scores: each dancer's 4 panel judges, max 400; one ranking for the category.
+export function recalculateDancers(list: Dancer[], panels: PrelimPanels = DEFAULT_PANELS): Dancer[] {
   const updated = list.map((d) => {
-    const total = PRELIM_JUDGE_IDS.reduce((acc, jId) => acc + (d.prelimScores?.[jId] ?? 0), 0);
+    const total = prelimJudgeIdsFor(d, panels).reduce((acc, jId) => acc + (d.prelimScores?.[jId] ?? 0), 0);
     return {
       ...d,
       prelimScores: d.prelimScores ?? {},
-      prelimScoreTotal: Math.min(400, Math.round(total)),
-      prelimScoreAvg: Math.round(total / PRELIM_JUDGE_IDS.length),
+      prelimScoreTotal: Math.min(PANEL_SIZE * 100, Math.round(total)),
+      prelimScoreAvg: Math.round(total / PANEL_SIZE),
     };
   });
 
@@ -139,12 +183,12 @@ export const matchVotesToDoc = (v: MatchVotes): DocumentData => v.rounds;
 // An admin client derives these from the private collections; rules keep the private ones unreadable to guests.
 
 /**
- * A dancer's prelim scores go public once all prelim judges have scored, or when the category is locked.
+ * A dancer's prelim scores go public once the 4 judges of their panel have scored, or when the category is locked.
  * Real name and age of the (under-16) dancers stay private.
  */
-export function toPublicDancer(d: Dancer, categoryLocked: boolean): DocumentData {
+export function toPublicDancer(d: Dancer, categoryLocked: boolean, panels: PrelimPanels = DEFAULT_PANELS): DocumentData {
   const { realName: _name, ...stored } = dancerToDoc(d);
-  const complete = PRELIM_JUDGE_IDS.every((j) => typeof d.prelimScores?.[j] === 'number');
+  const complete = isPrelimComplete(d, panels);
   return { ...stored, prelimScores: complete || categoryLocked ? d.prelimScores : {} };
 }
 
