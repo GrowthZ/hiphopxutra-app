@@ -29,12 +29,13 @@ const CHEERS = [
 
 export const isScored = (d: Dancer, judges: number) => Object.keys(d.prelimScores ?? {}).length >= judges;
 
-/** Public ranking: fully scored dancers by total; those still being scored go last, by SBD. */
+/** Public ranking: fully scored dancers by total (then tie-break); those still being scored go last, by SBD. */
 export const rankForDisplay = (list: Dancer[], judges: number) =>
   [...list].sort(
     (a, b) =>
       Number(isScored(b, judges)) - Number(isScored(a, judges)) ||
       b.prelimScoreTotal - a.prelimScoreTotal ||
+      (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) || // tie across the cut-off: settled by all 8 judges
       a.sbd.localeCompare(b.sbd)
   );
 

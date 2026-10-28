@@ -25,22 +25,36 @@ export const PrelimScoringPanel: React.FC = () => {
     setActiveCategory,
     selectedJudgeId,
     updatePrelimScore,
+    updateTieBreakScore,
     isNewbieTop32Locked,
     isProTop32Locked,
     prelimPanels,
   } = useTournament();
 
   const myPanel = panelOfJudge(selectedJudgeId, prelimPanels);
-  const dancers = useMemo(
-    () => scoringOrder(activeCategory === 'newbie_1v1' ? newbieDancers : proDancers, selectedJudgeId, prelimPanels),
-    [activeCategory, newbieDancers, proDancers, selectedJudgeId, prelimPanels]
+  const locked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
+  const categoryList = activeCategory === 'newbie_1v1' ? newbieDancers : proDancers;
+
+  // Tie-break across the Top 32 cut-off: the flagged dancers, scored by all 8 judges whatever their panel.
+  const tieDancers = useMemo(
+    () => categoryList.filter((d) => d.tieBreak).sort((a, b) => a.sbd.localeCompare(b.sbd)),
+    [categoryList]
   );
+  const tieOpen = Boolean(myPanel) && tieDancers.length > 0 && !locked;
+  const [mode, setMode] = useState<'prelim' | 'tie'>('prelim');
+  useEffect(() => setMode(tieOpen ? 'tie' : 'prelim'), [tieOpen, activeCategory]);
+  const tie = mode === 'tie' && tieOpen;
+
+  const dancers = useMemo(
+    () => (tie ? tieDancers : scoringOrder(categoryList, selectedJudgeId, prelimPanels)),
+    [tie, tieDancers, categoryList, selectedJudgeId, prelimPanels]
+  );
+  const scoreOf = (d?: Dancer) => (tie ? d?.tieBreakScores?.[selectedJudgeId] : d?.prelimScores[selectedJudgeId]);
   // Tracked by id: the list re-sorts as scores arrive, an index would jump to someone else.
   const [dancerId, setDancerId] = useState<string | null>(null);
   const index = Math.max(0, dancers.findIndex((d) => d.id === dancerId));
   const dancer = dancers[index];
-  const saved = dancer?.prelimScores[selectedJudgeId];
-  const locked = activeCategory === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
+  const saved = scoreOf(dancer);
 
   const [input, setInput] = useState('');
   const [fresh, setFresh] = useState(true); // the first key replaces the shown (saved) score
@@ -65,7 +79,7 @@ export const PrelimScoringPanel: React.FC = () => {
   const value = input === '' ? null : Number(input);
   const dirty = value !== null && value !== shown;
   const hasNext = index < dancers.length - 1;
-  const scoredCount = dancers.filter((d) => typeof d.prelimScores[selectedJudgeId] === 'number').length;
+  const scoredCount = dancers.filter((d) => typeof scoreOf(d) === 'number').length;
 
   const goTo = (i: number) => {
     const next = dancers[Math.min(dancers.length - 1, Math.max(0, i))];
@@ -94,7 +108,7 @@ export const PrelimScoringPanel: React.FC = () => {
     soundFX.playVoteConfirmed();
     setError(null);
     setSending((s) => ({ ...s, [target.id]: value }));
-    updatePrelimScore(activeCategory, target.id, selectedJudgeId, value).then((ok) => {
+    (tie ? updateTieBreakScore : updatePrelimScore)(activeCategory, target.id, selectedJudgeId, value).then((ok) => {
       setSending(({ [target.id]: _, ...rest }) => rest);
       if (!ok) setError(`Chưa lưu được điểm ${target.name}. Quay lại thí sinh này và bấm Lưu lần nữa.`);
     });
@@ -160,10 +174,35 @@ export const PrelimScoringPanel: React.FC = () => {
             </button>
           ))}
         </div>
-        {myPanel && (
-          <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
-            Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
-          </span>
+        {tieOpen ? (
+          <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Chấm vòng loại hoặc tie-break">
+            <button
+              onClick={() => {
+                setMode('prelim');
+                setDancerId(null);
+              }}
+              aria-pressed={!tie}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${!tie ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'}`}
+            >
+              Bảng {myPanel}
+            </button>
+            <button
+              onClick={() => {
+                setMode('tie');
+                setDancerId(null);
+              }}
+              aria-pressed={tie}
+              className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${tie ? 'bg-red-600 text-white' : 'text-red-600'}`}
+            >
+              Tie-break ({tieDancers.length})
+            </button>
+          </div>
+        ) : (
+          myPanel && (
+            <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
+              Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
+            </span>
+          )
         )}
         <label className="relative flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums">
           {scoredCount}/{dancers.length}
@@ -176,7 +215,7 @@ export const PrelimScoringPanel: React.FC = () => {
           >
             {dancers.map((d) => (
               <option key={d.id} value={d.id}>
-                {typeof d.prelimScores[selectedJudgeId] === 'number' ? '✓ ' : ''}
+                {typeof scoreOf(d) === 'number' ? '✓ ' : ''}
                 {d.sbd ? `${d.sbd} · ` : ''}
                 {d.name}
               </option>

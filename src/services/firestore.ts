@@ -78,6 +78,9 @@ export async function getStaffRole(email: string): Promise<StaffRole | null> {
 export const writePrelimScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) =>
   updateDoc(eventDoc(dancersCollectionOf(category), dancerId), new FieldPath('prelimScores', judgeId), score);
 
+export const writeTieBreakScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) =>
+  updateDoc(eventDoc(dancersCollectionOf(category), dancerId), new FieldPath('tieBreakScores', judgeId), score);
+
 export const writeBattleVote = (matchId: string, roundNumber: number, judgeId: string, side: 'red' | 'blue') =>
   setDoc(eventDoc('votes', matchId), { [`r${roundNumber}`]: { [judgeId]: side } }, { merge: true });
 

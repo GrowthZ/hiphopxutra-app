@@ -21,7 +21,14 @@ import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from '../dancers/DancerPhotoUploadModal';
 import { BankingScoreKeypadModal } from './BankingScoreKeypadModal';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
-import { PANEL_SIZE, panelOfDancer, prelimJudgeIdsFor } from '../../domain/model';
+import {
+  allPrelimJudgeIds,
+  cutoffTie,
+  isCutoffUndecided,
+  PANEL_SIZE,
+  panelOfDancer,
+  prelimJudgeIdsFor,
+} from '../../domain/model';
 import { PrelimPanelsCard } from './PrelimPanelsCard';
 import { openInNewTab } from '../../app/routes';
 
@@ -37,6 +44,7 @@ export const PrelimView: React.FC = () => {
     isNewbieTop32Locked,
     isProTop32Locked,
     lockTop32,
+    openTieBreak,
     setActiveView,
     syncWithGoogleSheet,
     sheetConfig,
@@ -106,13 +114,12 @@ export const PrelimView: React.FC = () => {
   );
   const totalExpectedVotes = currentDancers.filter((d) => judgeIdsOf(d).length > 0).length * PANEL_SIZE;
 
-  // Tie-breaker check at boundary Rank 32 vs 33
-  const rank32Dancer = currentDancers[31];
-  const rank33Dancer = currentDancers[32];
-  const hasTieAtThreshold =
-    rank32Dancer &&
-    rank33Dancer &&
-    Math.round(rank32Dancer.prelimScoreTotal) === Math.round(rank33Dancer.prelimScoreTotal);
+  // Tie across the cut-off (rank 32 vs 33): all 8 prelim judges score the tied dancers once more.
+  const tiedAtCutoff = cutoffTie(currentDancers);
+  const hasTieAtThreshold = isCutoffUndecided(currentDancers);
+  const tieJudgeIds = allPrelimJudgeIds(prelimPanels);
+  const tieBreakDancers = currentDancers.filter((d) => d.tieBreak);
+  const tieNotOpened = tiedAtCutoff.filter((d) => !d.tieBreak);
 
   // Display filtering: Sát ngưỡng Top 32 (Hạng 27 - 36) or Tất cả
   const displayedDancers =
@@ -529,11 +536,22 @@ export const PrelimView: React.FC = () => {
               {hasTieAtThreshold ? (
                 <div className="flex items-start gap-2 text-amber-700 font-medium bg-amber-50 p-2 rounded border border-amber-200">
                   <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                  <div>
-                    <div className="font-bold">Đồng hạng tại vị trí 32 & 33!</div>
-                    <div className="text-[11px] text-amber-600">
-                      Cần chấm phụ (Tie-break) hoặc giám khảo hội ý điều chỉnh điểm số.
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div>
+                      <div className="font-bold">Đồng điểm tại ngưỡng hạng 32 & 33!</div>
+                      <div className="text-[11px] text-amber-600">
+                        Tie-break: cả {tieJudgeIds.length} GK của 2 bảng chấm thêm 1 lượt (0–100) cho các thí sinh đồng
+                        điểm. Chỉ dùng để xếp thứ tự giữa họ.
+                      </div>
                     </div>
+                    {tieNotOpened.length > 0 && !isLocked && (
+                      <button
+                        onClick={() => openTieBreak(activeCategory, tieNotOpened.map((d) => d.id))}
+                        className="w-full rounded bg-red-600 px-2 py-2 text-[11px] font-black uppercase tracking-wider text-white hover:bg-red-700 cursor-pointer"
+                      >
+                        Mở tie-break cho {tieNotOpened.length} thí sinh
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -543,6 +561,29 @@ export const PrelimView: React.FC = () => {
                 </div>
               )}
             </div>
+
+            {tieBreakDancers.length > 0 && (
+              <div className="space-y-1 rounded border border-zinc-200 p-2 text-xs">
+                <div className="text-[11px] font-black uppercase tracking-wider text-zinc-500">
+                  Tie-break · {tieJudgeIds.length} GK
+                </div>
+                {tieBreakDancers.map((d) => {
+                  const done = tieJudgeIds.filter((j) => typeof d.tieBreakScores?.[j] === 'number').length;
+                  return (
+                    <div key={d.id} className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-zinc-500">{d.sbd}</span>
+                      <span className="min-w-0 flex-1 truncate font-bold text-zinc-900">{d.name}</span>
+                      <span className="tabular-nums text-zinc-500">
+                        {done}/{tieJudgeIds.length}
+                      </span>
+                      <span className="w-10 text-right font-black tabular-nums text-zinc-900">
+                        {d.tieBreakTotal ?? '—'}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Main Action Button */}
             <div className="pt-2 border-t border-zinc-200">
@@ -591,6 +632,7 @@ export const PrelimView: React.FC = () => {
             </div>
             <ul className="list-disc pl-4 space-y-1 text-[11px] text-zinc-500">
               <li>Mỗi thí sinh được chấm bởi đúng 4 giám khảo.</li>
+              <li>Đồng điểm ở ngưỡng Top 32: mở tie-break, cả 8 giám khảo chấm thêm.</li>
               <li>Điểm số là số nguyên từ 0 đến 100.</li>
               <li>Tổng điểm và điểm trung bình tự động tính toán.</li>
               <li>Top 32 vận động viên cao điểm nhất sẽ bước vào vòng đối kháng trực tiếp.</li>

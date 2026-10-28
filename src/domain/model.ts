@@ -46,6 +46,36 @@ export const prelimJudgeIdsFor = (d: Pick<Dancer, 'sbd' | 'panel'>, panels: Prel
 export const panelOfJudge = (judgeId: string, panels: PrelimPanels): PanelId | null =>
   panels.A.includes(judgeId) ? 'A' : panels.B.includes(judgeId) ? 'B' : null;
 
+// ---------- Prelim tie-break ----------
+// A tie across the Top 32 cut-off: the tied dancers get one more round scored by all 8 prelim judges (0-100 each,
+// max 800). It only orders the tied dancers among themselves; their prelim totals (/400) don't change.
+
+export const allPrelimJudgeIds = (panels: PrelimPanels) => [...panels.A, ...panels.B];
+
+/** Tie-break total once all 8 judges have scored, else undefined. */
+export function tieBreakTotalOf(d: Pick<Dancer, 'tieBreak' | 'tieBreakScores'>, panels: PrelimPanels): number | undefined {
+  if (!d.tieBreak) return undefined;
+  const ids = allPrelimJudgeIds(panels);
+  const scores = ids.map((j) => d.tieBreakScores?.[j]);
+  return scores.every((s): s is number => typeof s === 'number') ? scores.reduce((a, b) => a + b, 0) : undefined;
+}
+
+/** Dancers sharing the last qualifier's total when that tie crosses the cut-off (rank `qualify` vs `qualify + 1`). */
+export function cutoffTie(ranked: Dancer[], qualify = 32): Dancer[] {
+  const last = ranked[qualify - 1];
+  const next = ranked[qualify];
+  if (!last || !next || last.prelimScoreTotal !== next.prelimScoreTotal) return [];
+  return ranked.filter((d) => d.prelimScoreTotal === last.prelimScoreTotal);
+}
+
+/** The cut-off is still undecided: a tie across it that the tie-break hasn't separated yet. */
+export function isCutoffUndecided(ranked: Dancer[], qualify = 32): boolean {
+  const last = ranked[qualify - 1];
+  const next = ranked[qualify];
+  if (!last || !next || last.prelimScoreTotal !== next.prelimScoreTotal) return false;
+  return last.tieBreakTotal === undefined || next.tieBreakTotal === undefined || last.tieBreakTotal === next.tieBreakTotal;
+}
+
 export const isPrelimComplete = (d: Dancer, panels: PrelimPanels) => {
   const ids = prelimJudgeIdsFor(d, panels);
   return ids.length > 0 && ids.every((j) => typeof d.prelimScores?.[j] === 'number');
@@ -66,11 +96,15 @@ export function recalculateDancers(list: Dancer[], panels: PrelimPanels = DEFAUL
       prelimScores: d.prelimScores ?? {},
       prelimScoreTotal: Math.min(PANEL_SIZE * 100, Math.round(total)),
       prelimScoreAvg: Math.round(total / PANEL_SIZE),
+      tieBreakTotal: tieBreakTotalOf(d, panels),
     };
   });
 
-  // Sort descending by total score, secondary sort by SBD
-  updated.sort((a, b) => b.prelimScoreTotal - a.prelimScoreTotal || a.sbd.localeCompare(b.sbd));
+  // Total score, then (same total) the tie-break total, then SBD
+  updated.sort(
+    (a, b) =>
+      b.prelimScoreTotal - a.prelimScoreTotal || (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) || a.sbd.localeCompare(b.sbd)
+  );
 
   return updated.map((d, idx) => ({ ...d, prelimRank: idx + 1, isQualifiedTop32: idx < 32 }));
 }
@@ -88,7 +122,7 @@ const stubDancer = (id: string): Dancer => ({
 
 // ---------- Dancers: derived ranking fields are computed, not stored ----------
 export function dancerToDoc(d: Dancer): DocumentData {
-  const { prelimScoreTotal: _t, prelimScoreAvg: _a, prelimRank: _r, isQualifiedTop32: _q, ...stored } = d;
+  const { prelimScoreTotal: _t, prelimScoreAvg: _a, prelimRank: _r, isQualifiedTop32: _q, tieBreakTotal: _tb, ...stored } = d;
   return stored;
 }
 
@@ -189,21 +223,30 @@ export const matchVotesToDoc = (v: MatchVotes): DocumentData => v.rounds;
 export function toPublicDancer(d: Dancer, categoryLocked: boolean, panels: PrelimPanels = DEFAULT_PANELS): DocumentData {
   const { realName: _name, ...stored } = dancerToDoc(d);
   const complete = isPrelimComplete(d, panels);
-  return { ...stored, prelimScores: complete || categoryLocked ? d.prelimScores : {} };
+  const tieBreakDone = tieBreakTotalOf(d, panels) !== undefined;
+  return {
+    ...stored,
+    prelimScores: complete || categoryLocked ? d.prelimScores : {},
+    ...(d.tieBreak ? { tieBreakScores: tieBreakDone || categoryLocked ? (d.tieBreakScores ?? {}) : {} } : {}),
+  };
 }
 
 /** What one judge has scored and voted: lets a judge see their own ballots, never the others' (GK-09). */
 export interface JudgeBallot {
   id: string; // judgeId
   prelim: Record<string, number>; // dancerId -> score
+  tieBreak?: Record<string, number>; // dancerId -> tie-break score
   votes: Record<string, Record<string, 'red' | 'blue'>>; // matchId -> `r{round}` -> side
 }
 
 export function toJudgeBallot(judgeId: string, dancers: Dancer[], votes: Record<string, Votes>): JudgeBallot {
   const prelim: Record<string, number> = {};
+  const tieBreak: Record<string, number> = {};
   for (const d of dancers) {
     const score = d.prelimScores?.[judgeId];
     if (typeof score === 'number') prelim[d.id] = score;
+    const extra = d.tieBreakScores?.[judgeId];
+    if (typeof extra === 'number') tieBreak[d.id] = extra;
   }
   const own: JudgeBallot['votes'] = {};
   for (const [matchId, rounds] of Object.entries(votes)) {
@@ -212,7 +255,7 @@ export function toJudgeBallot(judgeId: string, dancers: Dancer[], votes: Record<
       if (side === 'red' || side === 'blue') (own[matchId] ??= {})[key] = side;
     }
   }
-  return { id: judgeId, prelim, votes: own };
+  return { id: judgeId, prelim, tieBreak, votes: own };
 }
 
 /** A round's sides go public once the admin reveals or confirms it; before that only "has voted" shows. */

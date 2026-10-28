@@ -60,6 +60,9 @@ export interface Dancer {
   halfBodyUrl?: string; // Ảnh nửa người (pose chiến đấu / cut-out), ảnh gốc duy nhất BTC tải lên
   avatarCrop?: { x: number; y: number; width: number; height: number }; // vùng cắt avatar (% ảnh nửa người)
   prelimScores: Record<string, number>; // judgeId -> score (0-100)
+  tieBreak?: boolean; // đồng điểm ở ngưỡng Top 32: cả 8 GK chấm thêm 1 lượt
+  tieBreakScores?: Record<string, number>; // judgeId -> score (0-100), 8 GK
+  tieBreakTotal?: number; // tổng tie-break khi đủ 8 GK (tính ra, không lưu)
   prelimScoreTotal: number;
   prelimScoreAvg: number;
   prelimRank?: number;

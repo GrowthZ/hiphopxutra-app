@@ -131,16 +131,35 @@ service cloud.firestore {
         allow read: if isJudge() && judgeId() == id;
       }
 
+      // Tie-break across the Top 32 cut-off: any of the 8 prelim judges scores a dancer the admin flagged (tieBreak),
+      // only their own score, 0-100, while Top 32 isn't locked.
+      function validOwnTieBreakScore(lockField) {
+        let before = resource.data.get('tieBreakScores', {});
+        let after = request.resource.data.tieBreakScores;
+        let meta = eventData('meta', 'current');
+        let panels = meta.get('prelimPanels', {
+          'A': ['gk-1', 'gk-2', 'gk-3', 'gk-4'], 'B': ['gk-5', 'gk-6', 'gk-7', 'gk-8'], 'aIsOdd': true
+        });
+        return isJudge()
+          && resource.data.get('tieBreak', false) == true
+          && judgeId() in panels.A.concat(panels.B)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['tieBreakScores'])
+          && after.diff(before).affectedKeys().hasOnly([judgeId()])
+          && after[judgeId()] is number
+          && after[judgeId()] >= 0 && after[judgeId()] <= 100
+          && meta.get(lockField, false) == false;
+      }
+
       match /newbieDancers/{dancerId} {
         allow read: if isStaff();
         allow create: if validWalkIn('newbie_1v1');
-        allow update: if validOwnPrelimScore('isNewbieTop32Locked') || validCheckIn();
+        allow update: if validOwnPrelimScore('isNewbieTop32Locked') || validOwnTieBreakScore('isNewbieTop32Locked') || validCheckIn();
       }
 
       match /proDancers/{dancerId} {
         allow read: if isStaff();
         allow create: if validWalkIn('pro_2v2');
-        allow update: if validOwnPrelimScore('isProTop32Locked') || validCheckIn();
+        allow update: if validOwnPrelimScore('isProTop32Locked') || validOwnTieBreakScore('isProTop32Locked') || validCheckIn();
       }
 
       // SBD counter, shared by every check-in desk (transaction in checkInDancer).

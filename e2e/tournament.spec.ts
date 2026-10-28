@@ -102,6 +102,34 @@ test('prelim panels: a panel B judge scores even SBDs only; panel A cannot touch
   expect(res.status).toBe(403);
 });
 
+test('tie-break: any of the 8 judges scores a flagged dancer, never an unflagged one', async () => {
+  const { idToken } = await (
+    await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'gk-5@giamkhao.hiphopxutra.vn', password: '555555', returnSecureToken: true }),
+    })
+  ).json();
+  const odd = (await event.collection('proDancers').get()).docs.filter((d) => /[13579]$/.test(d.get('sbd')));
+  const [flagged, plain] = odd;
+  await flagged.ref.update({ tieBreak: true });
+
+  const patch = (path: string) =>
+    fetch(
+      `http://127.0.0.1:8080/v1/projects/demo-hiphopxutra/databases/(default)/documents/${path}?updateMask.fieldPaths=${encodeURIComponent('tieBreakScores.`gk-5`')}`,
+      {
+        method: 'PATCH',
+        signal: AbortSignal.timeout(10_000),
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { tieBreakScores: { mapValue: { fields: { 'gk-5': { integerValue: '66' } } } } } }),
+      }
+    );
+  // gk-5 is panel B, the dancer is panel A: allowed only because the tie-break is open for them.
+  expect((await patch(flagged.ref.path)).status).toBe(200);
+  expect((await patch(plain.ref.path)).status).toBe(403);
+  await flagged.ref.update({ tieBreak: false, tieBreakScores: {} });
+});
+
 test('admin announces a battle round and the result is published', async () => {
   const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
   // The other 8 judges vote red too, as their phones would.

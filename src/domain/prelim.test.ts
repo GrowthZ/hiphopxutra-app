@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { describe, expect, test } from 'bun:test';
-import { DEFAULT_PANELS, panelOf, panelOfJudge, prelimJudgeIdsFor, recalculateDancers, toPublicDancer } from './model';
+import { cutoffTie, DEFAULT_PANELS, isCutoffUndecided, panelOf, panelOfJudge, prelimJudgeIdsFor, recalculateDancers, toPublicDancer } from './model';
 import { Dancer } from './types';
 
 const dancer = (sbd: string, prelimScores: Record<string, number> = {}) =>
@@ -44,5 +44,40 @@ describe('panel set at check-in', () => {
   test("the dancer's own panel wins over the SBD parity", () => {
     const d = { ...dancer('P001'), panel: 'B' as const };
     expect(prelimJudgeIdsFor(d, DEFAULT_PANELS)).toEqual(DEFAULT_PANELS.B);
+  });
+});
+
+describe('tie-break across the Top 32 cut-off', () => {
+  const all8 = (score: number) => Object.fromEntries(['gk-1', 'gk-2', 'gk-3', 'gk-4', 'gk-5', 'gk-6', 'gk-7', 'gk-8'].map((j) => [j, score]));
+  // 31 clear qualifiers, then P032 and P033 tied on 280 for the last place.
+  const field = (tie: Partial<Dancer> = {}, tie2: Partial<Dancer> = {}) =>
+    recalculateDancers([
+      ...Array.from({ length: 31 }, (_, i) => dancer(`P${101 + 2 * i}`, { 'gk-1': 90, 'gk-2': 90, 'gk-3': 90, 'gk-4': 90 })),
+      { ...dancer('P033', { 'gk-1': 70, 'gk-2': 70, 'gk-3': 70, 'gk-4': 70 }), ...tie },
+      { ...dancer('P035', { 'gk-1': 70, 'gk-2': 70, 'gk-3': 70, 'gk-4': 70 }), ...tie2 },
+    ]);
+
+  test('a tie across the cut-off is found and blocks the lock', () => {
+    const ranked = field();
+    expect(cutoffTie(ranked).map((d) => d.sbd)).toEqual(['P033', 'P035']);
+    expect(isCutoffUndecided(ranked)).toBe(true);
+  });
+
+  test('the 8-judge tie-break orders the tied dancers once all 8 are in', () => {
+    const partial = field({ tieBreak: true, tieBreakScores: { 'gk-1': 50 } }, { tieBreak: true, tieBreakScores: all8(60) });
+    expect(isCutoffUndecided(partial)).toBe(true); // P033 still waiting on 7 judges
+
+    const done = field({ tieBreak: true, tieBreakScores: all8(50) }, { tieBreak: true, tieBreakScores: all8(60) });
+    expect(done[31].sbd).toBe('P035');
+    expect(done[31].tieBreakTotal).toBe(480);
+    expect(done[31].prelimScoreTotal).toBe(280); // prelim total unchanged
+    expect(isCutoffUndecided(done)).toBe(false);
+  });
+
+  test('tie-break scores stay hidden from guests until all 8 judges are in', () => {
+    const d = { ...dancer('P033'), tieBreak: true, tieBreakScores: { 'gk-1': 50 } };
+    expect(toPublicDancer(d, false, DEFAULT_PANELS).tieBreakScores).toEqual({});
+    const full = { ...d, tieBreakScores: all8(50) };
+    expect(toPublicDancer(full, false, DEFAULT_PANELS).tieBreakScores).toEqual(all8(50));
   });
 });

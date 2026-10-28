@@ -39,7 +39,7 @@ import {
 import * as battle from '../domain/battle';
 import { IS_PUBLIC_SOURCE } from '../app/routes';
 import { getSavedStorageConfig, saveStorageConfig } from '../services/storageService';
-import { clearVotes, eventDoc, StaffRole, writeBattleVote, writePrelimScore } from '../services/firestore';
+import { clearVotes, eventDoc, StaffRole, writeBattleVote, writePrelimScore, writeTieBreakScore } from '../services/firestore';
 import { soundFX } from '../services/soundEffects';
 import * as cues from '../services/stageCues';
 import { useSyncedCollection } from './useSyncedCollection';
@@ -85,6 +85,10 @@ interface TournamentContextType {
   newbieDancers: Dancer[];
   proDancers: Dancer[];
   updatePrelimScore: (category: CategoryType, dancerId: string, judgeId: string, score: number) => Promise<boolean>;
+  /** Tie-break score (any of the 8 prelim judges) for a dancer tied across the Top 32 cut-off. */
+  updateTieBreakScore: (category: CategoryType, dancerId: string, judgeId: string, score: number) => Promise<boolean>;
+  /** Admin: put these tied dancers into a tie-break scored by all 8 prelim judges. */
+  openTieBreak: (category: CategoryType, dancerIds: string[]) => void;
   isNewbieTop32Locked: boolean;
   isProTop32Locked: boolean;
   lockTop32: (category: CategoryType) => void;
@@ -225,8 +229,16 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       !ownBallot
         ? list
         : list.map((d) =>
-            d.id in ownBallot.prelim
-              ? { ...d, prelimScores: { ...d.prelimScores, [ownBallot.id]: ownBallot.prelim[d.id] } }
+            d.id in ownBallot.prelim || d.id in (ownBallot.tieBreak ?? {})
+              ? {
+                  ...d,
+                  prelimScores:
+                    d.id in ownBallot.prelim ? { ...d.prelimScores, [ownBallot.id]: ownBallot.prelim[d.id] } : d.prelimScores,
+                  tieBreakScores:
+                    d.id in (ownBallot.tieBreak ?? {})
+                      ? { ...d.tieBreakScores, [ownBallot.id]: ownBallot.tieBreak![d.id] }
+                      : d.tieBreakScores,
+                }
               : d
           ),
     [ownBallot]
@@ -410,6 +422,26 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActiveMatchId(newMatches[0]?.id || '');
   };
 
+  const updateTieBreakScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) => {
+    const validScore = Math.min(100, Math.max(0, Math.round(score)));
+    return writeTieBreakScore(category, dancerId, judgeId, validScore).then(
+      () => {
+        recordOwnBallot((b) => ({ ...b, tieBreak: { ...b.tieBreak, [dancerId]: validScore } }));
+        return true;
+      },
+      (err: Error) => {
+        setActionError(`Không lưu được điểm tie-break: ${err.message}`);
+        return false;
+      }
+    );
+  };
+
+  const openTieBreak = (category: CategoryType, dancerIds: string[]) => {
+    const flag = (list: Dancer[]) => list.map((d) => (dancerIds.includes(d.id) ? { ...d, tieBreak: true } : d));
+    if (category === 'newbie_1v1') setNewbieDancers(flag);
+    else setProDancers(flag);
+  };
+
   const lockTop32 = (category: CategoryType) => {
     if (category === 'newbie_1v1') {
       setIsNewbieTop32Locked(true);
@@ -573,6 +605,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         newbieDancers,
         proDancers,
         updatePrelimScore,
+        updateTieBreakScore,
+        openTieBreak,
         isNewbieTop32Locked,
         isProTop32Locked,
         lockTop32,
