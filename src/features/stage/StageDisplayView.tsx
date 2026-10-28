@@ -599,10 +599,14 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
                     <span className="font-mono font-black text-amber-300 bg-black/40 px-1.5 py-0.5 rounded border border-white/20 shrink-0">
                       SBD: {getSideSbdText(match?.sideRed)}
                     </span>
-                    <span className="text-white/40 font-bold shrink-0">·</span>
-                    <span className="truncate" title={getTeamName(match?.sideRed, match?.category)}>
-                      {getTeamName(match?.sideRed, match?.category)}
-                    </span>
+                    {getTeamName(match?.sideRed, match?.category) && (
+                      <>
+                        <span className="text-white/40 font-bold shrink-0">·</span>
+                        <span className="truncate" title={getTeamName(match?.sideRed, match?.category)}>
+                          {getTeamName(match?.sideRed, match?.category)}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -670,10 +674,14 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
 
                   {/* SBD ĐẶT BÊN DƯỚI TÊN THÀNH VIÊN + Tên Đội */}
                   <div className="flex items-center md:justify-end gap-1.5 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-blue-100/95 font-semibold uppercase whitespace-nowrap overflow-hidden text-ellipsis leading-tight mt-0.5">
-                    <span className="truncate" title={getTeamName(match?.sideBlue, match?.category)}>
-                      {getTeamName(match?.sideBlue, match?.category)}
-                    </span>
-                    <span className="text-white/40 font-bold shrink-0">·</span>
+                    {getTeamName(match?.sideBlue, match?.category) && (
+                      <>
+                        <span className="truncate" title={getTeamName(match?.sideBlue, match?.category)}>
+                          {getTeamName(match?.sideBlue, match?.category)}
+                        </span>
+                        <span className="text-white/40 font-bold shrink-0">·</span>
+                      </>
+                    )}
                     <span className="font-mono font-black text-amber-300 bg-black/40 px-1.5 py-0.5 rounded border border-white/20 shrink-0">
                       SBD: {getSideSbdText(match?.sideBlue)}
                     </span>
