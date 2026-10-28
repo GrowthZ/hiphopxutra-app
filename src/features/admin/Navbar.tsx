@@ -48,7 +48,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="bg-zinc-950 border-b border-zinc-800 text-zinc-100 sticky top-0 z-50 select-none">
+    <header className="bg-white border-b border-zinc-200 text-zinc-900 sticky top-0 z-50 select-none">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Brand Lockup: Clean Swiss Typographic Wordmark */}
         <div className="flex items-center gap-3 shrink-0">
@@ -56,19 +56,19 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('prelim')}
             className="flex items-center gap-2.5 text-left group cursor-pointer focus-visible:outline-none"
           >
-            <div className="w-8 h-8 bg-zinc-900 border border-zinc-700 rounded flex items-center justify-center text-white shrink-0">
-              <Trophy className="w-4 h-4 text-zinc-200" />
+            <div className="w-8 h-8 bg-zinc-50 border border-zinc-300 rounded flex items-center justify-center text-zinc-900 shrink-0">
+              <Trophy className="w-4 h-4 text-zinc-700" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-condensed font-black text-lg tracking-wider text-white uppercase group-hover:text-zinc-300 transition-colors">
+                <span className="font-condensed font-black text-lg tracking-wider text-zinc-900 uppercase group-hover:text-amber-600 transition-colors">
                   HIPHOP XỨ TRÀ
                 </span>
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 border border-zinc-300">
                   U16 · 2026
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-400 font-medium hidden sm:block leading-none mt-0.5">
+              <p className="text-[11px] text-zinc-500 font-medium hidden sm:block leading-none mt-0.5">
                 Hệ Thống Chấm Điểm & Điều Hành Giải Đấu Breaking
               </p>
             </div>
@@ -76,13 +76,13 @@ export const Navbar: React.FC = () => {
         </div>
 
         {/* Center: Segmented Workspace Navigation (Crisp, Non-pill, Single-line) */}
-        <nav className="hidden lg:flex items-center bg-zinc-900 border border-zinc-800 rounded p-0.5 text-xs font-semibold">
+        <nav className="hidden lg:flex items-center bg-zinc-50 border border-zinc-200 rounded p-0.5 text-xs font-semibold">
           <button
             onClick={() => setActiveView('prelim')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'prelim'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             Sơ Loại Prelim
@@ -92,7 +92,7 @@ export const Navbar: React.FC = () => {
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'prelim_results'
                 ? 'bg-amber-500 text-zinc-950 font-black'
-                : 'text-amber-400 hover:text-amber-300'
+                : 'text-amber-600 hover:text-amber-700'
             }`}
             title="Trang kết quả Prelim (Khán giả & Màn LED)"
           >
@@ -103,7 +103,7 @@ export const Navbar: React.FC = () => {
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'prelim_guest'
                 ? 'bg-amber-500 text-zinc-950 font-black'
-                : 'text-zinc-400 hover:text-zinc-200'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
             title="Mở giao diện kết quả Prelim dành riêng cho khách & phụ huynh"
           >
@@ -113,8 +113,8 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('teams')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'teams'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             Ghép Đội 2vs2
@@ -123,8 +123,8 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('bracket')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'bracket'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             Nhánh Đấu
@@ -133,8 +133,8 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('battle')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'battle'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             Bàn Điều Hành Battle
@@ -143,8 +143,8 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('dancers')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap ${
               activeView === 'dancers'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
             Thí Sinh
@@ -153,11 +153,11 @@ export const Navbar: React.FC = () => {
             onClick={() => setActiveView('sheets')}
             className={`px-3 py-1.5 rounded transition-colors cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
               activeView === 'sheets'
-                ? 'bg-zinc-800 text-white font-bold'
-                : 'text-zinc-400 hover:text-zinc-200'
+                ? 'bg-zinc-100 text-zinc-900 font-bold'
+                : 'text-zinc-500 hover:text-zinc-700'
             }`}
           >
-            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
             <span>Google Sheets</span>
           </button>
         </nav>
@@ -165,16 +165,16 @@ export const Navbar: React.FC = () => {
         {/* Right Action Tools: Sports Broadcast Controls */}
         <div className="flex items-center gap-2">
           {/* Active Judge Simulator Switcher */}
-          <div className="hidden sm:flex items-center gap-1.5 bg-zinc-900 border border-zinc-800 rounded px-2 py-1">
-            <span className="text-[10px] text-zinc-400 uppercase font-mono font-semibold">GK:</span>
+          <div className="hidden sm:flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded px-2 py-1">
+            <span className="text-[10px] text-zinc-500 uppercase font-mono font-semibold">GK:</span>
             <select
               value={selectedJudgeId}
               onChange={(e) => setSelectedJudgeId(e.target.value)}
-              className="bg-transparent text-xs font-bold text-zinc-100 outline-none cursor-pointer"
+              className="bg-transparent text-xs font-bold text-zinc-900 outline-none cursor-pointer"
               title="Đổi góc nhìn của Giám Khảo để thử nghiệm chấm điểm"
             >
               {judges.map((j) => (
-                <option key={j.id} value={j.id} className="bg-zinc-900 text-white">
+                <option key={j.id} value={j.id} className="bg-zinc-50 text-zinc-900">
                   {j.code} • {j.judgeName || j.name.split('•')[1]?.trim() || j.code}
                 </option>
               ))}
@@ -182,7 +182,7 @@ export const Navbar: React.FC = () => {
 
             <button
               onClick={() => setIsJudgeConfigModalOpen(true)}
-              className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-zinc-200 text-zinc-500 hover:text-amber-600 transition-colors cursor-pointer"
               title="Cấu hình 2 ảnh Giám Khảo (Ảnh Full & Avatar)"
             >
               <Camera className="w-3.5 h-3.5" />
@@ -192,10 +192,10 @@ export const Navbar: React.FC = () => {
           {/* Quick link to Judge Mobile */}
           <button
             onClick={() => setActiveView('judge')}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white rounded text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-50 hover:bg-zinc-200 border border-zinc-300 text-zinc-700 hover:text-zinc-900 rounded text-xs font-bold transition-colors cursor-pointer"
             title="Mở giao diện chấm điểm trên điện thoại cho giám khảo"
           >
-            <Smartphone className="w-3.5 h-3.5 text-zinc-400" />
+            <Smartphone className="w-3.5 h-3.5 text-zinc-500" />
             <span className="hidden md:inline">Cổng Giám Khảo</span>
           </button>
 
@@ -212,10 +212,10 @@ export const Navbar: React.FC = () => {
           {/* Storage (R2 / Drive) Button */}
           <button
             onClick={() => setIsStorageModalOpen(true)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-200 hover:text-white rounded text-xs font-bold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-zinc-50 hover:bg-zinc-200 border border-zinc-300 text-zinc-700 hover:text-zinc-900 rounded text-xs font-bold transition-colors cursor-pointer"
             title="Cấu hình lưu trữ ảnh Cloudflare R2 / Google Drive"
           >
-            <Cloud className="w-3.5 h-3.5 text-emerald-400" />
+            <Cloud className="w-3.5 h-3.5 text-emerald-700" />
             <span className="hidden xl:inline uppercase text-[11px]">
               R2
             </span>
@@ -224,20 +224,20 @@ export const Navbar: React.FC = () => {
           {/* Sound FX Settings Modal */}
           <button
             onClick={() => setIsAudioModalOpen(true)}
-            className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition-colors cursor-pointer"
             title="Cài đặt hiệu ứng âm thanh giải đấu"
           >
-            <Sliders className="w-4 h-4 text-zinc-300" />
+            <Sliders className="w-4 h-4 text-zinc-700" />
           </button>
 
           {/* Mute/Unmute Toggle */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition-colors cursor-pointer"
             title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
           >
             {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-emerald-400" />
+              <Volume2 className="w-4 h-4 text-emerald-700" />
             ) : (
               <VolumeX className="w-4 h-4 text-zinc-500" />
             )}
@@ -250,7 +250,7 @@ export const Navbar: React.FC = () => {
                 resetAllData();
               }
             }}
-            className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-red-400 border border-zinc-800 transition-colors cursor-pointer"
+            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-500 hover:text-red-600 border border-zinc-200 transition-colors cursor-pointer"
             title="Khôi phục dữ liệu ban đầu"
           >
             <RotateCcw className="w-4 h-4" />
@@ -259,7 +259,7 @@ export const Navbar: React.FC = () => {
           {/* Fullscreen Button */}
           <button
             onClick={toggleFullscreen}
-            className="p-1.5 rounded bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer hidden xl:block"
+            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition-colors cursor-pointer hidden xl:block"
             title="Toàn màn hình"
           >
             <Maximize2 className="w-4 h-4" />

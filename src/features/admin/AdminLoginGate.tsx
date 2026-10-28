@@ -46,15 +46,15 @@ export const AdminLoginGate: React.FC = () => {
   const signedInNonAdmin = authUser && !authUser.isAnonymous;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-lg border border-zinc-800 bg-zinc-900 p-6 space-y-5">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-widest text-amber-400">HIPHOP XỨ TRÀ 2026</p>
+    <div className="min-h-screen bg-white text-zinc-900 flex items-center justify-center px-4">
+      <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-zinc-50 p-6 space-y-5">
+        <div className="space-y-3">
+          <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-16 w-auto" />
           <h1 className="font-condensed text-3xl font-black uppercase">Bảng điều hành</h1>
         </div>
 
         {!authReady ? (
-          <div className="flex items-center gap-2 text-sm text-zinc-400">
+          <div className="flex items-center gap-2 text-sm text-zinc-500">
             <Loader2 className="w-4 h-4 animate-spin" />
             <span>Đang kiểm tra đăng nhập…</span>
           </div>
@@ -64,7 +64,7 @@ export const AdminLoginGate: React.FC = () => {
           </p>
         ) : signedInNonAdmin ? (
           <div className="space-y-4">
-            <div className="flex gap-2 rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200">
+            <div className="flex gap-2 rounded border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-800">
               <ShieldAlert className="w-5 h-5 shrink-0 text-red-400" />
               <p>
                 Tài khoản <b>{authUser.email}</b> chưa có quyền admin. Nhờ admin thêm email này vào{' '}
@@ -73,7 +73,7 @@ export const AdminLoginGate: React.FC = () => {
             </div>
             <button
               onClick={handleGoogleLogout}
-              className="w-full flex items-center justify-center gap-2 rounded bg-zinc-800 px-4 py-3 text-sm font-bold hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-amber-400 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded bg-zinc-100 px-4 py-3 text-sm font-bold hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-amber-400 transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
               Đăng xuất, dùng tài khoản khác
@@ -89,7 +89,7 @@ export const AdminLoginGate: React.FC = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+                className="w-full rounded border border-zinc-300 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
               />
               <input
                 type="password"
@@ -98,25 +98,25 @@ export const AdminLoginGate: React.FC = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full rounded border border-zinc-700 bg-zinc-950 px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
+                className="w-full rounded border border-zinc-300 bg-white px-3 py-2.5 text-sm placeholder:text-zinc-500 focus-visible:outline-2 focus-visible:outline-amber-400"
               />
               <button
                 type="submit"
                 disabled={busy}
-                className="w-full flex items-center justify-center gap-2 rounded bg-amber-500 px-4 py-3 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 rounded bg-amber-500 px-4 py-3 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-amber-600 transition-colors cursor-pointer"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
                 Đăng nhập
               </button>
             </form>
             <div className="flex items-center gap-3 text-xs text-zinc-500">
-              <span className="h-px flex-1 bg-zinc-800" />
+              <span className="h-px flex-1 bg-zinc-100" />
               hoặc
-              <span className="h-px flex-1 bg-zinc-800" />
+              <span className="h-px flex-1 bg-zinc-100" />
             </div>
             <button
               onClick={signIn}
-              className="w-full flex items-center justify-center gap-2 rounded bg-zinc-800 px-4 py-3 text-sm font-bold hover:bg-zinc-700 focus-visible:outline-2 focus-visible:outline-amber-400 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-center gap-2 rounded bg-zinc-100 px-4 py-3 text-sm font-bold hover:bg-zinc-200 focus-visible:outline-2 focus-visible:outline-amber-400 transition-colors cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
               Đăng nhập bằng Google

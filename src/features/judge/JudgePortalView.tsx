@@ -7,7 +7,11 @@ import {
   Check,
   Camera,
   Zap,
+  ListChecks,
+  Swords,
 } from 'lucide-react';
+import { isStandalone } from '../../services/pwa';
+import { useWakeLock } from '../../state/useWakeLock';
 import { soundFX } from '../../services/soundEffects';
 import {
   getDancerAvatarUrl,
@@ -46,13 +50,18 @@ export const JudgePortalView: React.FC = () => {
   } = useTournament();
 
   useJudgeHeartbeat(judgeAccountId);
+  useWakeLock(); // scoring screen stays on between dancers
 
   // Server-confirmed save status (a write made offline stays "saving" until it reaches the server).
   const [voteSave, setVoteSave] = useState<SaveState>('idle');
   const [prelimSave, setPrelimSave] = useState<SaveState>('idle');
 
-  const [showWelcome, setShowWelcome] = useState<boolean>(true);
-  const [scoringMode, setScoringMode] = useState<'battle' | 'prelim'>('battle');
+  // The installed app opens straight into scoring; the welcome screen stays one tap away (avatar button).
+  const [showWelcome, setShowWelcome] = useState<boolean>(() => !isStandalone());
+  // Prelim comes first in the day: prelim judges start there, battle-only judges on Battle.
+  const [scoringMode, setScoringMode] = useState<'battle' | 'prelim'>(() =>
+    prelimJudges.some((j) => j.id === selectedJudgeId) ? 'prelim' : 'battle'
+  );
   const [selectedSide, setSelectedSide] = useState<'red' | 'blue' | null>('blue');
   const [isVoteSubmitted, setIsVoteSubmitted] = useState<boolean>(false);
   const [activePrelimDancerIdx, setActivePrelimDancerIdx] = useState<number>(0);
@@ -176,7 +185,7 @@ export const JudgePortalView: React.FC = () => {
   }
 
   return (
-    <div className="h-[100dvh] max-h-[100dvh] bg-zinc-100 flex flex-col items-center justify-start sm:p-2 select-none overflow-hidden">
+    <div className="flex-1 min-h-0 bg-zinc-100 flex flex-col items-center justify-start sm:p-2 select-none overflow-hidden">
       {/* Mobile-Viewport Frame */}
       <div className="w-full max-w-md bg-white sm:rounded-xl border border-zinc-300 shadow-sm overflow-hidden flex flex-col h-full">
         {/* Top App Bar (Exact layout from Image 2) */}
@@ -234,33 +243,9 @@ export const JudgePortalView: React.FC = () => {
           </div>
         </div>
 
-        {/* Mode Switcher */}
-        <div className="p-1.5 bg-zinc-50 border-b border-zinc-200 flex gap-1 text-xs font-bold shrink-0">
-          <button
-            onClick={() => setScoringMode('battle')}
-            className={`flex-1 py-1.5 rounded transition-colors cursor-pointer ${
-              scoringMode === 'battle'
-                ? 'bg-zinc-900 text-white'
-                : 'text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            Chấm Battle (9 GK)
-          </button>
-          <button
-            onClick={() => setScoringMode('prelim')}
-            className={`flex-1 py-1.5 rounded transition-colors cursor-pointer ${
-              scoringMode === 'prelim'
-                ? 'bg-zinc-900 text-white'
-                : 'text-zinc-600 hover:bg-zinc-200'
-            }`}
-          >
-            Chấm Prelim (4 GK)
-          </button>
-        </div>
-
         {scoringMode === 'battle' ? (
           /* BATTLE SCORING UI (Distraction-free, High-contrast, Exact to Image 2) */
-          <div className="p-3.5 flex flex-col flex-1 space-y-3 overflow-y-auto">
+          <div className="p-3.5 flex flex-col flex-1 min-h-0 space-y-3 overflow-y-auto">
             {/* Match Switcher Dropdown */}
             <div className="flex items-center justify-between text-xs text-zinc-500 bg-zinc-50 px-3 py-1.5 rounded border border-zinc-200">
               <span className="font-semibold text-zinc-600">Chọn trận:</span>
@@ -562,7 +547,7 @@ export const JudgePortalView: React.FC = () => {
           </div>
         ) : (
           /* PRELIM SOLO SCORING (FIT 100dvh MOBILE - ZERO SCROLL) */
-          <div className="p-2.5 sm:p-3 flex flex-col flex-1 justify-between overflow-hidden gap-2">
+          <div className="p-2.5 sm:p-3 flex flex-col flex-1 min-h-0 justify-between overflow-y-auto gap-2">
             {/* 1. Dancer Navigator */}
             <div className="flex items-center justify-between bg-zinc-50 px-2.5 py-1.5 rounded-lg border border-zinc-200 shrink-0">
               <button
@@ -766,6 +751,29 @@ export const JudgePortalView: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Bottom tab bar (thumb zone), in event order: Prelim, then Battle */}
+        <nav className="grid grid-cols-2 border-t border-zinc-200 bg-white pb-[env(safe-area-inset-bottom)] shrink-0" aria-label="Chế độ chấm">
+          {([
+            ['prelim', 'Chấm Prelim', '4 GK', ListChecks],
+            ['battle', 'Chấm Battle', '9 GK', Swords],
+          ] as const).map(([mode, label, sub, Icon]) => (
+            <button
+              key={mode}
+              onClick={() => setScoringMode(mode)}
+              aria-current={scoringMode === mode ? 'page' : undefined}
+              className={`flex flex-col items-center gap-0.5 pt-2 pb-1.5 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-500 ${
+                scoringMode === mode ? 'text-zinc-900' : 'text-zinc-400 hover:text-zinc-600'
+              }`}
+            >
+              <span className={`px-4 py-0.5 rounded-full ${scoringMode === mode ? 'bg-amber-100' : ''}`}>
+                <Icon className="w-5 h-5" />
+              </span>
+              <span className="text-[11px] font-black uppercase leading-none">{label}</span>
+              <span className="text-[10px] font-medium leading-none">{sub}</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* 2 Photos Config Modal */}

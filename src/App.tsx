@@ -12,6 +12,7 @@ import { CheckInView } from './features/dancers/CheckInView';
 import { JudgeLoginScreen } from './features/judge/JudgeLoginScreen';
 import { JudgeAccountsView } from './features/judge/JudgeAccountsView';
 import { JudgePortalView } from './features/judge/JudgePortalView';
+import { InstallAppButton } from './features/judge/InstallAppButton';
 import { PrelimResultsView } from './features/prelim/PrelimResultsView';
 import { PrelimGuestView } from './features/guest/PrelimGuestView';
 import { GuestBracketView, GuestMatchView } from './features/guest/GuestBattleView';
@@ -98,34 +99,37 @@ const MainContent: React.FC = () => {
 
   // Judge Portal View (Mobile-first judging view): judge accounts, or admins operating on a judge's behalf
   if (activeView === 'judge') {
-    if (!authReady) return <div className="min-h-[100dvh] bg-zinc-950" />;
+    if (!authReady) return <div className="min-h-[100dvh] bg-white" />;
     if (!judgeAccountId && !isAdmin) return <JudgeLoginScreen />;
     return (
-      <div className="min-h-screen bg-zinc-100 flex flex-col">
-        <div className="bg-zinc-950 text-white px-4 py-2 flex items-center justify-between text-xs border-b border-zinc-800">
+      <div className="h-[100dvh] bg-zinc-100 flex flex-col overflow-hidden">
+        <div className="bg-white text-zinc-900 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-2 text-xs border-b border-zinc-200 shrink-0">
           {judgeAccountId ? (
             <>
-              <span className="font-bold text-zinc-300">Đăng nhập: {activeJudge.code}</span>
-              <button
-                onClick={judgeSignOut}
-                className="flex items-center gap-1.5 text-zinc-300 hover:text-white font-bold cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Đăng xuất</span>
-              </button>
+              <span className="font-bold text-zinc-600">Đăng nhập: {activeJudge.code}</span>
+              <div className="flex items-center gap-3">
+                <InstallAppButton />
+                <button
+                  onClick={judgeSignOut}
+                  className="flex items-center gap-1.5 text-zinc-600 hover:text-zinc-900 font-bold cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Đăng xuất</span>
+                </button>
+              </div>
             </>
           ) : (
             <>
               <button
                 onClick={() => setActiveView('prelim')}
-                className="flex items-center gap-1.5 text-zinc-300 hover:text-white font-bold cursor-pointer"
+                className="flex items-center gap-1.5 text-zinc-600 hover:text-zinc-900 font-bold cursor-pointer"
               >
                 <LayoutDashboard className="w-3.5 h-3.5" />
                 <span>Trở về Bảng Điều Hành Ban Tổ Chức</span>
               </button>
               <button
                 onClick={() => setActiveView('stage_control')}
-                className="flex items-center gap-1 text-red-400 hover:text-red-300 font-bold cursor-pointer"
+                className="flex items-center gap-1 text-red-600 hover:text-red-700 font-bold cursor-pointer"
               >
                 <Tv className="w-3.5 h-3.5" />
                 <span>Điều khiển màn LED</span>

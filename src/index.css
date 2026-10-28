@@ -12,6 +12,9 @@
     background-color: #f4f4f5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* App-like on phones: no pull-to-refresh bounce, no double-tap zoom delay */
+    overscroll-behavior-y: none;
+    touch-action: manipulation;
   }
 }
 
