@@ -1,35 +1,125 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { LogOut } from 'lucide-react';
+import { ExternalLink, LogOut, Menu, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { auth } from '../../services/firebase';
 import { usernameOf } from '../../services/staffAccounts';
+import { VIEW_PATHS } from '../../app/routes';
+import { InstallAppButton } from '../judge/InstallAppButton';
 import { CheckInView } from './CheckInView';
+
+/** Installs as its own "Check-in" app: swaps the judge manifest for the desk's while this page is open. */
+const useCheckInManifest = () =>
+  useEffect(() => {
+    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
+    const title = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
+    const prev = [link?.href, title?.content] as const;
+    if (link) link.href = '/manifest-checkin.webmanifest';
+    if (title) title.content = 'Check-in';
+    return () => {
+      if (link && prev[0]) link.href = prev[0];
+      if (title && prev[1]) title.content = prev[1];
+    };
+  }, []);
 
 /** What a check-in role account sees on any /admin page: the check-in desk and nothing else. */
 export const CheckInDesk: React.FC = () => {
   const { authUser } = useTournament();
   const email = authUser?.email ?? '';
+  const username = usernameOf(email) ?? email;
+  const [menuOpen, setMenuOpen] = useState(false);
+  useCheckInManifest();
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setMenuOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
 
   return (
-    <div className="min-h-[100dvh] bg-zinc-100">
-      <header className="bg-white border-b border-zinc-200 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-9 w-auto" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-red-600">Bàn check-in</span>
-        </div>
-        <div className="flex items-center gap-3 text-xs">
-          <span className="max-w-28 truncate font-bold text-zinc-600 sm:max-w-none">{usernameOf(email) ?? email}</span>
+    <div className="min-h-[100dvh] bg-zinc-50 text-zinc-900">
+      <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-3 px-4">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-10 w-auto" />
+            <span className="font-condensed text-lg font-black uppercase tracking-wide">Bàn check-in</span>
+          </div>
           <button
-            onClick={() => signOut(auth)}
-            className="flex items-center gap-1.5 py-2 font-bold text-zinc-600 hover:text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            onClick={() => setMenuOpen(true)}
+            aria-label="Mở menu"
+            aria-expanded={menuOpen}
+            className="-mr-2 rounded-full p-2.5 text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
           >
-            <LogOut className="w-3.5 h-3.5" />
-            Đăng xuất
+            <Menu className="h-5 w-5" />
           </button>
         </div>
       </header>
-      <CheckInView stickySearch />
+
+      <CheckInView desk />
+
+      {/* Outside the header: its backdrop-blur would trap a fixed-position drawer inside it. */}
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end bg-zinc-900/40" onClick={() => setMenuOpen(false)}>
+          <nav
+            aria-label="Menu"
+            onClick={(e) => e.stopPropagation()}
+            className="flex h-full w-72 max-w-[85vw] flex-col gap-4 bg-white px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-condensed text-xl font-black uppercase">Menu</span>
+              <button
+                onClick={() => setMenuOpen(false)}
+                aria-label="Đóng menu"
+                className="-m-1 rounded-full p-2 text-zinc-400 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 rounded-2xl border border-zinc-200 p-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zinc-100 font-condensed text-lg font-black uppercase text-zinc-500">
+                {username.charAt(0)}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold">{username}</span>
+                <span className="text-xs text-zinc-500">Tài khoản check-in</span>
+              </span>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl border border-zinc-200 text-sm font-bold">
+              <a
+                href={VIEW_PATHS.prelim_guest}
+                target="_blank"
+                rel="noopener"
+                className="flex items-center justify-between px-4 py-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-500"
+              >
+                Kết quả vòng loại
+                <ExternalLink className="h-4 w-4 text-zinc-400" />
+              </a>
+              <a
+                href={VIEW_PATHS.bracket_guest}
+                target="_blank"
+                rel="noopener"
+                className="flex items-center justify-between border-t border-zinc-100 px-4 py-3 hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-500"
+              >
+                Nhánh đấu
+                <ExternalLink className="h-4 w-4 text-zinc-400" />
+              </a>
+            </div>
+
+            <InstallAppButton appName="Check-in" purpose="để check-in thí sinh" />
+
+            <button
+              onClick={() => signOut(auth)}
+              className="mt-auto flex items-center justify-center gap-2 rounded-xl border border-zinc-200 py-3 text-sm font-bold text-red-600 hover:bg-red-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              <LogOut className="h-4 w-4" />
+              Đăng xuất
+            </button>
+          </nav>
+        </div>
+      )}
     </div>
   );
 };

@@ -3,7 +3,10 @@ import { Download, Share, SquarePlus, X } from 'lucide-react';
 import { canPromptInstall, isIOS, isStandalone, promptInstall, subscribeInstall } from '../../services/pwa';
 
 /** "Cài đặt ứng dụng": the browser's install dialog, or Add-to-Home-Screen steps on iPhone. Hidden once installed. */
-export const InstallAppButton: React.FC = () => {
+export const InstallAppButton: React.FC<{ appName?: string; purpose?: string }> = ({
+  appName = 'Giám khảo',
+  purpose = 'để chấm điểm',
+}) => {
   const [canPrompt, setCanPrompt] = useState(canPromptInstall);
   const [installed, setInstalled] = useState(isStandalone);
   const [showIosHelp, setShowIosHelp] = useState(false);
@@ -75,7 +78,7 @@ export const InstallAppButton: React.FC = () => {
               <li className="flex items-center gap-3">
                 <span className="w-7 h-7 shrink-0 rounded-full bg-zinc-100 flex items-center justify-center font-black">3</span>
                 <span>
-                  Mở app <b>Giám khảo</b> từ màn hình chính để chấm điểm
+                  Mở app <b>{appName}</b> từ màn hình chính {purpose}
                 </span>
               </li>
             </ol>

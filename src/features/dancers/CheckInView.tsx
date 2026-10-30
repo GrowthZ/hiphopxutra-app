@@ -17,8 +17,8 @@ const finePointer = typeof window !== 'undefined' && window.matchMedia('(pointer
 
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
-/** stickySearch: pin the search bar on phones (the check-in desk, where the page itself scrolls). */
-export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch = false }) => {
+/** desk: the check-in staff app. The title lives in its app bar and the filters stick under it on phones. */
+export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   const { newbieDancers, proDancers, storageConfig, prelimPanels } = useTournament();
   const [category, setCategory] = useState<CategoryType>('newbie_1v1');
   const [status, setStatus] = useState<StatusFilter>('pending');
@@ -134,39 +134,37 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
   };
 
   return (
-    <div className={`px-3 py-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-5 ${lastIssued || error ? 'pb-40 sm:pb-6' : ''}`}>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 border-b border-zinc-200 pb-3 sm:pb-4">
-        <div>
-          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
-            Bàn check-in BTC
-          </span>
-          <h1 className="font-condensed font-black text-2xl sm:text-3xl text-zinc-900 tracking-tight mt-1 uppercase">
-            Check-in thí sinh
-          </h1>
-        </div>
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex gap-3 text-sm sm:text-xs font-bold text-zinc-600 tabular-nums">
-            <span>
-              Newbie <span className="text-zinc-900">{countDone(newbieDancers)}</span>/{newbieDancers.length}
+    <div
+      className={`mx-auto max-w-5xl space-y-4 px-4 py-4 sm:space-y-5 sm:p-6 ${
+        lastIssued || error ? 'pb-40 sm:pb-6' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
+      }`}
+    >
+      {/* Header: the desk app has its title in the app bar */}
+      <div className={`flex items-end justify-between gap-3 ${desk ? '' : 'border-b border-zinc-200 pb-3 sm:pb-4'}`}>
+        {!desk && (
+          <div>
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+              Bàn check-in BTC
             </span>
-            <span>
-              Pro <span className="text-zinc-900">{countDone(proDancers)}</span>/{proDancers.length}
-            </span>
+            <h1 className="font-condensed font-black text-2xl sm:text-3xl text-zinc-900 tracking-tight mt-1 uppercase">
+              Check-in thí sinh
+            </h1>
           </div>
-          <button
-            onClick={() => setWalkInOpen((o) => !o)}
-            aria-expanded={walkInOpen}
-            className="flex items-center gap-1.5 rounded bg-amber-500 px-3 py-2.5 sm:py-2 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
-          >
-            <UserPlus className="w-4 h-4" />
-            Đăng ký tại chỗ
-          </button>
-        </div>
+        )}
+        <button
+          onClick={() => setWalkInOpen((o) => !o)}
+          aria-expanded={walkInOpen}
+          className={`flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-3 sm:py-2.5 text-sm sm:text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900 ${
+            desk ? 'w-full sm:ml-auto sm:w-auto' : ''
+          }`}
+        >
+          <UserPlus className="w-4 h-4" />
+          Đăng ký tại chỗ
+        </button>
       </div>
 
       {walkInOpen && (
-        <form onSubmit={handleWalkIn} className="rounded-lg border border-amber-300 bg-amber-50/50 p-3 sm:p-4 space-y-3">
+        <form onSubmit={handleWalkIn} className="rounded-2xl border border-amber-300 bg-amber-50/50 p-3 sm:p-4 space-y-3">
           <h2 className="text-sm font-black uppercase text-zinc-900">Đăng ký thí sinh tại chỗ</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {(
@@ -185,13 +183,13 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
                   required={key === 'name'}
                   maxLength={60}
                   autoFocus={key === 'name'}
-                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
                 />
               </label>
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex w-full rounded border border-zinc-300 bg-white p-0.5 sm:w-auto" role="radiogroup" aria-label="Hạng mục đăng ký">
+            <div className="flex w-full rounded-xl border border-zinc-200 bg-white p-0.5 sm:w-auto" role="radiogroup" aria-label="Hạng mục đăng ký">
               {(
                 [
                   ['newbie_1v1', 'Newbie'],
@@ -205,7 +203,7 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
                   role="radio"
                   aria-checked={walkIn.category === id}
                   onClick={() => setWalkIn((w) => ({ ...w, category: id }))}
-                  className={`flex-1 rounded px-3 py-2.5 sm:py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
+                  className={`flex-1 rounded-lg px-3 py-2.5 sm:py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
                     walkIn.category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                   }`}
                 >
@@ -226,14 +224,14 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
               <button
                 type="button"
                 onClick={() => setWalkInOpen(false)}
-                className="flex-1 rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
+                className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
               >
                 Huỷ
               </button>
               <button
                 type="submit"
                 disabled={walkInBusy}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded bg-zinc-900 px-4 py-2.5 sm:py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2.5 sm:py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
               >
                 {walkInBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
                 Đăng ký
@@ -250,7 +248,7 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
           {lastIssued && (
             <div
               aria-live="polite"
-              className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 shadow-lg sm:shadow-none"
+              className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 shadow-lg sm:shadow-none"
             >
               <div className="flex min-w-0 items-center gap-3">
                 <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
@@ -270,23 +268,47 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
           )}
 
           {error && (
-            <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-lg sm:shadow-none">
+            <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-lg sm:shadow-none">
               {error}
             </p>
           )}
         </div>
       )}
 
-      {/* Filters */}
-      <div
-        className={`flex flex-col md:flex-row gap-2 sm:gap-3 ${
-          stickySearch
-            ? 'sticky top-0 z-30 -mx-3 bg-zinc-100/95 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none'
-            : ''
-        }`}
-      >
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+      {/* Category, with check-in progress */}
+      <div className="grid grid-cols-2 rounded-xl bg-zinc-200/70 p-1 text-sm font-bold" role="group" aria-label="Hạng mục">
+        {(
+          [
+            ['newbie_1v1', 'Newbie'],
+            ['pro_2v2', 'Pro'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            onClick={() => setCategory(id)}
+            aria-pressed={category === id}
+            className={`rounded-lg py-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+              category === id ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500'
+            }`}
+          >
+            {label}{' '}
+            <span className="font-normal tabular-nums text-zinc-500">
+              {countDone(listOf(id))}/{listOf(id).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Filters: search sticks under the app bar on phones */}
+      <div className="flex flex-col md:flex-row gap-2 sm:gap-3">
+        <div
+          className={`relative flex-1 ${
+            desk
+              ? 'sticky top-[calc(3.5rem+1px+env(safe-area-inset-top))] z-20 -mx-4 bg-zinc-50/95 px-4 py-2 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none'
+              : ''
+          }`}
+        >
+          <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400 ${desk ? 'left-7 sm:left-3' : 'left-3'}`} />
           <input
             type="search"
             autoFocus={finePointer}
@@ -296,23 +318,24 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
             onKeyDown={onSearchKeyDown}
             placeholder="Tìm theo tên, tên thật hoặc SBD…"
             aria-label="Tìm thí sinh"
-            className="w-full rounded border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-2 focus:outline-amber-500"
+            className="w-full rounded-xl border border-zinc-200 bg-white py-2.5 pl-9 pr-3 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-2 focus:outline-amber-500"
           />
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          <div className="col-span-2 flex rounded border border-zinc-300 bg-white p-0.5" role="group" aria-label="Hạng mục">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-1" role="group" aria-label="Trạng thái check-in">
             {(
               [
-                ['newbie_1v1', 'Newbie'],
-                ['pro_2v2', 'Pro'],
+                ['pending', 'Chưa check-in'],
+                ['done', 'Đã check-in'],
+                ['all', 'Tất cả'],
               ] as const
             ).map(([id, label]) => (
               <button
                 key={id}
-                onClick={() => setCategory(id)}
-                aria-pressed={category === id}
-                className={`flex-1 rounded px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
-                  category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                onClick={() => setStatus(id)}
+                aria-pressed={status === id}
+                className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                  status === id ? 'bg-zinc-900 text-white' : 'border border-zinc-200 bg-white text-zinc-600'
                 }`}
               >
                 {label}
@@ -320,20 +343,10 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
             ))}
           </div>
           <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as StatusFilter)}
-            aria-label="Trạng thái check-in"
-            className="min-w-0 rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-sm sm:text-xs font-bold text-zinc-900 cursor-pointer"
-          >
-            <option value="pending">Chưa check-in</option>
-            <option value="done">Đã check-in</option>
-            <option value="all">Tất cả</option>
-          </select>
-          <select
             value={crew}
             onChange={(e) => setCrew(e.target.value)}
             aria-label="Lọc theo CLB / Crew"
-            className="min-w-0 max-w-full rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-sm sm:text-xs font-bold text-zinc-900 cursor-pointer sm:max-w-56"
+            className="min-w-0 basis-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm sm:text-xs font-bold text-zinc-900 cursor-pointer sm:basis-auto sm:max-w-56"
           >
             <option value="">Tất cả CLB / Crew</option>
             {crews.map(([key, g]) => (
@@ -346,7 +359,7 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
       </div>
 
       {/* List */}
-      <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white">
+      <ul className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
         {visible.length === 0 && (
           <li className="px-4 py-10 text-center text-sm text-zinc-500">
             {query ? `Không có thí sinh nào khớp “${query}”.` : 'Không có thí sinh nào trong danh sách này.'}
@@ -414,7 +427,7 @@ export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch
                   <button
                     onClick={() => handleCheckIn(d)}
                     disabled={busy}
-                    className="flex items-center gap-1.5 rounded bg-amber-500 px-3 sm:px-4 py-3 sm:py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
+                    className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 sm:px-4 py-3 sm:py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                     Check-in
