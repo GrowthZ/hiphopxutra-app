@@ -6,6 +6,7 @@ coverage/
 *.log
 .env*
 !.env.example
+!.env.devdb
 .aistudio/
 secrets/
 backups/
@@ -13,3 +14,7 @@ test-results/
 playwright-report/
 *-debug.log
 .wrangler/
+# Real dancers' data and photos (minors): local only, never in this public repo or the deployed site
+docs/thi-sinh.md
+public/ảnh mẫu/
+public/man-led.jpg
