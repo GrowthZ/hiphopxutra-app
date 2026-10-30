@@ -14,6 +14,7 @@
     "test:e2e": "bun scripts/emulators.ts exec \"playwright test\"",
     "test:media": "bun scripts/emulators.ts exec \"bash scripts/media-test.sh\"",
     "emulators": "bun scripts/emulators.ts start",
+    "test:db": "bun scripts/emulators.ts test",
     "db": "bun scripts/db.ts",
     "deploy:rules": "firebase deploy --only firestore:rules"
   },

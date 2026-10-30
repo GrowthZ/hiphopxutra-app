@@ -15,9 +15,11 @@ type Docs = Record<string, Record<string, unknown>>; // id -> document
 
 /** Registered dancers and how many of them never show up at the desk. */
 const ROSTER: Record<CategoryType, { prefix: string; idPrefix: string; count: number; noShow: number }> = {
-  newbie_1v1: { prefix: 'N', idPrefix: 'newbie', count: 44, noShow: 4 },
-  pro_2v2: { prefix: 'P', idPrefix: 'pro', count: 38, noShow: 2 },
+  newbie_1v1: { prefix: 'N', idPrefix: 'newbie', count: 60, noShow: 4 },
+  pro_2v2: { prefix: 'P', idPrefix: 'pro', count: 60, noShow: 2 },
 };
+/** Dancers registered in both categories: one entry in each list, same name / real name / club. */
+const IN_BOTH = 15;
 
 const NICKNAMES = [
   'SÓC NÂU', 'MÈO MUN', 'TÔM HÙM', 'GIÓ LỐC', 'BÃO CÁT', 'SAO BĂNG', 'CHÂU CHẤU', 'BẮP RANG', 'ỚT CAY', 'BẠC HÀ',
@@ -28,6 +30,9 @@ const NICKNAMES = [
   'YETI', 'ZEN', 'ACORN', 'BISCUIT', 'CACTUS', 'DOMINO', 'EMBER', 'FALCON', 'GINGER', 'HONEY',
   'INDIGO', 'JUNO', 'KARMA', 'LEMON', 'MAPLE', 'NIMBUS', 'OLIVE', 'PRISM', 'QUILL', 'RIPPLE',
   'SPROUT', 'TANGO', 'UNO', 'VIVID', 'WAFFLE', 'XENON', 'YOYO', 'ZESTY', 'ATLAS', 'BOLT', 'CINDER', 'DUSK',
+  'CÀ PHÊ', 'BÁNH BAO', 'XOÀI XANH', 'CHÈ KHÚC', 'SẤM SÉT', 'MƯA RÀO', 'HẠT TIÊU', 'ĐOM ĐÓM', 'BỌ NGỰA', 'CÁ CHÉP',
+  'AMBER-K', 'BREEZE', 'COCOA', 'DYNAMO', 'ESPRESSO', 'FIZZ', 'GROOVE', 'HUSTLE', 'JAZZ', 'KOMBU',
+  'LOTUS', 'MAMBO', 'NOODLE', 'OREO', 'POPCORN', 'RUMBA', 'SWIRL', 'TIDAL', 'VELVET', 'WHIZ',
 ];
 const FAMILY = ['Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Vũ', 'Đặng', 'Bùi', 'Đỗ', 'Ngô', 'Dương', 'Lý'];
 const MIDDLE_M = ['Văn', 'Minh', 'Đức', 'Gia', 'Quang', 'Hữu'];
@@ -61,29 +66,33 @@ function shuffle<T>(list: T[], rnd: () => number): T[] {
 
 const STAGE_INDEX = (s: SeedStage) => SEED_STAGES.indexOf(s);
 
+type Person = Pick<Dancer, 'name' | 'realName' | 'crew' | 'gender'>;
+
+function person(nick: string, rnd: () => number): Person {
+  const female = rnd() < 0.3;
+  const pick = <T,>(l: T[]) => l[Math.floor(rnd() * l.length)];
+  return {
+    name: `${female ? 'BGIRL' : 'BBOY'} ${nick}`,
+    realName: `${pick(FAMILY)} ${pick(female ? MIDDLE_F : MIDDLE_M)} ${pick(female ? GIVEN_F : GIVEN_M)}`,
+    crew: rnd() < 0.9 ? pick(CREWS) : undefined, // a few without a club: the app hides the field
+    gender: female ? 'female' : 'male',
+  };
+}
+
 /** One category through the stages. Returns the dancers (scored as far as the stage goes) and the SBD counter. */
-function category(cat: CategoryType, stage: SeedStage, rnd: () => number, names: string[]) {
+function category(cat: CategoryType, stage: SeedStage, rnd: () => number, people: Person[]) {
   const { prefix, idPrefix, count, noShow } = ROSTER[cat];
   const at = STAGE_INDEX(stage);
 
-  let dancers: Dancer[] = names.slice(0, count).map((nick, i) => {
-    const female = rnd() < 0.3;
-    const pick = <T,>(l: T[]) => l[Math.floor(rnd() * l.length)];
-    const realName = `${pick(FAMILY)} ${pick(female ? MIDDLE_F : MIDDLE_M)} ${pick(female ? GIVEN_F : GIVEN_M)}`;
-    const crew = rnd() < 0.9 ? pick(CREWS) : undefined; // a few without a club: the app hides the field
-    return {
-      id: `${idPrefix}-${pad3(i + 1)}`,
-      sbd: '',
-      name: `${female ? 'BGIRL' : 'BBOY'} ${nick}`,
-      realName,
-      crew,
-      gender: female ? 'female' : 'male',
-      category: cat,
-      prelimScores: {},
-      prelimScoreTotal: 0,
-      prelimScoreAvg: 0,
-    };
-  });
+  let dancers: Dancer[] = people.slice(0, count).map((p, i) => ({
+    ...p,
+    id: `${idPrefix}-${pad3(i + 1)}`,
+    sbd: '',
+    category: cat,
+    prelimScores: {},
+    prelimScoreTotal: 0,
+    prelimScoreAvg: 0,
+  }));
 
   // Check-in: everyone but the no-shows, in a random arrival order, from 07:30 on the day.
   const arrivals = shuffle(dancers, rnd).slice(0, count - noShow);
@@ -136,9 +145,14 @@ function category(cat: CategoryType, stage: SeedStage, rnd: () => number, names:
 
 export function buildSeed(stage: SeedStage): Record<string, Docs> {
   const rnd = prng(2026);
-  const names = shuffle(NICKNAMES, rnd);
-  const newbie = category('newbie_1v1', stage, rnd, names.slice(0, ROSTER.newbie_1v1.count));
-  const pro = category('pro_2v2', stage, rnd, names.slice(ROSTER.newbie_1v1.count));
+  const nicks = shuffle(NICKNAMES, rnd);
+  const newbiePeople = nicks.slice(0, ROSTER.newbie_1v1.count).map((n) => person(n, rnd));
+  const proOnly = nicks.slice(ROSTER.newbie_1v1.count, ROSTER.newbie_1v1.count + ROSTER.pro_2v2.count - IN_BOTH);
+  if (proOnly.length + IN_BOTH < ROSTER.pro_2v2.count) throw new Error('NICKNAMES: not enough names for the roster');
+  // The 15 who entered both, mixed in among the Pro-only dancers.
+  const proPeople = shuffle([...shuffle(newbiePeople, rnd).slice(0, IN_BOTH), ...proOnly.map((n) => person(n, rnd))], rnd);
+  const newbie = category('newbie_1v1', stage, rnd, newbiePeople);
+  const pro = category('pro_2v2', stage, rnd, proPeople);
   const locked = stage === 'battle';
 
   // Before the lock the bracket is only a placeholder (replaced by "Chốt Top 32"), but the collections must not

@@ -9,9 +9,27 @@ máy LED, máy check-in) với mạng thật, mà không đụng tới dữ li�
 | `bun run dev` / web trên Vercel | **Giải thật** `events/hiphopxutra-2026` |
 | `bun run dev:devdb` | **Dev** `events/hiphopxutra-2026-dev` (dải hồng **DỮ LIỆU DEV** luôn hiện ở đầu màn hình) |
 | `bun run db <lệnh> --dev` | Dev |
-| `bun run emulators` + `VITE_FIREBASE_EMULATORS=true bunx vite --mode devdb` | Emulator trên máy (không cần mạng, không cần khoá) |
+| `TEST=true` trong `.env`, `bun run test:db` rồi `bun run dev` | **Dữ liệu mẫu trên emulator** của máy này (không cần mạng, không cần khoá, đủ tài khoản; xem mục 0) |
 
 Cách chọn dữ liệu: biến `VITE_EVENT_ID` trong file `.env.devdb` (đã commit). Không đặt biến này trên Vercel Production.
+
+## 0. Thử tính năng nhanh: TEST=true (emulator, không đụng giải thật)
+
+```bash
+# .env (không commit): TEST=true
+bun run test:db              # cửa sổ 1: bật emulator + nạp dữ liệu mẫu (mặc định giai đoạn dang-ky)
+bun run test:db battle       # ... hoặc nạp thẳng một giai đoạn khác (bảng ở mục 2)
+bun run dev                  # cửa sổ 2: http://localhost:3000
+```
+
+Dữ liệu mất khi tắt emulator (Ctrl+C); chạy lại `test:db` là có lại từ đầu. `TEST` chỉ có tác dụng với `bun run dev`:
+không vào bản build, không ảnh hưởng `test:e2e`. Chỉ mở được trên chính máy này (emulator nghe ở 127.0.0.1).
+
+| Tài khoản (chỉ có trên emulator) | Đăng nhập |
+|---|---|
+| BTC quản trị | `admin` / `admin123` ở `/admin` |
+| BTC check-in (2 bàn) | `checkin` / `checkin123`, `checkin2` / `checkin123` ở `/checkin` |
+| Giám khảo | `/giam-khao`, chọn GK 01 … GK 09, PIN `111111` … `999999` |
 
 ## 1. Chuẩn bị (1 lần)
 
@@ -31,8 +49,8 @@ Mỗi lần `seed` **xoá sạch** dữ liệu dev cũ (giữ tài khoản) rồ
 
 | Giai đoạn | Trạng thái sau khi nạp | Dùng để tập |
 |---|---|---|
-| `dang-ky` | 44 Newbie + 38 Pro đã đăng ký, chưa ai có SBD | Check-in, đăng ký tại chỗ, tải ảnh |
-| `check-in` | 40 Newbie (N001–N040) + 36 Pro (P001–P036) đã check-in, chia bảng A/B; 4 + 2 người vắng | Bắt đầu Prelim, giám khảo chấm |
+| `dang-ky` | 60 Newbie + 60 Pro đã đăng ký (15 người thi cả 2 hạng mục), chưa ai có SBD | Check-in, đăng ký tại chỗ, tải ảnh |
+| `check-in` | 56 Newbie (N001–N056) + 58 Pro (P001–P058) đã check-in, chia bảng A/B; 4 + 2 người vắng | Bắt đầu Prelim, giám khảo chấm |
 | `prelim` | Prelim đang chạy: 70% đã chấm đủ 4 GK, 4 người mới có 2/4 điểm, còn lại chưa chấm | Nhắc GK chấm thiếu, admin sửa điểm, BXH chiếu |
 | `chot-top32` | Chấm đủ hết; **đồng điểm ở hạng 32** (Newbie 3 người, Pro 4 người) | Tie-break, chốt Top 32, bốc thăm 2vs2 |
 | `battle` | Tie-break đã chấm, đã chốt Top 32 cả 2 hạng mục, đã bốc thăm 16 đội Pro, nhánh Top 32 Newbie / Top 16 Pro sẵn sàng | Điều hành battle, LED, giám khảo bỏ phiếu |
@@ -58,10 +76,9 @@ bun run db restore backups/hiphopxutra2026-dev-....json --dev
 | **Google Sheets** | Link bảng tính lưu theo trình duyệt, nên dev và thật trên cùng `localhost:3000` dùng **chung một bảng** | Không chặn: **đừng bấm đồng bộ Sheets khi đang ở dev** |
 | **Cổng 3000** | `bun run dev` và `bun run dev:devdb` cùng địa chỉ | Nhìn dải hồng **DỮ LIỆU DEV** trước khi bấm bất cứ gì |
 
-Muốn cô lập hoàn toàn (kể cả Auth), dùng emulator: `bun run db seed <giai-đoạn> --emulator --dev` tạo luôn
-9 tài khoản GK với PIN `111111` (gk-1) … `999999` (gk-9) trên emulator; admin thêm bằng `bun run db admin:add <email> --emulator --dev`.
+Muốn cô lập hoàn toàn (kể cả Auth), dùng emulator: xem mục 0 (`TEST=true`).
 
 ## 4. Xoá dữ liệu dev
 
 `bun run db reset --dev` xoá dữ liệu giải ở dev (giữ tài khoản). Dữ liệu dev chiếm rất ít dung lượng
-(khoảng 130 document), để lại cũng không sao.
+(khoảng 170 document), để lại cũng không sao.

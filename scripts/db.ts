@@ -33,6 +33,12 @@ const KEY_FILE = path.join(ROOT, 'secrets', 'service-account.json');
 const STAFF_EMAIL_DOMAIN = 'btc.hiphopxutra.vn'; // keep in sync with src/services/staffAccounts.ts
 const PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'staffSecrets'];
+// Emulator-only BTC logins (TEST=true): fixed, so testers can share them. Never created on the real project.
+const EMULATOR_STAFF = [
+  ['admin', 'admin', 'admin123'],
+  ['checkin', 'checkin', 'checkin123'],
+  ['checkin2', 'checkin', 'checkin123'],
+] as const;
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
@@ -238,6 +244,16 @@ const commands: Record<string, () => Promise<void>> = {
         );
         await event.collection('judgeSecrets').doc(`gk-${n}`).set({ pin, updatedAt: Date.now() });
       }
+      for (const [user, role, password] of EMULATOR_STAFF) {
+        const email = `${user}@${STAFF_EMAIL_DOMAIN}`;
+        const auth = getAuth();
+        await auth.getUserByEmail(email).then(
+          (u) => auth.updateUser(u.uid, { password }),
+          () => auth.createUser({ email, password })
+        );
+        await event.collection('staffSecrets').doc(email).set({ password, updatedAt: Date.now() });
+        await event.collection('admins').doc(email).set({ name: user, role, addedAt: Timestamp.now() });
+      }
     } else {
       const prod = db.collection('events').doc(PROD_EVENT_ID);
       const copies = (await Promise.all(KEEP_ON_RESET.map((c) => prod.collection(c).get()))).flatMap((snap, i) =>
@@ -254,7 +270,11 @@ const commands: Record<string, () => Promise<void>> = {
     await inBatches(writes, (batch, [ref, value]) => batch.set(ref, value));
     log(`Đã nạp dữ liệu mẫu giai đoạn "${stage}" vào events/${EVENT_ID} (${writes.length} document):`);
     for (const [col, docs] of Object.entries(data)) log(`  ${col.padEnd(16)} ${Object.keys(docs).length}`);
-    log(emulator ? 'PIN giám khảo trên emulator: gk-1 = 111111 ... gk-9 = 999999.' : 'Chạy app: bun run dev:devdb, rồi mở /admin một lần để xuất bản bản công khai.');
+    if (emulator) {
+      log('Tài khoản trên emulator:');
+      log('  Giám khảo   gk-1 = 111111 ... gk-9 = 999999 (chọn mã GK ở /giam-khao)');
+      for (const [user, role, password] of EMULATOR_STAFF) log(`  BTC ${role.padEnd(8)} ${user} / ${password}`);
+    } else log('Chạy app: bun run dev:devdb, rồi mở /admin một lần để xuất bản bản công khai.');
   },
 
   async 'dancer:list'() {

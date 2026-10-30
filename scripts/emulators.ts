@@ -5,6 +5,7 @@
 //
 //   bun scripts/emulators.ts start          keep the emulators running (UI off; data is dropped on exit)
 //   bun scripts/emulators.ts exec "<cmd>"   start them, run <cmd>, stop them (used by `bun run test:e2e`)
+//   bun scripts/emulators.ts test [stage]   start them and load the sample data at a stage (`bun run test:db`, TEST=true)
 
 import { existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
@@ -37,4 +38,19 @@ if (mode === 'exec') cli.push(rest.join(' '));
 // Called through node, not the bin shim: Windows .cmd shims reject arguments containing `&&`.
 const firebaseBin = path.join(import.meta.dir, '..', 'node_modules', 'firebase-tools', 'lib', 'bin', 'firebase.js');
 const proc = Bun.spawn(['node', firebaseBin, ...cli], { env, stdio: ['inherit', 'inherit', 'inherit'] });
+
+// test [stage]: once the emulators answer, load the sample data (events/hiphopxutra-2026-dev + fixed logins).
+if (mode === 'test') {
+  const stage = rest[0] ?? 'dang-ky';
+  const answers = (port: number) => fetch(`http://127.0.0.1:${port}/`).then(() => true, () => false);
+  while (proc.exitCode === null && !((await answers(8080)) && (await answers(9099)))) await Bun.sleep(500);
+  const seed =
+    proc.exitCode === null &&
+    Bun.spawn(['bun', path.join(import.meta.dir, 'db.ts'), 'seed', stage, '--emulator', '--dev'], {
+      stdio: ['inherit', 'inherit', 'inherit'],
+    });
+  // On failure the emulators keep running: Ctrl+C stops them cleanly (killing the CLI would orphan the Java process).
+  if (seed && (await seed.exited) === 0)
+    console.log('\nDữ liệu mẫu sẵn sàng. Đặt TEST=true trong .env rồi chạy `bun run dev` ở cửa sổ khác. Ctrl+C để tắt.');
+}
 process.exit(await proc.exited);

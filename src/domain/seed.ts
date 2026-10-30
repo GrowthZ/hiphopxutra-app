@@ -8,7 +8,7 @@ export const DEFAULT_JUDGES: Judge[] = [
   { id: 'gk-3', code: 'GK 03', name: 'GK 03 • Patrick', judgeName: 'Patrick', isOnline: true },
   { id: 'gk-4', code: 'GK 04', name: 'GK 04 • Hope', judgeName: 'Hope', isOnline: true },
   { id: 'gk-5', code: 'GK 05', name: 'GK 05 • Mystery', judgeName: 'Mystery', isOnline: true },
-  { id: 'gk-6', code: 'GK 06', name: 'GK 06 • Saker', judgeName: 'Saker', isOnline: true },
+  { id: 'gk-6', code: 'GK 06', name: 'GK 06 • Sakerz', judgeName: 'Sakerz', isOnline: true },
   { id: 'gk-7', code: 'GK 07', name: 'GK 07 • Russo', judgeName: 'Russo', isOnline: true },
   { id: 'gk-8', code: 'GK 08', name: 'GK 08 • Dash', judgeName: 'Dash', isOnline: true },
   { id: 'gk-9', code: 'GK 09', name: 'GK 09 • Huco', judgeName: 'Huco', isOnline: true },
