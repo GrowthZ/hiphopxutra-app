@@ -3,7 +3,7 @@ import Cropper, { Area, Point } from 'react-easy-crop';
 import { Dancer, CategoryType } from '../../domain/types';
 import { useTournament } from '../../state/TournamentContext';
 import { CheckCircle2, Image as ImageIcon, Trash2, Upload, X, ZoomIn } from 'lucide-react';
-import { CropArea, isInlineImage, MEDIA_URL, uploadDancerPhotos } from '../../services/media';
+import { CropArea, isInlineImage, loadImage, MEDIA_URL, SIZES, uploadDancerPhotos } from '../../services/media';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
 
 interface DancerPhotoUploadModalProps {
@@ -27,6 +27,8 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
   const [cropTouched, setCropTouched] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Pixel size of the picked file, to warn when it is below the recommended half-body size.
+  const [pickedSize, setPickedSize] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     if (!dancer) return;
@@ -37,6 +39,7 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
     setZoom(1);
     setArea(null);
     setCropTouched(false);
+    setPickedSize(null);
     setErrorMessage(null);
   }, [dancer]);
 
@@ -50,6 +53,10 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
   const existingHalfBody = cleared ? '' : dancer.halfBodyUrl || '';
   const source = fileUrl || existingHalfBody;
 
+  const { width: halfW, height: halfH } = SIZES.halfBody;
+  // Smaller than the half-body box on the side that limits it: the LED would show it upscaled.
+  const tooSmall = file && pickedSize && Math.min(halfW / pickedSize.width, halfH / pickedSize.height) > 1;
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const picked = e.target.files?.[0];
     e.target.value = '';
@@ -57,6 +64,11 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
     if (!picked.type.startsWith('image/')) return setErrorMessage('Vui lòng chọn file ảnh (JPG, PNG, WEBP, HEIC…).');
     setErrorMessage(null);
     setFile(picked);
+    setPickedSize(null);
+    loadImage(picked).then(
+      (img) => setPickedSize({ width: img.naturalWidth, height: img.naturalHeight }),
+      () => {} // unreadable here (e.g. HEIC on some browsers): the upload reports it
+    );
     setCleared(false);
     setCrop({ x: 0, y: 0 });
     setZoom(1);
@@ -218,10 +230,21 @@ export const DancerPhotoUploadModal: React.FC<DancerPhotoUploadModalProps> = ({ 
           )}
         </div>
 
-        <p className="flex items-start gap-1.5 text-[11px] leading-relaxed text-zinc-500">
-          <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Ảnh được thu nhỏ (nửa người tối đa 1080×1440, avatar 320×320) và nén WebP trên máy này trước khi tải lên R2.
-        </p>
+        <div className="flex items-start gap-2 rounded border border-zinc-200 bg-zinc-50 p-2.5 text-xs leading-relaxed text-zinc-600">
+          <ImageIcon className="mt-0.5 h-4 w-4 shrink-0 text-zinc-400" />
+          <div>
+            <p className="font-bold text-zinc-800">
+              Ảnh chuẩn: dọc 3:4, tối thiểu {halfW}×{halfH} px, PNG đã tách nền
+            </p>
+            <p>Bán thân, đứng giữa khung, phần thân chạm mép dưới. Avatar {SIZES.avatar.width}×{SIZES.avatar.height} cắt từ chính ảnh này.</p>
+            {file && pickedSize && (
+              <p className={`mt-1 font-semibold tabular-nums ${tooSmall ? 'text-amber-700' : 'text-emerald-700'}`}>
+                Ảnh đã chọn: {pickedSize.width}×{pickedSize.height} px
+                {tooSmall ? ' · nhỏ hơn khuyến nghị, có thể bị mờ trên màn LED' : ' · đủ nét'}
+              </p>
+            )}
+          </div>
+        </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-zinc-200 pt-3">
           <button
