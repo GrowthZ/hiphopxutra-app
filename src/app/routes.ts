@@ -35,6 +35,17 @@ const PATH_ALIASES: Record<string, ActiveViewType> = {
   '/admin': 'prelim',
 };
 
+// Short links handed to each team (read out over the phone): rewritten to the full path on load.
+const SHORT_LINKS: Record<string, ActiveViewType> = {
+  '/gk': 'judge',
+  '/checkin': 'checkin',
+  '/mc': 'prelim_guest',
+  '/xem': 'prelim_guest',
+  '/bxh': 'prelim_results',
+  '/nhanh': 'bracket_guest',
+  '/tv': 'prelim_screen',
+};
+
 // Old hash / ?view= links printed on QR codes and bookmarks before path routing.
 const LEGACY_VIEWS: Record<string, ActiveViewType> = {
   guest: 'prelim_guest',
@@ -61,6 +72,11 @@ export function viewFromLocation(): ActiveViewType {
   }
 
   const path = pathname.replace(/\/+$/, '') || '/';
+  const short = SHORT_LINKS[path.toLowerCase()];
+  if (short) {
+    window.history.replaceState(null, '', VIEW_PATHS[short]);
+    return short;
+  }
   if (path.startsWith(`${VIEW_PATHS.match_guest}/`)) return 'match_guest';
   const exact = (Object.keys(VIEW_PATHS) as ActiveViewType[]).find((v) => VIEW_PATHS[v] === path);
   return exact ?? PATH_ALIASES[path] ?? 'prelim_guest';

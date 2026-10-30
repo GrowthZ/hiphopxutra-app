@@ -16,6 +16,9 @@ HIPHOP XỨ TRÀ 2026. Dùng cho **buổi tập dượt** (trên dữ liệu dev
 | 9 giám khảo | Điện thoại riêng, sạc đầy | `/giam-khao` (cài thành app: "Thêm vào màn hình chính") | Mã GK + PIN 6 số |
 | Khán giả | Điện thoại | Quét QR → `/ket-qua/prelim` | Không |
 
+Link rút gọn để gửi các bộ phận (tự chuyển sang trang đầy đủ): `/gk` giám khảo, `/checkin` bàn check-in,
+`/mc` và `/xem` theo dõi Prelim, `/bxh` bảng xếp hạng, `/nhanh` nhánh đấu, `/tv` màn chiếu phụ, `/led` máy LED.
+
 Bảng chấm Prelim: GK 01–04 là **bảng A** (mặc định SBD lẻ), GK 05–08 là **bảng B** (SBD chẵn). GK 09 chỉ chấm Battle.
 Mỗi thí sinh do 4 GK của bảng mình chấm, tổng tối đa 400.
 
