@@ -1,7 +1,7 @@
 import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signOut, updatePassword } from 'firebase/auth';
 import { deleteDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { accountsAuth } from './judgeAccounts';
-import { eventCollection, eventDoc, StaffRole } from './firestore';
+import { assertProdAuthUntouched, eventCollection, eventDoc, SHARES_PROD_AUTH, StaffRole } from './firestore';
 
 // Organizer (BTC) accounts: email/password on a made-up domain, so staff only type a username.
 // firestore.rules accepts this domain without email verification; the role lives in admins/{email}.
@@ -41,6 +41,7 @@ const authError = (err: unknown) => {
 };
 
 export async function createStaffAccount(username: string, password: string, role: StaffRole, name: string) {
+  assertProdAuthUntouched();
   const user = username.trim().toLowerCase();
   if (!USERNAME_PATTERN.test(user)) throw new Error('Tên đăng nhập 3–30 ký tự: chữ thường không dấu, số, dấu . _ -');
   const email = staffEmail(user);
@@ -60,6 +61,7 @@ export const setStaffRole = (email: string, role: StaffRole) => updateDoc(eventD
 
 /** Replaces the password (needs the stored one); the member's other sessions are signed out by Firebase. */
 export async function resetStaffPassword(email: string, currentPassword: string) {
+  assertProdAuthUntouched();
   const password = generatePassword();
   try {
     const { user } = await signInWithEmailAndPassword(accountsAuth, email, currentPassword);
@@ -73,10 +75,13 @@ export async function resetStaffPassword(email: string, currentPassword: string)
   return password;
 }
 
-/** Revokes access at once (admins entry), then deletes the login itself when its password is known. */
+/**
+ * Revokes access at once (admins entry), then deletes the login itself when its password is known
+ * (never from the rehearsal data: the login is the real one).
+ */
 export async function removeStaffAccount(email: string, password?: string) {
   await deleteDoc(eventDoc('admins', email));
-  if (password) {
+  if (password && !SHARES_PROD_AUTH) {
     try {
       const { user } = await signInWithEmailAndPassword(accountsAuth, email, password);
       await deleteUser(user);

@@ -17,7 +17,22 @@ import { app, USE_EMULATORS } from './firebase';
 import { CategoryType } from '../domain/types';
 
 // One Firestore tree per tournament: events/{EVENT_ID}/...
-export const EVENT_ID = 'hiphopxutra-2026';
+// VITE_EVENT_ID points the app at another tree: the rehearsal data (`bun run dev:devdb`, see docs/dev-database.md).
+export const PROD_EVENT_ID = 'hiphopxutra-2026';
+export const EVENT_ID = import.meta.env.VITE_EVENT_ID || PROD_EVENT_ID;
+
+/**
+ * Rehearsal tree in the real project: Firebase Auth is shared with production, so judge PINs and BTC passwords
+ * must not be created or changed from here (that would change the real logins too).
+ */
+export const SHARES_PROD_AUTH = EVENT_ID !== PROD_EVENT_ID && !USE_EMULATORS;
+export function assertProdAuthUntouched() {
+  if (SHARES_PROD_AUTH) {
+    throw new Error(
+      'Đang chạy dữ liệu DEV, tài khoản đăng nhập dùng chung với giải thật: tạo / đổi PIN, mật khẩu ở bản thật rồi chạy lại "bun run db seed".'
+    );
+  }
+}
 
 export const db = initializeFirestore(app, {
   localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),

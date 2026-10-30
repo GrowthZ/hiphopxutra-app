@@ -5,6 +5,7 @@
 //
 //   bun run db stats
 //   bun run db admin:list | admin:add <email> [name] | admin:remove <email>
+//   bun run db staff:add <username> [checkin|admin] [name]   (BTC login, prints the generated password)
 //   bun run db backup [file]
 //   bun run db restore <file>          (overwrites docs with the same ids)
 //   bun run db reset                   (deletes event data, keeps admins + judge/staff passwords)
@@ -12,24 +13,33 @@
 //   bun run db dancer:import <file.tsv|csv>   (header row: Tên thi đấu, Họ và tên, CLB, Hạng mục; upserts by name)
 //   bun run db dancer:set <id> field=value ...  (name, realName, crew, gender; empty value removes the field)
 //   bun run db dancer:remove <id> ...
-//   flags: --emulator  --yes (skip the confirmation prompt)
+//   bun run db seed <stage> --dev      (rehearsal data only: wipes the dev event and loads sample data at a stage:
+//                                       dang-ky | check-in | prelim | chot-top32 | battle; see docs/dev-database.md)
+//   flags: --emulator  --dev (events/hiphopxutra-2026-dev instead of the real event)  --yes (skip the confirmation)
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createInterface } from 'node:readline/promises';
 import { applicationDefault, cert, initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { DocumentReference, FieldValue, getFirestore, Timestamp, WriteBatch } from 'firebase-admin/firestore';
+import { buildSeed, SEED_STAGES, SeedStage } from './devSeed';
 
 const ROOT = path.resolve(import.meta.dir, '..');
-const EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts
+const PROD_EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts
+const DEV_EVENT_ID = 'hiphopxutra-2026-dev'; // keep in sync with .env.devdb
 const EMULATOR_PROJECT_ID = 'demo-hiphopxutra'; // keep in sync with src/services/firebase.ts
 const KEY_FILE = path.join(ROOT, 'secrets', 'service-account.json');
+const STAFF_EMAIL_DOMAIN = 'btc.hiphopxutra.vn'; // keep in sync with src/services/staffAccounts.ts
+const PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'staffSecrets'];
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
 const [command, ...params] = args.filter((a) => !a.startsWith('--'));
 const emulator = flags.has('--emulator');
+const dev = flags.has('--dev');
+const EVENT_ID = dev ? DEV_EVENT_ID : PROD_EVENT_ID;
 
 function connect() {
   if (emulator) {
@@ -49,9 +59,9 @@ const db = getFirestore();
 const event = db.collection('events').doc(EVENT_ID);
 const log = (msg: string) => console.log(msg);
 
-/** Production writes need the project id typed back (or --yes). */
+/** Production writes need the project id typed back (or --yes); the dev event is disposable. */
 async function confirm(action: string) {
-  if (emulator || flags.has('--yes')) return;
+  if (emulator || dev || flags.has('--yes')) return;
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   const answer = await rl.question(`!! ${action} trên PRODUCTION (${target}). Gõ "${target}" để tiếp tục: `);
   rl.close();
@@ -151,13 +161,32 @@ const commands: Record<string, () => Promise<void>> = {
     log(`Đã xoá admin ${id}.`);
   },
 
+  // Same as "Thêm tài khoản" in /admin/cai-dat/nguoi-dung: a BTC login with a generated password, kept in
+  // staffSecrets so admins can read it there. Logins live in the project's Auth, so always on the real event.
+  async 'staff:add'() {
+    const [username, role = 'checkin', ...name] = params;
+    const user = username?.trim().toLowerCase() ?? '';
+    if (!/^[a-z0-9._-]{3,30}$/.test(user) || !['checkin', 'admin'].includes(role))
+      throw new Error('Cách dùng: staff:add <tên-đăng-nhập> [checkin|admin] [tên hiển thị]');
+    if (dev) throw new Error('staff:add chạy trên giải thật (bỏ --dev): bản dev mượn tài khoản của giải thật.');
+    const email = `${user}@${STAFF_EMAIL_DOMAIN}`;
+    const auth = getAuth();
+    if (await auth.getUserByEmail(email).then(() => true, () => false)) throw new Error(`${user} đã có tài khoản.`);
+    await confirm(`Tạo tài khoản ${role} ${user}`);
+    const password = Array.from(crypto.getRandomValues(new Uint32Array(10)), (n) => PASSWORD_ALPHABET[n % PASSWORD_ALPHABET.length]).join('');
+    await auth.createUser({ email, password });
+    await event.collection('staffSecrets').doc(email).set({ password, updatedAt: Date.now() });
+    await event.collection('admins').doc(email).set({ name: name.join(' ') || user, role, addedAt: Timestamp.now() });
+    log(`Đã tạo ${role}: ${user}  mật khẩu: ${password}`);
+  },
+
   async backup() {
     const data: Record<string, Record<string, unknown>> = {};
     for (const col of await collections()) {
       data[col.id] = Object.fromEntries((await col.get()).docs.map((d) => [d.id, toJson(d.data())]));
     }
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const file = path.resolve(params[0] ?? path.join(ROOT, 'backups', `${emulator ? 'emulator' : target}-${stamp}.json`));
+    const file = path.resolve(params[0] ?? path.join(ROOT, 'backups', `${emulator ? 'emulator' : target}${dev ? '-dev' : ''}-${stamp}.json`));
     mkdirSync(path.dirname(file), { recursive: true });
     writeFileSync(file, JSON.stringify({ project: target, eventId: EVENT_ID, exportedAt: new Date().toISOString(), data }, null, 2));
     const total = Object.values(data).reduce((n, docs) => n + Object.keys(docs).length, 0);
@@ -184,6 +213,48 @@ const commands: Record<string, () => Promise<void>> = {
     await confirm('Xoá dữ liệu giải');
     await inBatches(refs, (batch, ref) => batch.delete(ref));
     log('Đã xoá. Admin mở /admin để nạp lại dữ liệu mẫu.');
+  },
+
+  async seed() {
+    const stage = params[0] as SeedStage;
+    if (!SEED_STAGES.includes(stage)) throw new Error(`Cách dùng: seed <${SEED_STAGES.join(' | ')}> --dev`);
+    if (EVENT_ID === PROD_EVENT_ID && !emulator) throw new Error('seed chỉ chạy với --dev (hoặc --emulator), không bao giờ trên giải thật.');
+
+    // Wipe the previous rehearsal, logins kept.
+    const cols = (await collections()).filter((c) => !KEEP_ON_RESET.includes(c.id));
+    const stale = (await Promise.all(cols.map((c) => c.listDocuments()))).flat();
+    await inBatches(stale, (batch, ref) => batch.delete(ref));
+
+    // Logins: Firebase Auth is shared by every event of a project, so the dev event borrows the real admins,
+    // judge PINs and BTC passwords. The emulator has no real event: judges gk-N get PIN NNNNNN there.
+    if (emulator) {
+      for (let n = 1; n <= 9; n++) {
+        const email = `gk-${n}@giamkhao.hiphopxutra.vn`;
+        const pin = String(n).repeat(6);
+        const auth = getAuth();
+        await auth.getUserByEmail(email).then(
+          (u) => auth.updateUser(u.uid, { password: pin }),
+          () => auth.createUser({ email, password: pin })
+        );
+        await event.collection('judgeSecrets').doc(`gk-${n}`).set({ pin, updatedAt: Date.now() });
+      }
+    } else {
+      const prod = db.collection('events').doc(PROD_EVENT_ID);
+      const copies = (await Promise.all(KEEP_ON_RESET.map((c) => prod.collection(c).get()))).flatMap((snap, i) =>
+        snap.docs.map((d) => [event.collection(KEEP_ON_RESET[i]).doc(d.id), d.data()] as const)
+      );
+      await inBatches(copies, (batch, [ref, data]) => batch.set(ref, data));
+      log(`Chép ${copies.length} tài khoản (admin, PIN giám khảo, mật khẩu BTC) từ giải thật.`);
+    }
+
+    const data = buildSeed(stage);
+    const writes = Object.entries(data).flatMap(([col, docs]) =>
+      Object.entries(docs).map(([id, value]) => [event.collection(col).doc(id), value] as const)
+    );
+    await inBatches(writes, (batch, [ref, value]) => batch.set(ref, value));
+    log(`Đã nạp dữ liệu mẫu giai đoạn "${stage}" vào events/${EVENT_ID} (${writes.length} document):`);
+    for (const [col, docs] of Object.entries(data)) log(`  ${col.padEnd(16)} ${Object.keys(docs).length}`);
+    log(emulator ? 'PIN giám khảo trên emulator: gk-1 = 111111 ... gk-9 = 999999.' : 'Chạy app: bun run dev:devdb, rồi mở /admin một lần để xuất bản bản công khai.');
   },
 
   async 'dancer:list'() {

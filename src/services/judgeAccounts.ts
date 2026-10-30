@@ -10,7 +10,7 @@ import {
 } from 'firebase/auth';
 import { onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, AUTH_EMULATOR_URL, firebaseConfig, USE_EMULATORS } from './firebase';
-import { eventCollection, eventDoc } from './firestore';
+import { assertProdAuthUntouched, eventCollection, eventDoc } from './firestore';
 
 // Each judge is a Firebase email/password account; the PIN is the password.
 // firestore.rules reads the judge id back from the email, so the format must stay in sync.
@@ -44,6 +44,7 @@ async function saveSecret(judgeId: string, pin: string) {
 
 /** Admin: create the judge's account with a fresh random PIN. */
 export async function createJudgeAccount(judgeId: string): Promise<string> {
+  assertProdAuthUntouched();
   const pin = generatePin();
   try {
     await createUserWithEmailAndPassword(accountsAuth, judgeEmail(judgeId), pin);
@@ -64,6 +65,7 @@ export async function createJudgeAccount(judgeId: string): Promise<string> {
 
 /** Admin: replace the PIN. Firebase revokes the judge's other sessions on password change. */
 export async function changeJudgePin(judgeId: string, currentPin: string): Promise<string> {
+  assertProdAuthUntouched();
   const pin = generatePin();
   try {
     const { user } = await signInWithEmailAndPassword(accountsAuth, judgeEmail(judgeId), currentPin);

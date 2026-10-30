@@ -12,12 +12,14 @@ dùng **chung** dữ liệu và tài khoản đó.
 | `bun run dev` | **Database thật (prod)** | Chuẩn bị giải, nhập thí sinh, chạy thật |
 | Web trên Vercel (tự deploy khi push `main`) | **Database thật (prod)** | Ngày thi |
 | `bun run db <lệnh>` | **Database thật (prod)**, có hỏi xác nhận trước khi ghi/xoá | Quản trị admin, sao lưu, khôi phục, xoá dữ liệu |
+| `bun run dev:devdb` + `bun run db seed <giai-đoạn> --dev` | **Dữ liệu dev** `events/hiphopxutra-2026-dev` (cùng project) | Tập dượt trên thiết bị thật, xem [dev-database.md](dev-database.md) |
 | `bun run emulators` + `VITE_FIREBASE_EMULATORS=true bun run dev` | Emulator trên máy (project `demo-hiphopxutra`) | Thử nghiệm thoải mái, dữ liệu mất khi tắt |
 | `bun run test:e2e` | Emulator (tự bật, tự tắt) | Kiểm tra trước khi deploy |
 
-> ⚠️ Vì dev dùng chung database thật, **mọi thao tác ở localhost đều thay đổi dữ liệu giải thật**: bấm
+> ⚠️ `bun run dev` dùng chung database thật, **mọi thao tác ở đó đều thay đổi dữ liệu giải thật**: bấm
 > "Khôi phục dữ liệu ban đầu", bốc thăm lại hay khoá Top 32 sẽ có hiệu lực ngay trên LED và điện thoại giám khảo.
-> Muốn thử thì dùng emulator (mục 5). Trước các thao tác lớn, luôn chạy `bun run db backup`.
+> Muốn thử thì dùng dữ liệu dev ([dev-database.md](dev-database.md)) hoặc emulator (mục 5).
+> Trước các thao tác lớn, luôn chạy `bun run db backup`. Kịch bản ngày thi: [kich-ban-giai-dau.md](kich-ban-giai-dau.md).
 
 ## 2. Cấu hình project lần đầu (Firebase Console)
 

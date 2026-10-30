@@ -25,6 +25,7 @@ import { AdminLoginGate } from './features/admin/AdminLoginGate';
 import { StaffAccountsView } from './features/admin/StaffAccountsView';
 import { CheckInDesk } from './features/dancers/CheckInDesk';
 import { isAdminView } from './app/routes';
+import { EVENT_ID, PROD_EVENT_ID } from './services/firestore';
 import { ArrowLeft, LayoutDashboard, Tv, CloudOff, LogOut } from 'lucide-react';
 
 const SyncErrorBanner: React.FC = () => {
@@ -192,11 +193,20 @@ const MainContent: React.FC = () => {
   );
 };
 
+/** Always on screen while the app runs on the rehearsal data, so nobody takes it for the real event. */
+const DevDataBadge: React.FC = () =>
+  EVENT_ID === PROD_EVENT_ID ? null : (
+    <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 z-[100] rounded-b bg-fuchsia-600 px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider text-white shadow">
+      Dữ liệu DEV · {EVENT_ID}
+    </div>
+  );
+
 export default function App() {
   return (
     <TournamentProvider>
       <MainContent />
       <SyncErrorBanner />
+      <DevDataBadge />
     </TournamentProvider>
   );
 }
