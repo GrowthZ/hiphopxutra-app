@@ -109,6 +109,61 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
   );
 };
 
+/**
+ * When each round of the match was revealed (round number -> ms), so its JudgeBallotCards flip one by one.
+ * Rounds already open when the match first shows up stay still (a reload or a new screen mid-battle).
+ */
+export function useRevealStartTimes(match?: BattleMatch): Record<number, number> {
+  const [revealStartTimes, setRevealStartTimes] = useState<Record<number, number>>({});
+  const seen = useRef<{ matchId?: string; open: Set<number> }>({ open: new Set() });
+
+  // Same window as the operator console: start right on the click, before the database round trip.
+  useEffect(() => {
+    const handleRoundRevealCustom = (e: Event) => {
+      const customEvent = e as CustomEvent<{ matchId: string; roundNumbers: number[]; timestamp: number }>;
+      if (customEvent.detail && customEvent.detail.matchId === match?.id) {
+        const now = customEvent.detail.timestamp || Date.now();
+        setRevealStartTimes((prev) => {
+          const updated = { ...prev };
+          customEvent.detail.roundNumbers.forEach((rNum) => {
+            updated[rNum] = now;
+          });
+          return updated;
+        });
+      }
+    };
+
+    window.addEventListener('ROUND_REVEAL_DISPLAY_TRIGGER', handleRoundRevealCustom);
+    return () => {
+      window.removeEventListener('ROUND_REVEAL_DISPLAY_TRIGGER', handleRoundRevealCustom);
+    };
+  }, [match?.id]);
+
+  useEffect(() => {
+    if (!match) return;
+    const open = new Set(match.rounds.filter(isRoundOpen).map((r) => r.roundNumber));
+    const firstLook = seen.current.matchId !== match.id;
+    const opened = firstLook ? [] : [...open].filter((n) => !seen.current.open.has(n));
+    seen.current = { matchId: match.id, open };
+
+    if (firstLook) {
+      setRevealStartTimes({}); // round numbers repeat from match to match
+    } else if (opened.length > 0) {
+      const now = Date.now();
+      setRevealStartTimes((prev) => {
+        const updated = { ...prev };
+        opened.forEach((rNum) => {
+          // Keep the operator's click time if it just came in; otherwise (also a re-reveal after an undo) start now.
+          if (!updated[rNum] || now - updated[rNum] > 3000) updated[rNum] = now;
+        });
+        return updated;
+      });
+    }
+  }, [match?.id, match?.rounds]);
+
+  return revealStartTimes;
+}
+
 interface StageDisplayViewProps {
   /** Set by /admin/led. */
   theme?: 'daylight' | 'night';
@@ -204,57 +259,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   }, [match?.id]);
 
   // 2. Judge pills flip one by one when a round is revealed
-  const [revealStartTimes, setRevealStartTimes] = useState<Record<number, number>>({});
-  const prevRevealedRoundsRef = useRef<Set<number>>(new Set());
-
-  useEffect(() => {
-    const handleRoundRevealCustom = (e: Event) => {
-      const customEvent = e as CustomEvent<{ matchId: string; roundNumbers: number[]; timestamp: number }>;
-      if (customEvent.detail && customEvent.detail.matchId === match?.id) {
-        const now = customEvent.detail.timestamp || Date.now();
-        setRevealStartTimes((prev) => {
-          const updated = { ...prev };
-          customEvent.detail.roundNumbers.forEach((rNum) => {
-            updated[rNum] = now;
-          });
-          return updated;
-        });
-      }
-    };
-
-    window.addEventListener('ROUND_REVEAL_DISPLAY_TRIGGER', handleRoundRevealCustom);
-    return () => {
-      window.removeEventListener('ROUND_REVEAL_DISPLAY_TRIGGER', handleRoundRevealCustom);
-    };
-  }, [match?.id]);
-
-  useEffect(() => {
-    if (!match?.rounds) return;
-    const currentlyRevealed = new Set<number>();
-    const newlyRevealedRounds: number[] = [];
-
-    match.rounds.forEach((r) => {
-      if (isRoundOpen(r)) {
-        currentlyRevealed.add(r.roundNumber);
-        if (!prevRevealedRoundsRef.current.has(r.roundNumber)) {
-          newlyRevealedRounds.push(r.roundNumber);
-        }
-      }
-    });
-
-    if (newlyRevealedRounds.length > 0 && prevRevealedRoundsRef.current.size > 0) {
-      const now = Date.now();
-      setRevealStartTimes((prev) => {
-        const updated = { ...prev };
-        newlyRevealedRounds.forEach((rNum) => {
-          if (!updated[rNum]) updated[rNum] = now;
-        });
-        return updated;
-      });
-    }
-
-    prevRevealedRoundsRef.current = currentlyRevealed;
-  }, [match?.rounds]);
+  const revealStartTimes = useRevealStartTimes(match);
 
   if (!match) return <div className="fixed inset-0 bg-black" />;
 

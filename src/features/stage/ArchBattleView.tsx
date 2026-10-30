@@ -5,7 +5,7 @@ import { isRoundOpen } from '../../domain/model';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
-import { JudgeBallotCard } from './StageDisplayView';
+import { JudgeBallotCard, useRevealStartTimes } from './StageDisplayView';
 import {
   ARCH_CLIP_PATH,
   ARCH_COLUMNS,
@@ -52,6 +52,7 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
 export const ArchBattleView: React.FC = () => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
+  const revealStartTimes = useRevealStartTimes(match);
 
   // The picture keeps its pixel size on the HDMI output; only a smaller preview window scales it down.
   const [scale, setScale] = useState(1);
@@ -208,7 +209,14 @@ export const ArchBattleView: React.FC = () => {
                       )}
                     </div>
                     {judges.map((j, idx) => (
-                      <JudgeBallotCard key={j.id} judgeCode={j.code} judgeIndex={idx} vote={round.votes[j.id]} isRevealed={open} />
+                      <JudgeBallotCard
+                        key={j.id}
+                        judgeCode={j.code}
+                        judgeIndex={idx}
+                        vote={round.votes[j.id]}
+                        isRevealed={open}
+                        revealStartTime={revealStartTimes[round.roundNumber]}
+                      />
                     ))}
                   </div>
                 );
