@@ -1,33 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Check } from 'lucide-react';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
-import {
-  Maximize2,
-  Minimize2,
-  Volume2,
-  VolumeX,
-  ChevronLeft,
-  ChevronRight,
-  Sliders,
-  Sun,
-  Flame,
-  Check,
-  Zap,
-  Trophy,
-  Swords,
-} from 'lucide-react';
 import { soundFX } from '../../services/soundEffects';
-import { AudioSettingsModal } from '../settings/AudioSettingsModal';
-import {
-  getDancerHalfBodyUrl,
-  getTeamPhotoUrl,
-  stripBreakerPrefix,
-  getJudgeAvatarUrl,
-  DEFAULT_JUDGE_AVATAR,
-} from '../../shared/placeholderAssets';
-import { BattleSide } from '../../domain/types';
+import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { BattleMatch, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
+
+// Main battle on the 16:9 LED (/led). Drawn on a fixed 1920×1080 canvas and scaled to the window, so the HDMI
+// output is pixel-exact and the /admin/led preview is the same picture, smaller.
+//   top            category · event logo · stage and match
+//   middle         the two corners: photo on the outside, name bar from the screen edge, score at its inner end
+//   name bar → end dark fade under the judge table, so the red / blue votes stand out over the photos
+const W = 1920;
+const H = 1080;
+const BAR_TOP = 470; // name bars; the fade starts here
+const GRID_TOP = 612; // judge names, then one row per round
 
 interface JudgeBallotCardProps {
   judgeCode: string;
@@ -37,13 +26,8 @@ interface JudgeBallotCardProps {
   revealStartTime?: number;
 }
 
-const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({
-  judgeCode,
-  judgeIndex,
-  vote,
-  isRevealed,
-  revealStartTime,
-}) => {
+/** One judge's pill in a round row: white while waiting, green once voted, flips to red / blue on reveal. */
+export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, judgeIndex, vote, isRevealed, revealStartTime }) => {
   const [hasFlipped, setHasFlipped] = useState<boolean>(() => {
     if (!isRevealed) return false;
     if (!revealStartTime) return true;
@@ -90,76 +74,88 @@ const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({
     };
   }, [isRevealed, revealStartTime, judgeIndex, vote]);
 
-  // Display revealed card (flipped to Red / Blue)
+  const base = `flex h-full w-full items-center justify-center rounded-xl font-condensed font-black uppercase leading-none transition-colors ${
+    isFlipping ? 'animate-judge-flip' : ''
+  }`;
+
   if (isRevealed && hasFlipped) {
     return (
       <div
-        className={`h-8 sm:h-9 rounded-lg sm:rounded-xl border-2 flex items-center justify-center font-condensed font-black text-xs sm:text-sm tracking-wider uppercase drop-shadow-md transition-all ${
-          isFlipping ? 'animate-judge-flip' : ''
-        } ${
+        className={`${base} text-[30px] tracking-wider text-white ${
           vote === 'red'
-            ? 'bg-red-600 border-red-300 text-white shadow-[0_0_16px_rgba(220,38,38,0.95)] ring-1 ring-white/50 scale-102'
+            ? 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_24px_rgba(239,68,68,0.85)] ring-2 ring-red-300/70'
             : vote === 'blue'
-            ? 'bg-blue-600 border-blue-300 text-white shadow-[0_0_16px_rgba(37,99,235,0.95)] ring-1 ring-white/50 scale-102'
-            : 'bg-white/10 border-white/20 text-white/40'
+              ? 'bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_24px_rgba(59,130,246,0.85)] ring-2 ring-blue-300/70'
+              : 'bg-white/10 text-white/40'
         }`}
-        title={`${judgeCode}: Đã chọn ${vote === 'red' ? 'ĐỎ' : vote === 'blue' ? 'XANH' : 'Chưa có'}`}
       >
-        <span>{vote === 'red' ? 'ĐỎ' : vote === 'blue' ? 'XANH' : '—'}</span>
+        {vote === 'red' ? 'Đỏ' : vote === 'blue' ? 'Xanh' : '—'}
       </div>
     );
   }
 
-  // Display submitted ballot with Green checkmark (Waiting for reveal flip)
-  const hasVoted = vote != null;
-  if (hasVoted) {
+  if (vote != null) {
     return (
-      <div
-        className={`h-8 sm:h-9 rounded-lg sm:rounded-xl border-2 border-emerald-300 bg-emerald-600 text-white flex items-center justify-center shadow-[0_0_15px_rgba(16,185,129,0.9)] scale-102 transition-all ${
-          isFlipping ? 'animate-judge-flip' : ''
-        }`}
-        title={`${judgeCode}: Đã chấm điểm ✓ (Chờ lật thẻ)`}
-      >
-        <Check className="w-5 h-5 text-white stroke-[3.5]" />
+      <div className={`${base} bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_0_20px_rgba(16,185,129,0.8)] ring-2 ring-emerald-300/70`}>
+        <Check className="h-9 w-9 text-white" strokeWidth={4} />
       </div>
     );
   }
 
-  // Display pending box
   return (
-    <div
-      className="h-8 sm:h-9 rounded-lg sm:rounded-xl border-2 border-white/70 bg-white/90 text-zinc-400 flex items-center justify-center font-mono font-bold text-[10px] sm:text-xs shadow-xs transition-all"
-      title={`${judgeCode}: Đang chờ chấm...`}
-    >
-      <span className="opacity-40">{judgeCode.replace('GK ', '')}</span>
+    <div className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]`}>
+      {judgeCode.replace('GK ', '')}
     </div>
   );
 };
 
 interface StageDisplayViewProps {
-  /** Set by /admin/led; when present it overrides the local day/night toggle. */
+  /** Set by /admin/led. */
   theme?: 'daylight' | 'night';
 }
 
-export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => {
-  const {
-    matches,
-    activeMatchId,
-    setActiveMatchId,
-    judges,
-    soundEnabled,
-    setSoundEnabled,
-    storageConfig,
-  } = useTournament();
+const breakerName = (side?: BattleSide) =>
+  !side
+    ? 'Chờ xác định'
+    : side.dancers?.length
+      ? side.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ')
+      : stripBreakerPrefix(side.name);
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
-  const [localDaylight, setIsDaylightHighContrast] = useState(true); // Default true for outdoor daytime LED screen
-  const isDaylightHighContrast = theme ? theme === 'daylight' : localDaylight;
+/** SBD and crew (team name too for 2vs2), shown under the name. */
+const sideSub = (match: BattleMatch, side: BattleSide) => {
+  const sbd = side.sbdText ? side.sbdText.replace(/^SBD\s*/i, '').trim() : side.dancers.map((d) => d.sbd).filter(Boolean).join(' / ');
+  const crews = [...new Set(side.dancers.map((d) => d.crew).filter(Boolean))].join(' · ');
+  const team = match.category === 'pro_2v2' ? [side.name, crews].filter(Boolean).join(' · ') : crews;
+  return [sbd && `SBD ${sbd}`, team].filter(Boolean).join('  ·  ');
+};
 
+// One line whatever the length.
+const nameSize = (name: string) =>
+  name.length > 20 ? 'text-[42px]' : name.length > 14 ? 'text-[52px]' : name.length > 8 ? 'text-[66px]' : 'text-[82px]';
+
+// Short judge name for the column header ("GK 01 • Bboy Neo (HN)" -> "Neo").
+const judgeShortName = (name: string, code: string) => {
+  const clean = name?.split('•')[1]?.split('(')[0].trim().replace(/^BBOY\s+|^BGIRL\s+/i, '');
+  return clean || code;
+};
+
+export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight' }) => {
+  const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
 
-  // 1. Hiệu ứng xuất hiện 2 team (từ ngoài lướt vào)
+  // Fixed 1920×1080 picture, scaled to fit and centred (letterboxed on other aspect ratios).
+  const [fit, setFit] = useState({ scale: 1, left: 0, top: 0 });
+  useEffect(() => {
+    const resize = () => {
+      const scale = Math.min(window.innerWidth / W, window.innerHeight / H);
+      setFit({ scale, left: (window.innerWidth - W * scale) / 2, top: (window.innerHeight - H * scale) / 2 });
+    };
+    resize();
+    window.addEventListener('resize', resize);
+    return () => window.removeEventListener('resize', resize);
+  }, []);
+
+  // 1. Both corners slide in from the sides (new match, or "Ra sân" from the operator)
   const [entranceKey, setEntranceKey] = useState<number>(() => Date.now());
   const [isEntranceActive, setIsEntranceActive] = useState<boolean>(true);
   const lastMatchIdRef = useRef<string>(match?.id || '');
@@ -186,10 +182,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
       lastMatchIdRef.current = match.id;
       lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
       triggerEntranceAnimation(true);
-    } else if (
-      match.entranceTriggerTimestamp &&
-      match.entranceTriggerTimestamp !== lastEntranceTimestampRef.current
-    ) {
+    } else if (match.entranceTriggerTimestamp && match.entranceTriggerTimestamp !== lastEntranceTimestampRef.current) {
       lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
       triggerEntranceAnimation(true);
     }
@@ -210,7 +203,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
     };
   }, [match?.id]);
 
-  // 2. Hiệu ứng lật từng ô khi công bố phiếu giám khảo
+  // 2. Judge pills flip one by one when a round is revealed
   const [revealStartTimes, setRevealStartTimes] = useState<Record<number, number>>({});
   const prevRevealedRoundsRef = useRef<Set<number>>(new Set());
 
@@ -263,673 +256,265 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme }) => 
     prevRevealedRoundsRef.current = currentlyRevealed;
   }, [match?.rounds]);
 
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().then(() => setIsFullscreen(true));
-    } else {
-      document.exitFullscreen().then(() => setIsFullscreen(false));
-    }
-  };
-
-  const handleNextMatch = () => {
-    const idx = matches.findIndex((m) => m.id === match?.id);
-    if (idx < matches.length - 1) {
-      setActiveMatchId(matches[idx + 1].id);
-    }
-  };
-
-  const handlePrevMatch = () => {
-    const idx = matches.findIndex((m) => m.id === match?.id);
-    if (idx > 0) {
-      setActiveMatchId(matches[idx - 1].id);
-    }
-  };
-
-  // Helper to extract clean Bboy/Bgirl name with prefix stripped (e.g. BBOY T-REX -> T-REX, BGIRL MAYA -> MAYA)
-  const getBreakerName = (side?: BattleSide): string => {
-    if (!side) return 'CHƯA XÁC ĐỊNH';
-    if (side.dancers && side.dancers.length > 0) {
-      return side.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ');
-    }
-    return stripBreakerPrefix(side.name);
-  };
-
-  // Helper to extract Team / Crew name displayed underneath the dancer name
-  const getTeamName = (side?: BattleSide, category?: string): string => {
-    if (!side) return '';
-    if (category === 'pro_2v2') {
-      const crews = Array.from(new Set(side.dancers.map((d) => d.crew).filter(Boolean))).join(' · ');
-      return crews ? `${side.name} · ${crews}` : side.name;
-    }
-    const dancer = side.dancers?.[0];
-    if (dancer?.crew) {
-      return dancer.crew;
-    }
-    return side.name !== dancer?.name ? side.name : '';
-  };
-
-  // Helper to extract SBD text / identifier
-  const getSideSbdText = (side?: BattleSide): string => {
-    if (!side) return '000';
-    if (side.sbdText) {
-      return side.sbdText.replace(/^SBD\s*/i, '').trim();
-    }
-    if (side.dancers && side.dancers.length > 0) {
-      return side.dancers.map((d) => d.sbd).join('/');
-    }
-    return '000';
-  };
-
-  // Smart font sizing to guarantee strictly 1 line without cutting off
-  const getBreakerFontSize = (name: string): string => {
-    const len = name.length;
-    if (len > 22) {
-      return 'text-lg sm:text-xl md:text-2xl lg:text-3xl';
-    }
-    if (len > 14) {
-      return 'text-xl sm:text-2xl md:text-3xl lg:text-4xl';
-    }
-    if (len > 8) {
-      return 'text-2xl sm:text-3xl md:text-4xl lg:text-5xl';
-    }
-    return 'text-3xl sm:text-4xl md:text-5xl lg:text-6xl';
-  };
-
-  // Get photo for Red Corner (upper-body standing above the name board)
-  const redPhotoUrl = match
-    ? match.category === 'pro_2v2'
-      ? getTeamPhotoUrl(match.sideRed, storageConfig.placeholders)
-      : getDancerHalfBodyUrl(match.sideRed?.dancers?.[0], storageConfig.placeholders)
-    : '';
-
-  // Get photo for Blue Corner (upper-body standing above the name board)
-  const bluePhotoUrl = match
-    ? match.category === 'pro_2v2'
-      ? getTeamPhotoUrl(match.sideBlue, storageConfig.placeholders)
-      : getDancerHalfBodyUrl(match.sideBlue?.dancers?.[0], storageConfig.placeholders)
-    : '';
-
-  // Short judge name for the 9-column matrix
-  const getJudgeShortName = (name: string, code: string): string => {
-    if (!name) return code;
-    const parts = name.split('•');
-    if (parts[1]) {
-      const clean = parts[1].split('(')[0].trim().replace(/^BBOY\s+|^BGIRL\s+/i, '');
-      if (clean) return clean;
-    }
-    return code;
-  };
+  if (!match) return <div className="fixed inset-0 bg-black" />;
 
   // Announced result: the match winner once it's over, else the last revealed round until the next round's votes
   // start coming in. Drives RED WIN / BLUE WIN in the centre and greys out the losing side.
   const announcedWinner: 'red' | 'blue' | null = (() => {
-    if (!match) return null;
     if (match.status === 'finished' && match.winnerSide) return match.winnerSide;
     const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
     if (current && !isRoundOpen(current) && Object.values(current.votes).some(Boolean)) return null;
     const lastOpen = [...match.rounds].reverse().find(isRoundOpen);
     return lastOpen?.winner ?? null;
   })();
-  const announcedRound = match ? [...match.rounds].reverse().find(isRoundOpen) : undefined;
-  const loserDim = (side: 'red' | 'blue') =>
-    announcedWinner && announcedWinner !== side ? 'grayscale opacity-35 transition-all duration-700' : 'transition-all duration-700';
+  const announcedRound = [...match.rounds].reverse().find(isRoundOpen);
+  const lost = (side: 'red' | 'blue') => announcedWinner !== null && announcedWinner !== side;
+  const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35' : '');
 
-  const redBreakerName = getBreakerName(match?.sideRed);
-  const blueBreakerName = getBreakerName(match?.sideBlue);
-
-  // Check if battle is tied after all regular rounds
+  const regularRounds = match.category === 'newbie_1v1' ? 2 : 4;
+  const isTieBreakRound = (r: BattleMatch['rounds'][number]) => r.isTieBreak || r.roundNumber > regularRounds;
+  const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak);
   const isMatchTied =
-    match &&
     match.roundWinsRed === match.roundWinsBlue &&
     match.rounds.length > 0 &&
-    match.rounds.every((r) => r.isConfirmed);
+    match.rounds.filter((r) => !r.isTieBreak).every((r) => r.isConfirmed || r.isRevealed);
+  const currentRound = match.rounds.find((r) => r.roundNumber === match.currentRound);
+  const roundLabel = (r?: BattleMatch['rounds'][number]) => (!r ? '' : isTieBreakRound(r) ? 'Tie-break' : `Round ${r.roundNumber}`);
 
-  const hasTieBreakRound = match?.rounds.some((r) => r.isTieBreak);
+  // Rows fill the space under the names, and shrink when a 2vs2 battle needs more than three of them.
+  const rowH = match.rounds.length > 3 ? 58 : match.rounds.length > 2 ? 84 : 96;
+  const cols = `220px repeat(${Math.max(judges.length, 1)}, minmax(0, 1fr))`;
+
+  const photoBox = match.category === 'pro_2v2' ? 'bottom-[360px] w-[860px]' : 'bottom-0 w-[720px]';
+
+  const photo = (side: BattleSide, color: 'red' | 'blue') => {
+    const shadow = `drop-shadow-[0_14px_30px_rgba(0,0,0,0.85)] ${
+      color === 'red' ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.35)]' : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.35)]'
+    }`;
+    return match.category === 'pro_2v2' ? (
+      <TeamPhoto
+        photoUrl={side.teamPhotoUrl}
+        dancers={side.dancers}
+        placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
+        alt={breakerName(side)}
+        className={`h-full w-full object-contain object-bottom ${shadow}`}
+        boxClassName="h-full w-full"
+        cutoutClassName={shadow}
+      />
+    ) : (
+      <img
+        src={getDancerHalfBodyUrl(side.dancers?.[0], storageConfig.placeholders)}
+        alt={breakerName(side)}
+        className={`h-full w-full object-contain object-bottom ${shadow}`}
+      />
+    );
+  };
+
+  const statusText =
+    match.status === 'finished'
+      ? `Chung cuộc ${match.roundWinsRed} - ${match.roundWinsBlue}${hasTieBreakRound ? ' · thắng tie-break' : ''}`
+      : hasTieBreakRound || isMatchTied
+        ? `Hòa ${match.roundWinsRed} - ${match.roundWinsBlue} · tie-break phân định thắng thua`
+        : `${regularRounds} rounds · hòa đấu tie-break`;
 
   return (
-    <div
-      className={`relative min-h-screen text-white flex flex-col justify-between p-3 sm:p-5 lg:p-6 select-none overflow-hidden font-sans transition-all duration-300 ${
-        isDaylightHighContrast
-          ? 'bg-gradient-to-b from-[#0b1c44] via-[#091533] to-[#040b1c]'
-          : 'bg-zinc-950'
-      }`}
-    >
-      {/* Dynamic Background Breaking Graphics (Curved WDSF Olympic Stage Motifs from reference image) */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-        {/* Subtle radial stadium lights */}
-        <div className="absolute -top-32 left-1/4 w-[600px] h-[600px] bg-blue-600/15 rounded-full blur-3xl" />
-        <div className="absolute -top-32 right-1/4 w-[600px] h-[600px] bg-red-600/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-sky-500/10 rounded-full blur-3xl" />
-
-        {/* Concentric Stadium Breaking Arcs */}
-        <svg
-          className="absolute inset-0 w-full h-full opacity-20"
-          xmlns="http://www.w3.org/2000/svg"
-          preserveAspectRatio="none"
-          viewBox="0 0 1920 1080"
-        >
-          <circle cx="960" cy="540" r="420" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeDasharray="12 12" />
-          <circle cx="960" cy="540" r="640" fill="none" stroke="#60a5fa" strokeWidth="1" strokeOpacity="0.4" />
-          <path d="M 0 540 Q 480 380 960 540 T 1920 540" fill="none" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.3" />
-          <path d="M 0 680 Q 480 820 960 680 T 1920 680" fill="none" stroke="#3b82f6" strokeWidth="1" strokeOpacity="0.25" />
-        </svg>
-      </div>
-
-      {/* =========================================================================
-          TOP BANNER (WDSF Olympic Breaking Broadcast Style - Matching Reference Image)
-          ========================================================================= */}
-      <div className="relative z-20 flex items-center justify-between border-b border-white/15 pb-2 shrink-0">
-        {/* Left: WDSF Breaking Emblem & Tournament Badge */}
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-lg bg-white/10 backdrop-blur-md border border-white/20 flex flex-col items-center justify-center shrink-0 shadow-md">
-            <span className="font-condensed font-black text-xs sm:text-sm tracking-tighter text-white leading-none">
-              WDSF
-            </span>
-            <span className="font-mono text-[8px] font-bold tracking-widest text-red-400 leading-none mt-0.5">
-              BREAK
-            </span>
-          </div>
-
-          <div>
-            <div className="font-condensed font-black text-lg sm:text-2xl tracking-widest uppercase flex items-center gap-2 drop-shadow-sm">
-              <span className="text-white">HIPHOP XỨ TRÀ</span>
-              <span className="text-[10px] sm:text-xs font-mono font-black px-2 py-0.5 rounded bg-amber-400 text-black border border-amber-300 uppercase shadow-xs">
-                2026
-              </span>
-            </div>
-            <div className="text-[11px] sm:text-xs text-sky-200 font-semibold tracking-wider uppercase drop-shadow-xs">
-              {match?.category === 'pro_2v2' ? 'KID PRO 2VS2' : 'KID NEWBIE 1VS1'} · {match?.stageName || 'MAIN BATTLE'}
-            </div>
-          </div>
-        </div>
-
-        {/* Center: Stage Title & Match Indicator (Daylight High-Contrast Text) */}
-        <div className="flex flex-col items-center justify-center text-center">
-          <div className="font-condensed font-black text-2xl sm:text-3xl md:text-4xl text-white tracking-widest uppercase drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] leading-none">
-            BREAKING
-          </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <button
-              onClick={handlePrevMatch}
-              className="p-0.5 hover:bg-white/20 rounded text-sky-200 hover:text-white transition-colors cursor-pointer"
-              title="Trận trước"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="text-[11px] sm:text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-white/15 text-white border border-white/25 uppercase tracking-wider backdrop-blur-xs">
-              {match?.stageName} · TRẬN {String(match?.matchNumber).padStart(2, '0')}
-            </span>
-            <button
-              onClick={handleNextMatch}
-              className="p-0.5 hover:bg-white/20 rounded text-sky-200 hover:text-white transition-colors cursor-pointer"
-              title="Trận sau"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Right: Tournament Style Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Outdoor Daylight High-Contrast Mode Toggle */}
-          <button
-            onClick={() => setIsDaylightHighContrast(!isDaylightHighContrast)}
-            className={`px-2.5 py-1.5 rounded-md font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer uppercase shadow-md ${
-              isDaylightHighContrast
-                ? 'bg-amber-400 hover:bg-amber-300 text-black border border-amber-300 font-black'
-                : 'bg-white/10 hover:bg-white/20 border border-white/20 text-white'
-            }`}
-            title="Chế độ màn LED ngoài trời ban ngày (Tương phản cao)"
-          >
-            <Sun className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">LED Ngoài Trời</span>
-          </button>
-
-          {/* Replay 2 Teams Entrance */}
-          <button
-            onClick={() => triggerEntranceAnimation(true)}
-            className="px-2.5 py-1.5 rounded-md bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-1 transition-all cursor-pointer uppercase shadow-md"
-            title="Kích hoạt lại hiệu ứng ra sân 2 team (từ ngoài vào)"
-          >
-            <Swords className="w-3.5 h-3.5 text-amber-300" />
-            <span className="hidden lg:inline">Ra Sân</span>
-          </button>
-
-          {/* Airhorn FX */}
-          <button
-            onClick={() => soundFX.playHiphopAirhorn()}
-            className="px-2.5 py-1.5 rounded-md bg-red-600 hover:bg-red-500 border border-red-400 text-white font-black text-xs flex items-center gap-1 transition-all cursor-pointer uppercase shadow-md"
-            title="Còi Hiphop Airhorn sân khấu"
-          >
-            <Flame className="w-3.5 h-3.5 text-amber-300" />
-            <span className="hidden sm:inline">Airhorn</span>
-          </button>
-
-          <button
-            onClick={() => setIsAudioModalOpen(true)}
-            className="p-1.5 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition-colors text-white cursor-pointer shadow-xs"
-            title="Cài đặt âm thanh"
-          >
-            <Sliders className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-1.5 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition-colors text-white cursor-pointer shadow-xs"
-            title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-          >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-zinc-400" />}
-          </button>
-
-          <button
-            onClick={toggleFullscreen}
-            className="p-1.5 rounded-md bg-white/10 border border-white/20 hover:bg-white/20 transition-colors text-white cursor-pointer shadow-xs"
-            title="Toàn màn hình trình chiếu"
-          >
-            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-          </button>
-        </div>
-      </div>
-
-      {/* =========================================================================
-          SMART BATTLE ARENA (ĐẨY CAO TẤT CẢ KHUNG LÊN CHO CÂN ĐỐI)
-          - Đẩy cao toàn bộ khung lên giữa/trên màn hình để cân đối không gian
-          - Nửa người trên Bboy/Bgirl hiển thị trực tiếp trên bảng tên
-          - Bỏ chữ 'bboy', 'bgirl' trước tên
-          - Đảm bảo tên nằm trên 1 dòng duy nhất không bị cắt
-          - SBD ĐẶT NGAY BÊN DƯỚI TÊN THÀNH VIÊN (Kèm tên đội/crew)
-          ========================================================================= */}
-      {/* =========================================================================
-          SMART BATTLE ARENA (ĐẨY CAO TẤT CẢ KHUNG LÊN CHO CÂN ĐỐI)
-          - Hiệu ứng xuất hiện 2 team lướt từ 2 bên ngoài vào sân
-          - Biểu tượng va chạm VS Clash bùng nổ ở giữa
-          - Nửa người trên Bboy/Bgirl hiển thị trực tiếp trên bảng tên
-          - Bỏ chữ 'bboy', 'bgirl' trước tên
-          - Đảm bảo tên nằm trên 1 dòng duy nhất không bị cắt
-          - SBD ĐẶT NGAY BÊN DƯỚI TÊN THÀNH VIÊN (Kèm tên đội/crew)
-          ========================================================================= */}
+    <div className="fixed inset-0 overflow-hidden bg-black">
       <div
-        key={`arena-${entranceKey}`}
-        className="relative z-10 flex-1 flex flex-col justify-center pt-1 pb-3 sm:pb-5 my-auto overflow-hidden"
+        className="absolute origin-top-left overflow-hidden text-white select-none"
+        style={{ width: W, height: H, left: fit.left, top: fit.top, transform: `scale(${fit.scale})` }}
       >
-        <div className="w-full grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8 items-end px-1 sm:px-4 relative">
-          {announcedWinner && (
-            <div
-              key={`win-${announcedWinner}-${announcedRound?.roundNumber}-${match?.status}`}
-              className="led-pop pointer-events-none absolute inset-x-0 top-[6%] z-20 flex flex-col items-center"
-            >
-              <span
-                className={`font-condensed text-[11vw] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
-                  announcedWinner === 'red'
-                    ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.95)] [-webkit-text-stroke:0.35vw_#dc2626]'
-                    : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.95)] [-webkit-text-stroke:0.35vw_#2563eb]'
-                }`}
-              >
-                {announcedWinner === 'red' ? 'Red' : 'Blue'} win
-              </span>
-              <span
-                className={`mt-2 rounded-full px-5 py-1.5 font-condensed text-[2vw] font-black uppercase leading-none text-white ${
-                  announcedWinner === 'red' ? 'bg-red-600' : 'bg-blue-600'
-                }`}
-              >
-                {match?.status === 'finished'
-                  ? 'Chung cuộc'
-                  : announcedRound?.isTieBreak
-                    ? 'Tie-break'
-                    : `Round ${announcedRound?.roundNumber ?? ''}`}
-              </span>
-            </div>
-          )}
+        {/* Backdrop */}
+        <div
+          className={`absolute inset-0 ${
+            theme === 'daylight' ? 'bg-gradient-to-b from-[#1a2a6c] via-[#13205a] to-[#0a1238]' : 'bg-gradient-to-b from-[#120a24] via-[#0b1030] to-[#05060f]'
+          }`}
+        />
+        <div className="absolute -left-[12%] top-[8%] h-[80%] w-[55%] rounded-full bg-red-600/25 blur-[140px]" />
+        <div className="absolute -right-[12%] top-[8%] h-[80%] w-[55%] rounded-full bg-blue-600/25 blur-[140px]" />
+        <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_64px)]" />
 
-          {/* =====================================================================
-              RED CORNER CARD (Cột đấu Góc Đỏ - Lướt từ ngoài bên trái vào)
-              ===================================================================== */}
-          <div className={`flex flex-col items-center justify-end w-full transition-all duration-700 ${
-            isEntranceActive ? 'animate-entrance-left' : ''
-          }`}>
-            {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
-            <div className={`w-full h-56 sm:h-72 md:h-80 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none ${loserDim('red')}`}>
-              {match?.category === 'pro_2v2' ? (
-                <TeamPhoto
-                  photoUrl={match.sideRed.teamPhotoUrl}
-                  dancers={match.sideRed.dancers}
-                  placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
-                  alt={redBreakerName}
-                  className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                  boxClassName="h-full w-[92%]"
-                  cutoutClassName="filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                />
-              ) : (
-                redPhotoUrl && (
-                  <img
-                    src={redPhotoUrl}
-                    alt={redBreakerName}
-                    className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                  />
-                )
-              )}
-            </div>
-
-            {/* Bảng tên Góc Đỏ & Hộp điểm */}
-            <div className={`w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10 ${loserDim('red')}`}>
-              {/* Bảng tên Đỏ */}
-              <div className="flex-1 min-w-0 flex items-center rounded-xl sm:rounded-2xl bg-gradient-to-r from-red-600 via-red-600 to-red-500 border-2 sm:border-3 border-red-400 p-2 sm:p-3 shadow-[0_12px_35px_rgba(220,38,38,0.5)]">
-                {/* Flag Badge on Left */}
-                <div className="bg-white/20 backdrop-blur-xs border border-white/40 rounded-lg px-2 sm:px-2.5 py-1 sm:py-1.5 flex items-center justify-center shrink-0 mr-2 sm:mr-3 text-center">
-                  <span className="text-base sm:text-xl leading-none">🇻🇳</span>
-                </div>
-
-                {/* Text Container: Breaker Name (1 line) + SBD UNDERNEATH */}
-                <div className="min-w-0 flex-1 overflow-hidden">
-                  <div className="text-[9px] sm:text-[10px] font-mono font-black tracking-widest text-red-100 uppercase opacity-90 leading-tight">
-                    GÓC ĐỎ • RED CORNER
-                  </div>
-
-                  {/* Tên Thí Sinh (Đã bỏ Bboy/Bgirl, đảm bảo trên 1 dòng không cắt chữ) */}
-                  <div
-                    className={`font-condensed font-black text-white tracking-tight uppercase leading-none whitespace-nowrap overflow-hidden text-ellipsis drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] my-0.5 sm:my-1 ${getBreakerFontSize(
-                      redBreakerName
-                    )}`}
-                    title={redBreakerName}
-                  >
-                    {redBreakerName}
-                  </div>
-
-                  {/* SBD ĐẶT BÊN DƯỚI TÊN THÀNH VIÊN + Tên Đội */}
-                  <div className="flex items-center gap-1.5 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-red-100/95 font-semibold uppercase whitespace-nowrap overflow-hidden text-ellipsis leading-tight mt-0.5">
-                    <span className="font-mono font-black text-amber-300 bg-black/40 px-1.5 py-0.5 rounded border border-white/20 shrink-0">
-                      SBD: {getSideSbdText(match?.sideRed)}
-                    </span>
-                    {getTeamName(match?.sideRed, match?.category) && (
-                      <>
-                        <span className="text-white/40 font-bold shrink-0">·</span>
-                        <span className="truncate" title={getTeamName(match?.sideRed, match?.category)}>
-                          {getTeamName(match?.sideRed, match?.category)}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Hộp điểm Đỏ */}
-              <div className="w-16 sm:w-24 md:w-28 lg:w-32 h-16 sm:h-24 md:h-28 lg:h-32 rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-600 to-red-700 border-2 sm:border-3 border-red-400 flex items-center justify-center font-condensed font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-white shrink-0 tabular-nums shadow-[0_0_35px_rgba(239,68,68,0.7)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]">
-                {match?.roundWinsRed ?? 0}
-              </div>
-            </div>
+        {/* Top: category · logo · stage */}
+        <div className="absolute inset-x-[40px] top-[22px] flex h-[130px] items-center gap-6">
+          <div className="flex flex-1 items-center gap-4">
+            <span className="rounded-lg bg-gradient-to-b from-amber-200 to-amber-400 px-5 py-2 font-condensed text-[32px] font-black uppercase leading-none text-zinc-950 shadow-lg">
+              {match.category === 'pro_2v2' ? 'Kid Pro 2vs2' : 'Kid Newbie 1vs1'}
+            </span>
+            <span className="h-[3px] flex-1 rounded-full bg-gradient-to-r from-amber-300 to-amber-300/0" />
           </div>
-
-          {/* =====================================================================
-              BLUE CORNER CARD (Cột đấu Góc Xanh - Lướt từ ngoài bên phải vào)
-              ===================================================================== */}
-          <div className={`flex flex-col items-center justify-end w-full transition-all duration-700 ${
-            isEntranceActive ? 'animate-entrance-right' : ''
-          }`}>
-            {/* Nửa người trên hiển thị trên bảng tên (Đẩy cao cân đối) */}
-            <div className={`w-full h-56 sm:h-72 md:h-84 lg:h-96 xl:h-[400px] flex items-end justify-center relative -mb-1 sm:-mb-2 z-0 pointer-events-none ${loserDim('blue')}`}>
-              {match?.category === 'pro_2v2' ? (
-                <TeamPhoto
-                  photoUrl={match.sideBlue.teamPhotoUrl}
-                  dancers={match.sideBlue.dancers}
-                  placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
-                  alt={blueBreakerName}
-                  className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                  boxClassName="h-full w-[92%]"
-                  cutoutClassName="filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                />
-              ) : (
-                bluePhotoUrl && (
-                  <img
-                    src={bluePhotoUrl}
-                    alt={blueBreakerName}
-                    className="h-full w-auto max-w-[85%] object-contain object-bottom filter drop-shadow-[0_15px_30px_rgba(0,0,0,0.85)] brightness-105 contrast-110"
-                  />
-                )
-              )}
-            </div>
-
-            {/* Hộp điểm & Bảng tên Góc Xanh */}
-            <div className={`w-full flex items-center justify-between gap-2.5 sm:gap-4 relative z-10 flex-row-reverse md:flex-row ${loserDim('blue')}`}>
-              {/* Hộp điểm Xanh */}
-              <div className="w-16 sm:w-24 md:w-28 lg:w-32 h-16 sm:h-24 md:h-28 lg:h-32 rounded-xl sm:rounded-2xl bg-gradient-to-br from-blue-600 to-blue-700 border-2 sm:border-3 border-blue-400 flex items-center justify-center font-condensed font-black text-4xl sm:text-6xl md:text-7xl lg:text-8xl text-white shrink-0 tabular-nums shadow-[0_0_35px_rgba(59,130,246,0.7)] drop-shadow-[0_4px_10px_rgba(0,0,0,0.6)]">
-                {match?.roundWinsBlue ?? 0}
-              </div>
-
-              {/* Bảng tên Xanh */}
-              <div className="flex-1 min-w-0 flex items-center justify-between rounded-xl sm:rounded-2xl bg-gradient-to-l from-blue-600 via-blue-600 to-blue-500 border-2 sm:border-3 border-blue-400 p-2 sm:p-3 shadow-[0_12px_35px_rgba(37,99,235,0.5)]">
-                {/* Text Container: Breaker Name (1 line) + SBD UNDERNEATH */}
-                <div className="min-w-0 flex-1 text-left md:text-right pr-0 md:pr-2 lg:pr-3 overflow-hidden">
-                  <div className="text-[9px] sm:text-[10px] font-mono font-black tracking-widest text-blue-100 uppercase opacity-90 leading-tight">
-                    BLUE CORNER • GÓC XANH
-                  </div>
-
-                  {/* Tên Thí Sinh (Đã bỏ Bboy/Bgirl, đảm bảo trên 1 dòng không cắt chữ) */}
-                  <div
-                    className={`font-condensed font-black text-white tracking-tight uppercase leading-none whitespace-nowrap overflow-hidden text-ellipsis drop-shadow-[0_2px_4px_rgba(0,0,0,0.7)] my-0.5 sm:my-1 ${getBreakerFontSize(
-                      blueBreakerName
-                    )}`}
-                    title={blueBreakerName}
-                  >
-                    {blueBreakerName}
-                  </div>
-
-                  {/* SBD ĐẶT BÊN DƯỚI TÊN THÀNH VIÊN + Tên Đội */}
-                  <div className="flex items-center md:justify-end gap-1.5 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-blue-100/95 font-semibold uppercase whitespace-nowrap overflow-hidden text-ellipsis leading-tight mt-0.5">
-                    {getTeamName(match?.sideBlue, match?.category) && (
-                      <>
-                        <span className="truncate" title={getTeamName(match?.sideBlue, match?.category)}>
-                          {getTeamName(match?.sideBlue, match?.category)}
-                        </span>
-                        <span className="text-white/40 font-bold shrink-0">·</span>
-                      </>
-                    )}
-                    <span className="font-mono font-black text-amber-300 bg-black/40 px-1.5 py-0.5 rounded border border-white/20 shrink-0">
-                      SBD: {getSideSbdText(match?.sideBlue)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Flag Badge on Right */}
-                <div className="bg-white/20 backdrop-blur-xs border border-white/40 rounded-lg px-2 sm:px-2.5 py-1 sm:py-1.5 flex items-center justify-center shrink-0 ml-2 sm:ml-3 text-center">
-                  <span className="text-base sm:text-xl leading-none">🇻🇳</span>
-                </div>
-              </div>
-            </div>
+          <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-[130px] w-auto shrink-0 drop-shadow-[0_0_30px_rgba(239,68,68,0.45)]" />
+          <div className="flex flex-1 items-center gap-4">
+            <span className="h-[3px] flex-1 rounded-full bg-gradient-to-l from-amber-300 to-amber-300/0" />
+            <span className="rounded-lg bg-gradient-to-b from-amber-200 to-amber-400 px-5 py-2 font-condensed text-[32px] font-black uppercase leading-none text-zinc-950 shadow-lg">
+              {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* =========================================================================
-          CENTER / BOTTOM: 9 JUDGES DIRECT VOTING MATRIX (Exact Match to Reference Photo)
-          - Header: 9 Judge Names in High Contrast
-          - Round 1, Round 2, Round 3, và ROUND TIE-BREAK (Hiệp phụ khi hòa)
-          - Vote Pills: Crisp White (Pending) -> High Contrast Vivid Red/Blue (Voted)
-          - Center Badge: "BEST OF 3" hoặc thông báo Round Tie-Break
-          ========================================================================= */}
-      <div className="relative z-20 mt-1 shrink-0">
-        <div className="max-w-5xl mx-auto bg-black/45 backdrop-blur-md border border-white/20 rounded-2xl p-2.5 sm:p-3.5 shadow-[0_10px_40px_rgba(0,0,0,0.6)] overflow-x-auto">
-          <div className="min-w-[700px]">
-            {/* Header: Judge Names (9 Columns) */}
-            <div className="grid grid-cols-11 gap-1.5 sm:gap-2 mb-2 items-center">
-              {/* Empty space for Round label */}
-              <div className="col-span-2 text-center text-[11px] font-mono font-black text-sky-200 uppercase tracking-widest">
-                ROUND
-              </div>
+        {/* Corner photos (behind everything else). A 1vs1 half-body runs down behind the judge table; a 2vs2 photo is
+            usually landscape, so it gets a wider box that ends a little under the name bar, keeping the team in view */}
+        <div key={`rp-${entranceKey}`} className={`absolute left-[20px] top-[165px] ${photoBox} transition-all duration-700 ${dim('red')} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
+          {photo(match.sideRed, 'red')}
+        </div>
+        <div key={`bp-${entranceKey}`} className={`absolute right-[20px] top-[165px] ${photoBox} transition-all duration-700 ${dim('blue')} ${isEntranceActive ? 'animate-entrance-right' : ''}`}>
+          {photo(match.sideBlue, 'blue')}
+        </div>
 
-              {/* 9 Judges names with mini avatars */}
-              {judges.map((j) => (
-                <div
-                  key={j.id}
-                  className="flex flex-col items-center justify-center text-center px-0.5"
-                  title={j.name}
-                >
-                  <img
-                    src={getJudgeAvatarUrl(j)}
-                    alt={j.code}
-                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full object-cover border border-amber-400/70 mb-0.5 shadow-sm bg-zinc-900"
-                    onError={(e) => {
-                      e.currentTarget.src = DEFAULT_JUDGE_AVATAR;
-                    }}
-                  />
-                  <div className="font-condensed font-black text-[10px] sm:text-xs text-white truncate max-w-full drop-shadow-xs uppercase">
-                    {j.judgeName || getJudgeShortName(j.name, j.code)}
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* From the name bars down: fade to dark so the vote colours read clearly over the photos */}
+        <div
+          className="absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#05060f]/80 via-35% to-[#05060f]/95"
+          style={{ top: BAR_TOP }}
+        />
 
-            {/* Rounds Rows (Round 1, Round 2, Round 3, và Round Tie-Break) */}
-            <div className="space-y-1.5 sm:space-y-2">
-              {match?.rounds.map((round) => {
-                const isCurrent = round.roundNumber === match.currentRound;
-                const isTieBreak = round.isTieBreak || round.roundNumber > (match.category === 'newbie_1v1' ? 2 : 4);
-                const isRevealed = isRoundOpen(round);
-                const votesCount = Object.keys(round.votes).length;
+        {/* Centre: RED WIN / BLUE WIN, or VS and the round being danced */}
+        {announcedWinner ? (
+          <div
+            key={`win-${announcedWinner}-${announcedRound?.roundNumber}-${match.status}`}
+            className="led-pop absolute left-[560px] right-[560px] top-[140px] flex h-[220px] flex-col items-center justify-center"
+          >
+            <span
+              className={`whitespace-nowrap font-condensed text-[170px] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
+                announcedWinner === 'red'
+                  ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.95)] [-webkit-text-stroke:6px_#dc2626]'
+                  : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.95)] [-webkit-text-stroke:6px_#2563eb]'
+              }`}
+            >
+              {announcedWinner === 'red' ? 'Red' : 'Blue'} win
+            </span>
+            <span
+              className={`mt-3 rounded-full px-6 py-2 font-condensed text-[36px] font-black uppercase leading-none ${
+                announcedWinner === 'red' ? 'bg-red-600' : 'bg-blue-600'
+              }`}
+            >
+              {match.status === 'finished' ? 'Chung cuộc' : roundLabel(announcedRound)}
+            </span>
+          </div>
+        ) : (
+          <div className="absolute left-[760px] right-[760px] top-[170px] flex h-[180px] flex-col items-center justify-center gap-3">
+            <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">
+              VS
+            </span>
+            {currentRound && (
+              <span className="whitespace-nowrap rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
+                {roundLabel(currentRound)}
+              </span>
+            )}
+          </div>
+        )}
 
-                return (
+        {/* Name bars from the screen edges, score at the inner end */}
+        <div key={`rn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${dim('red')} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
+          <NameBar color="red" name={breakerName(match.sideRed)} sub={sideSub(match, match.sideRed)} />
+          <ScoreBox color="red" value={match.roundWinsRed} />
+        </div>
+        <div key={`bn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${dim('blue')} ${isEntranceActive ? 'animate-entrance-right' : ''}`}>
+          <NameBar color="blue" name={breakerName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} />
+          <ScoreBox color="blue" value={match.roundWinsBlue} />
+        </div>
+
+        {/* Judges × rounds */}
+        <div className="absolute inset-x-[50px]" style={{ top: GRID_TOP }}>
+          <div className="grid gap-x-3" style={{ gridTemplateColumns: cols }}>
+            <span />
+            {judges.map((j) => (
+              <span
+                key={j.id}
+                className="truncate rounded-md bg-black/55 px-2 py-1.5 text-center font-condensed text-[26px] font-black uppercase leading-none text-white ring-1 ring-white/10"
+              >
+                {j.judgeName || judgeShortName(j.name, j.code)}
+              </span>
+            ))}
+          </div>
+
+          <div className="mt-3 space-y-3">
+            {match.rounds.map((round) => {
+              const isTieBreak = isTieBreakRound(round);
+              const isCurrent = round.roundNumber === match.currentRound && match.status !== 'finished';
+              const isRevealed = isRoundOpen(round);
+              const revealAt = revealStartTimes[round.roundNumber];
+              const flipping = isRevealed && revealAt && Date.now() - revealAt < judges.length * 150 + 200;
+              const votes = Object.values(round.votes).filter(Boolean).length;
+              return (
+                <div key={round.roundNumber} className="grid gap-x-3" style={{ gridTemplateColumns: cols, height: rowH }}>
                   <div
-                    key={round.roundNumber}
-                    className={`grid grid-cols-11 gap-1.5 sm:gap-2 items-center p-1.5 sm:p-2 rounded-xl transition-all ${
-                      isTieBreak
-                        ? isCurrent
-                          ? 'bg-amber-950/70 border-2 border-amber-400 shadow-[0_0_25px_rgba(251,191,36,0.4)]'
-                          : 'bg-amber-950/40 border border-amber-500/50'
-                        : isCurrent
-                        ? 'bg-white/15 border-2 border-amber-400/80 shadow-md'
-                        : 'bg-white/5 border border-white/10'
+                    className={`flex flex-col justify-center rounded-xl px-4 ${
+                      isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
                     }`}
                   >
-                    {/* Round Identifier Capsule */}
-                    <div
-                      className={`col-span-2 flex items-center justify-between px-2 py-1 sm:py-1.5 rounded-lg border ${
-                        isTieBreak
-                          ? 'bg-amber-900/80 border-amber-400'
-                          : 'bg-black/60 border-white/20'
+                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? 'text-[28px] text-amber-300' : 'text-[32px] text-white'}`}>
+                      {roundLabel(round)}
+                    </span>
+                    <span
+                      className={`mt-1 text-[15px] font-black uppercase leading-none tracking-wider ${
+                        isRevealed && !flipping ? (round.winner === 'red' ? 'text-red-400' : 'text-blue-400') : 'text-emerald-300'
                       }`}
                     >
-                      <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
-                        {isTieBreak ? (
-                          <span className="font-mono font-black text-[10px] sm:text-xs text-amber-300 tracking-wider flex items-center gap-1 shrink-0 animate-pulse">
-                            <span>⚡</span>
-                            <span>TIE-BREAK</span>
-                          </span>
-                        ) : (
-                          <span className="font-mono font-black text-xs sm:text-sm text-white tracking-wider shrink-0">
-                            ROUND {round.roundNumber}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Status / Reveal Indicator (Pure Broadcast Badge) */}
-                      <div className="flex items-center gap-1">
-                        {isRevealed ? (
-                          revealStartTimes[round.roundNumber] &&
-                          Date.now() - revealStartTimes[round.roundNumber] < 9 * 150 + 200 ? (
-                            <span className="text-[9px] sm:text-[10px] font-black px-2 py-0.5 rounded uppercase font-mono shadow-md bg-amber-400 text-black animate-pulse flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-black animate-ping" />
-                              <span>ĐANG LẬT PHIẾU...</span>
-                            </span>
-                          ) : (
-                            <span
-                              className={`text-[9px] sm:text-[10px] font-black px-1.5 sm:px-2 py-0.5 rounded uppercase font-mono shadow-xs animate-in fade-in zoom-in-95 duration-200 ${
-                                round.winner === 'red'
-                                  ? 'bg-red-600 text-white shadow-[0_0_12px_rgba(239,68,68,0.7)]'
-                                  : 'bg-blue-600 text-white shadow-[0_0_12px_rgba(59,130,246,0.7)]'
-                              }`}
-                            >
-                              {round.winner === 'red' ? 'ĐỎ THẮNG' : 'XANH THẮNG'}
-                            </span>
-                          )
-                        ) : (
-                          <span className="text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-600/70 flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            <span>{votesCount}/9 ĐÃ CHẤM</span>
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* 9 Judges Rounded Capsule Vote Pills (Lật từng ô theo hiệu ứng 3D khi công bố) */}
-                    {judges.map((j, idx) => (
-                      <JudgeBallotCard
-                        key={j.id}
-                        judgeCode={j.code}
-                        judgeIndex={idx}
-                        vote={round.votes[j.id]}
-                        isRevealed={isRevealed}
-                        revealStartTime={revealStartTimes[round.roundNumber]}
-                      />
-                    ))}
+                      {isRevealed ? (flipping ? 'Đang lật phiếu…' : round.winner === 'red' ? 'Đỏ thắng' : 'Xanh thắng') : `${votes}/${judges.length} đã chấm`}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-
-            {/* Stage LED Status Bar (Pure Broadcast Display - No Interactive Buttons) */}
-            {(() => {
-              const hasTieBreakRound = match?.rounds.some((r) => r.isTieBreak);
-              const isMatchTied =
-                match &&
-                match.roundWinsRed === 1 &&
-                match.roundWinsBlue === 1 &&
-                match.rounds.filter((r) => !r.isTieBreak).every((r) => r.isConfirmed || r.isRevealed);
-              const isMatchFinished = match?.status === 'finished';
-
-              return (
-                <div className="mt-2.5 pt-2 border-t border-white/10 flex flex-col items-center gap-2">
-                  <div className="flex flex-wrap items-center justify-center gap-2">
-                    {isMatchFinished ? (
-                      <div className="px-5 py-1 rounded-full bg-emerald-500/20 border-2 border-emerald-400 text-emerald-300 font-mono font-black text-xs sm:text-sm tracking-widest uppercase flex items-center gap-2 shadow-md">
-                        <Trophy className="w-4 h-4 text-amber-300" />
-                        <span>
-                          CHUNG CUỘC: {match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name} CHIẾN THẮNG ({match.roundWinsRed} - {match.roundWinsBlue}){hasTieBreakRound ? ' · THẮNG TIE-BREAK' : ''}!
-                        </span>
-                      </div>
-                    ) : hasTieBreakRound ? (
-                      <div className="px-4 py-1 rounded-full bg-amber-500/25 border-2 border-amber-400 text-amber-300 font-mono font-black text-xs sm:text-sm tracking-widest uppercase shadow-md flex items-center gap-2 animate-pulse">
-                        <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-                        <span>HÒA 1 - 1 · ROUND TIE-BREAK (HIỆP PHỤ) PHÂN ĐỊNH THẮNG THUA</span>
-                      </div>
-                    ) : isMatchTied ? (
-                      <div className="px-4 py-1 rounded-full bg-amber-500/25 border-2 border-amber-400 text-amber-300 font-mono font-black text-xs sm:text-sm tracking-widest uppercase shadow-md flex items-center gap-2 animate-pulse">
-                        <Zap className="w-4 h-4 text-amber-300 fill-amber-300" />
-                        <span>HÒA 1 - 1 ROUNDS · BẮT ĐẦU ROUND TIE-BREAK (HIỆP PHỤ)</span>
-                      </div>
-                    ) : (
-                      <div className="px-4 py-0.5 rounded-full bg-white/15 border border-white/30 text-white font-mono font-black text-[11px] sm:text-xs tracking-widest uppercase shadow-sm">
-                        THỂ THỨC 2 ROUNDS · HÒA 1-1 ĐẤU 1 ROUND TIE-BREAK (ĐỎ HOẶC XANH THẮNG)
-                      </div>
-                    )}
-                  </div>
+                  {judges.map((j, idx) => (
+                    <JudgeBallotCard
+                      key={j.id}
+                      judgeCode={j.code}
+                      judgeIndex={idx}
+                      vote={round.votes[j.id]}
+                      isRevealed={isRevealed}
+                      revealStartTime={revealAt}
+                    />
+                  ))}
                 </div>
               );
-            })()}
+            })}
           </div>
         </div>
-      </div>
 
-      {/* =========================================================================
-          BOTTOM FOOTER: BROADCAST & TOURNAMENT CREDITS (HIPHOP XỨ TRÀ 2026)
-          ========================================================================= */}
-      <div className="relative z-20 flex items-center justify-between text-[11px] sm:text-xs text-sky-200/80 pt-2 border-t border-white/15 mt-1 font-mono shrink-0">
-        <div className="tracking-widest uppercase flex items-center gap-2">
-          <span className="font-bold text-white">BORNAN SPORTS TECHNOLOGY</span>
-          <span>·</span>
-          <span>WDSF 9-JUDGE MATRIX</span>
+        {/* Format / result tag */}
+        <div className="absolute inset-x-0 bottom-[16px] flex justify-center">
+          <span
+            className={`rounded-lg px-5 py-1.5 font-condensed text-[26px] font-black uppercase leading-none tracking-wider ${
+              match.status === 'finished'
+                ? 'bg-emerald-500 text-zinc-950'
+                : hasTieBreakRound || isMatchTied
+                  ? 'bg-amber-400 text-zinc-950'
+                  : 'bg-black/60 text-white/85 ring-1 ring-white/15'
+            }`}
+          >
+            {statusText}
+          </span>
         </div>
-        <div className="uppercase tracking-wider font-bold text-white">
-          HIPHOP XỨ TRÀ 2026 · THÁI NGUYÊN
-        </div>
+
+        <AutomatedVictoryDisplay match={match} />
       </div>
-
-      {/* Automated Olympic Breaking Victory Display Overlay (Controlled automatically from Operator Console) */}
-      {match && <AutomatedVictoryDisplay match={match} />}
-
-      {/* Audio Settings Modal */}
-      <AudioSettingsModal
-        isOpen={isAudioModalOpen}
-        onClose={() => setIsAudioModalOpen(false)}
-      />
     </div>
   );
 };
+
+/** Name bar from the screen edge to near the centre; the score box sits on its inner end. */
+const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string }> = ({ color, name, sub }) => (
+  <div
+    className={`absolute flex h-[118px] flex-col justify-center gap-1.5 ${
+      color === 'red'
+        ? 'left-0 w-[880px] items-start rounded-r-2xl bg-gradient-to-r from-red-700/95 via-red-600/95 to-red-500/90 pl-[60px] pr-[190px] shadow-[0_10px_50px_rgba(239,68,68,0.45)]'
+        : 'right-0 w-[880px] items-end rounded-l-2xl bg-gradient-to-l from-blue-700/95 via-blue-600/95 to-blue-500/90 pl-[190px] pr-[60px] text-right shadow-[0_10px_50px_rgba(59,130,246,0.45)]'
+    }`}
+    style={{ top: BAR_TOP }}
+  >
+    <span className={`max-w-full truncate font-condensed font-black uppercase leading-[0.9] drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)] ${nameSize(name)}`}>
+      {name}
+    </span>
+    {sub && <span className="max-w-full truncate text-[22px] font-bold uppercase leading-none text-white/85">{sub}</span>}
+  </div>
+);
+
+/** Rounds won, overlapping the top of the name bar's inner end (as on the WDSF broadcast). */
+const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number }> = ({ color, value }) => (
+  <div
+    className={`absolute flex h-[160px] w-[160px] items-center justify-center rounded-2xl font-condensed text-[130px] font-black leading-none tabular-nums ${
+      color === 'red'
+        ? 'left-[730px] bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_50px_rgba(239,68,68,0.65)] ring-4 ring-red-300/60'
+        : 'right-[730px] bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_50px_rgba(59,130,246,0.65)] ring-4 ring-blue-300/60'
+    }`}
+    style={{ top: BAR_TOP - 110 }}
+  >
+    {value}
+  </div>
+);
