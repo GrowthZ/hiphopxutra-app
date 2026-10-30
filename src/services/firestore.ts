@@ -152,13 +152,16 @@ export interface WalkInDancer {
  * Registers a dancer at the desk (check-in staff or admin). The id is random so two desks never collide,
  * and its letter prefix keeps `bun run db dancer:import` numbering (newbie-001...) unaffected.
  */
+/** Stage name as stored: "bboy  kenz - x" -> "BBOY KENZ-X". */
+export const walkInName = (name: string) => name.replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
+
 export async function registerWalkIn(category: CategoryType, dancer: WalkInDancer): Promise<string> {
   const id = `${category === 'newbie_1v1' ? 'newbie' : 'pro'}-w${crypto.randomUUID().slice(0, 8)}`;
-  const name = dancer.name.replace(/s*-s*/g, '-').replace(/s+/g, ' ').trim().toUpperCase();
+  const name = walkInName(dancer.name);
   await setDoc(eventDoc(dancersCollectionOf(category), id), {
     sbd: '',
     name,
-    gender: /^BGIRL/.test(name) ? 'female' : 'male',
+    gender: /^BGIRL\b/.test(name) ? 'female' : 'male',
     category,
     prelimScores: {},
     ...(dancer.realName?.trim() ? { realName: dancer.realName.trim() } : {}),

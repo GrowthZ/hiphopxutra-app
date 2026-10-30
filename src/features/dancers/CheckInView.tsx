@@ -1,7 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { Search, UserCheck, Undo2, Loader2, X, CheckCircle2, UserPlus } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Search, UserCheck, Undo2, Loader2, X, CheckCircle2, UserPlus, AlertCircle } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
-import { checkInDancer, undoCheckIn, isIssuedSbd, registerWalkIn } from '../../services/firestore';
+import { checkInDancer, undoCheckIn, isIssuedSbd, registerWalkIn, walkInName } from '../../services/firestore';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
 import { CategoryType, Dancer } from '../../domain/types';
 
@@ -17,6 +17,10 @@ const finePointer = typeof window !== 'undefined' && window.matchMedia('(pointer
 
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
+// Success toasts stay long enough to copy the SBD onto the bib; errors stay until closed.
+const TOAST_MS = 8000;
+type Toast = { key: number; kind: 'ok' | 'error'; title: string; sbd?: string };
+
 /** desk: the check-in staff app. The title lives in its app bar and the filters stick under it on phones. */
 export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   const { newbieDancers, proDancers, storageConfig, prelimPanels } = useTournament();
@@ -24,11 +28,31 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   const [status, setStatus] = useState<StatusFilter>('pending');
   const [query, setQuery] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [lastIssued, setLastIssued] = useState<{ id: string; name: string; sbd: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   const [walkInOpen, setWalkInOpen] = useState(false);
   const [walkIn, setWalkIn] = useState({ name: '', realName: '', crew: '', category: 'newbie_1v1' as WalkInCategory, checkIn: true });
   const [walkInBusy, setWalkInBusy] = useState(false);
+  const [walkInError, setWalkInError] = useState<string | null>(null);
+  // Walk-ins registered at this desk, newest first: pinned to the top of the list whatever the filters.
+  const [recent, setRecent] = useState<{ id: string; at: number }[]>([]);
+
+  // Toasts, newest on top.
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastKey = useRef(0);
+  const dismiss = (key: number) => setToasts((list) => list.filter((t) => t.key !== key));
+  const notify = (toast: Omit<Toast, 'key'>) => {
+    const key = ++toastKey.current;
+    setToasts((list) => [{ ...toast, key }, ...list].slice(0, 4));
+    if (toast.kind === 'ok') setTimeout(() => dismiss(key), TOAST_MS);
+  };
+  const setError = (title: string) => notify({ kind: 'error', title });
+
+  useEffect(() => {
+    if (!walkInOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && !walkInBusy && setWalkInOpen(false);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [walkInOpen, walkInBusy]);
 
   const listOf = (cat: CategoryType) => (cat === 'newbie_1v1' ? newbieDancers : proDancers);
   const dancers = listOf(category);
@@ -49,14 +73,28 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
     return [...groups.entries()].sort((a, b) => a[1].label.localeCompare(b[1].label, 'vi'));
   }, [newbieDancers, proDancers]);
 
+  // Recent walk-ins of this category (once synced back), unless a search is on.
+  const pinned = useMemo(
+    () =>
+      query.trim()
+        ? []
+        : recent.flatMap(({ id, at }) => {
+            const d = dancers.find((x) => x.id === id);
+            return d ? [{ dancer: d, at }] : [];
+          }),
+    [recent, dancers, query]
+  );
+
   const visible = useMemo(() => {
     const q = normalize(query);
+    const pinnedIds = new Set(pinned.map((p) => p.dancer.id));
     return dancers
+      .filter((d) => !pinnedIds.has(d.id))
       .filter((d) => (status === 'pending' ? !d.checkedInAt : status === 'done' ? Boolean(d.checkedInAt) : true))
       .filter((d) => !crew || normalize(d.crew) === crew)
       .filter((d) => !q || [d.name, d.realName, d.checkedInAt ? d.sbd : ''].some((f) => normalize(f).includes(q)))
       .sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-  }, [dancers, status, query, crew]);
+  }, [dancers, status, query, crew, pinned]);
 
   // Check-in hands out the SBD and the prelim panel (A / B by the number's parity) together.
   const issueSbd = async (cat: CategoryType, dancerId: string) => {
@@ -72,29 +110,39 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
     const key = normalize(walkIn.name).replace(/\s+/g, ' ');
     const duplicate = cats.find((cat) => listOf(cat).some((d) => normalize(d.name) === key));
     if (duplicate) {
-      setError(`${walkIn.name.toUpperCase()} đã có trong danh sách ${duplicate === 'newbie_1v1' ? 'Newbie' : 'Pro'}: tìm tên để check-in.`);
+      // Already on the list: close the form and show the existing entry instead.
+      setError(`${walkInName(walkIn.name)} đã có trong danh sách ${duplicate === 'newbie_1v1' ? 'Newbie' : 'Pro'}: tìm tên để check-in.`);
       setCategory(duplicate);
       setStatus('all');
       setQuery(walkIn.name);
+      setWalkInOpen(false);
       return;
     }
     setWalkInBusy(true);
-    setError(null);
+    setWalkInError(null);
     try {
       const sbds: string[] = [];
-      let firstId = '';
+      const ids: string[] = [];
       for (const cat of cats) {
         const id = await registerWalkIn(cat, walkIn);
-        firstId ||= id;
+        ids.push(id);
         if (walkIn.checkIn) sbds.push(await issueSbd(cat, id));
       }
-      const name = walkIn.name.trim().toUpperCase();
-      setLastIssued(sbds.length ? { id: firstId, name, sbd: sbds.join(' · ') } : null);
-      if (!sbds.length) setQuery(name);
+      const name = walkInName(walkIn.name);
+      const at = Date.now();
+      setRecent((list) => [...ids.map((id) => ({ id, at })), ...list]);
+      setCategory(cats[0]);
+      setQuery('');
+      setHighlightId(ids[0]);
+      notify(
+        sbds.length
+          ? { kind: 'ok', title: `Đã check-in ${name}`, sbd: sbds.join(' · ') }
+          : { kind: 'ok', title: `Đã đăng ký ${name}`, sbd: 'Chưa cấp SBD' }
+      );
       setWalkIn((w) => ({ ...w, name: '', realName: '', crew: '' }));
       setWalkInOpen(false);
     } catch (err) {
-      setError(`Không đăng ký được: ${err instanceof Error ? err.message : String(err)}`);
+      setWalkInError(`Không đăng ký được: ${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setWalkInBusy(false);
     }
@@ -102,10 +150,10 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
 
   const handleCheckIn = async (dancer: Dancer) => {
     setBusyId(dancer.id);
-    setError(null);
     try {
       const sbd = await issueSbd(category, dancer.id);
-      setLastIssued({ id: dancer.id, name: dancer.name, sbd });
+      setHighlightId(dancer.id);
+      notify({ kind: 'ok', title: `Đã check-in ${dancer.name}`, sbd });
       setQuery('');
     } catch (e) {
       setError(`Không check-in được ${dancer.name}: ${e instanceof Error ? e.message : String(e)}`);
@@ -116,10 +164,9 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
 
   const handleUndo = async (dancer: Dancer) => {
     setBusyId(dancer.id);
-    setError(null);
     try {
       await undoCheckIn(category, dancer.id);
-      if (lastIssued?.id === dancer.id) setLastIssued(null);
+      if (highlightId === dancer.id) setHighlightId(null);
     } catch (e) {
       setError(`Không huỷ được check-in: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -134,11 +181,7 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   };
 
   return (
-    <div
-      className={`mx-auto max-w-5xl space-y-4 px-4 py-4 sm:space-y-5 sm:p-6 ${
-        lastIssued || error ? 'pb-40 sm:pb-6' : 'pb-[max(1.5rem,env(safe-area-inset-bottom))]'
-      }`}
-    >
+    <div className="mx-auto max-w-5xl space-y-4 px-4 py-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:space-y-5 sm:p-6">
       {/* Header: the desk app has its title in the app bar */}
       <div className={`flex items-end justify-between gap-3 ${desk ? '' : 'border-b border-zinc-200 pb-3 sm:pb-4'}`}>
         {!desk && (
@@ -152,8 +195,11 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
           </div>
         )}
         <button
-          onClick={() => setWalkInOpen((o) => !o)}
-          aria-expanded={walkInOpen}
+          onClick={() => {
+            setWalkInError(null);
+            setWalkInOpen(true);
+          }}
+          aria-haspopup="dialog"
           className={`flex items-center justify-center gap-1.5 rounded-xl bg-amber-500 px-4 py-3 sm:py-2.5 text-sm sm:text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900 ${
             desk ? 'w-full sm:ml-auto sm:w-auto' : ''
           }`}
@@ -163,115 +209,152 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
         </button>
       </div>
 
-      {walkInOpen && (
-        <form onSubmit={handleWalkIn} className="rounded-2xl border border-amber-300 bg-amber-50/50 p-3 sm:p-4 space-y-3">
-          <h2 className="text-sm font-black uppercase text-zinc-900">Đăng ký thí sinh tại chỗ</h2>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {(
-              [
-                ['name', 'Tên thi đấu *', 'vd. Bboy Kenz'],
-                ['realName', 'Họ và tên', 'không bắt buộc'],
-                ['crew', 'CLB / Đội', 'không bắt buộc'],
-              ] as const
-            ).map(([key, label, placeholder]) => (
-              <label key={key} className="block space-y-1">
-                <span className="text-xs font-bold text-zinc-600">{label}</span>
-                <input
-                  value={walkIn[key]}
-                  onChange={(e) => setWalkIn((w) => ({ ...w, [key]: e.target.value }))}
-                  placeholder={placeholder}
-                  required={key === 'name'}
-                  maxLength={60}
-                  autoFocus={key === 'name'}
-                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
-                />
-              </label>
-            ))}
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex w-full rounded-xl border border-zinc-200 bg-white p-0.5 sm:w-auto" role="radiogroup" aria-label="Hạng mục đăng ký">
-              {(
-                [
-                  ['newbie_1v1', 'Newbie'],
-                  ['pro_2v2', 'Pro'],
-                  ['both', 'Cả 2'],
-                ] as const
-              ).map(([id, label]) => (
-                <button
-                  key={id}
-                  type="button"
-                  role="radio"
-                  aria-checked={walkIn.category === id}
-                  onClick={() => setWalkIn((w) => ({ ...w, category: id }))}
-                  className={`flex-1 rounded-lg px-3 py-2.5 sm:py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
-                    walkIn.category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+      {/* Toasts: top of the screen, newest first */}
+      <div
+        aria-live="polite"
+        className={`pointer-events-none fixed inset-x-3 z-40 flex flex-col gap-2 sm:left-auto sm:right-4 sm:w-96 ${
+          desk ? 'top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)]' : 'top-20'
+        }`}
+      >
+        {toasts.map((t) => (
+          <div
+            key={t.key}
+            role={t.kind === 'error' ? 'alert' : undefined}
+            className={`pointer-events-auto flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-lg ${
+              t.kind === 'ok' ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50'
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              {t.kind === 'ok' ? (
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-red-600 shrink-0" />
+              )}
+              <div className="min-w-0">
+                <p className={`text-xs font-bold ${t.kind === 'ok' ? 'truncate text-emerald-800' : 'text-red-700'}`}>{t.title}</p>
+                {t.sbd && <p className="font-condensed font-black text-3xl leading-none text-zinc-900 tabular-nums">{t.sbd}</p>}
+              </div>
             </div>
-            <label className="flex items-center gap-2 py-1 text-sm sm:text-xs font-bold text-zinc-700 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={walkIn.checkIn}
-                onChange={(e) => setWalkIn((w) => ({ ...w, checkIn: e.target.checked }))}
-                className="w-5 h-5 sm:w-4 sm:h-4 accent-zinc-900"
-              />
-              Check-in và cấp SBD luôn
-            </label>
-            <div className="flex w-full gap-2 sm:w-auto sm:ml-auto">
+            <button
+              onClick={() => dismiss(t.key)}
+              aria-label="Đóng thông báo"
+              className={`shrink-0 rounded p-2 cursor-pointer focus-visible:outline-2 ${
+                t.kind === 'ok' ? 'text-emerald-700 hover:bg-emerald-100 focus-visible:outline-emerald-600' : 'text-red-700 hover:bg-red-100 focus-visible:outline-red-600'
+              }`}
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Walk-in registration: bottom sheet on phones, dialog on larger screens */}
+      {walkInOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 sm:items-center sm:p-4"
+          onClick={() => !walkInBusy && setWalkInOpen(false)}
+        >
+          <form
+            onSubmit={handleWalkIn}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="walk-in-title"
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-lg space-y-4 rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-3xl"
+          >
+            <div className="flex items-center justify-between">
+              <h2 id="walk-in-title" className="font-condensed text-2xl font-black uppercase text-zinc-900">
+                Đăng ký tại chỗ
+              </h2>
               <button
                 type="button"
                 onClick={() => setWalkInOpen(false)}
-                className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
+                disabled={walkInBusy}
+                aria-label="Đóng"
+                className="-m-1 rounded-full p-2 text-zinc-400 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="grid gap-3">
+              {(
+                [
+                  ['name', 'Tên thi đấu *', 'vd. Bboy Kenz'],
+                  ['realName', 'Họ và tên', 'không bắt buộc'],
+                  ['crew', 'CLB / Đội', 'không bắt buộc'],
+                ] as const
+              ).map(([key, label, placeholder]) => (
+                <label key={key} className="block space-y-1">
+                  <span className="text-xs font-bold text-zinc-600">{label}</span>
+                  <input
+                    value={walkIn[key]}
+                    onChange={(e) => setWalkIn((w) => ({ ...w, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    required={key === 'name'}
+                    maxLength={60}
+                    autoFocus={key === 'name'}
+                    className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="space-y-3">
+              <div className="flex w-full rounded-xl border border-zinc-200 bg-white p-0.5" role="radiogroup" aria-label="Hạng mục đăng ký">
+                {(
+                  [
+                    ['newbie_1v1', 'Newbie'],
+                    ['pro_2v2', 'Pro'],
+                    ['both', 'Cả 2'],
+                  ] as const
+                ).map(([id, label]) => (
+                  <button
+                    key={id}
+                    type="button"
+                    role="radio"
+                    aria-checked={walkIn.category === id}
+                    onClick={() => setWalkIn((w) => ({ ...w, category: id }))}
+                    className={`flex-1 rounded-lg px-3 py-2.5 text-sm font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                      walkIn.category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <label className="flex items-center gap-2 py-1 text-sm sm:text-xs font-bold text-zinc-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={walkIn.checkIn}
+                  onChange={(e) => setWalkIn((w) => ({ ...w, checkIn: e.target.checked }))}
+                  className="w-5 h-5 sm:w-4 sm:h-4 accent-zinc-900"
+                />
+                Check-in và cấp SBD luôn
+              </label>
+            </div>
+            {walkInError && (
+              <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+                {walkInError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setWalkInOpen(false)}
+                disabled={walkInBusy}
+                className="flex-1 rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
               >
                 Huỷ
               </button>
               <button
                 type="submit"
                 disabled={walkInBusy}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-2.5 sm:py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
+                className="flex flex-[2] items-center justify-center gap-1.5 rounded-xl bg-zinc-900 px-4 py-3 text-sm font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
               >
-                {walkInBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+                {walkInBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                 Đăng ký
               </button>
             </div>
-          </div>
-        </form>
-      )}
-
-      {/* Last issued SBD + errors: pinned to the bottom on phones so they stay in view while scrolling */}
-      {(lastIssued || error) && (
-        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 space-y-2 sm:static sm:space-y-5">
-          {/* Last issued SBD: big enough to copy onto the bib */}
-          {lastIssued && (
-            <div
-              aria-live="polite"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 shadow-lg sm:shadow-none"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-emerald-800">Đã check-in {lastIssued.name}</p>
-                  <p className="font-condensed font-black text-3xl sm:text-4xl leading-none text-zinc-900 tabular-nums">{lastIssued.sbd}</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setLastIssued(null)}
-                aria-label="Đóng thông báo"
-                className="p-3 sm:p-2 rounded text-emerald-700 hover:bg-emerald-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
-
-          {error && (
-            <p role="alert" className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-lg sm:shadow-none">
-              {error}
-            </p>
-          )}
+          </form>
         </div>
       )}
 
@@ -360,81 +443,91 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
 
       {/* List */}
       <ul className="divide-y divide-zinc-100 overflow-hidden rounded-2xl border border-zinc-200 bg-white">
-        {visible.length === 0 && (
+        {visible.length + pinned.length === 0 && (
           <li className="px-4 py-10 text-center text-sm text-zinc-500">
             {query ? `Không có thí sinh nào khớp “${query}”.` : 'Không có thí sinh nào trong danh sách này.'}
           </li>
         )}
-        {visible.map((d) => {
+        {[...pinned, ...visible.map((dancer) => ({ dancer, at: 0 }))].map(({ dancer: d, at }, i) => {
           const busy = busyId === d.id;
           const hasNumber = isIssuedSbd(category, d.sbd);
           return (
-            <li
-              key={d.id}
-              className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 ${lastIssued?.id === d.id ? 'bg-emerald-50' : ''}`}
-            >
-              {/* Phones: no avatar, the name needs the width */}
-              <img loading="lazy" decoding="async"
-                src={getDancerAvatarUrl(d, storageConfig.placeholders)}
-                alt=""
-                className="hidden sm:block w-11 h-11 rounded-full object-cover bg-zinc-100 shrink-0"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="font-condensed font-black text-lg uppercase leading-tight text-zinc-900 truncate">{d.name}</p>
-                <p className="text-xs text-zinc-500 truncate">
-                  {[d.realName, d.crew, d.gender === 'female' ? 'Nữ' : 'Nam'].filter(Boolean).join(' · ')}
-                </p>
-              </div>
-
-              <div className="w-16 sm:w-20 text-center shrink-0">
-                {d.checkedInAt ? (
-                  <>
-                    <span className="block font-condensed font-black text-2xl leading-none text-zinc-900 tabular-nums">{d.sbd}</span>
-                    {d.panel && (
-                      <span
-                        className={`mt-0.5 inline-block rounded px-1.5 text-[11px] font-black ${
-                          d.panel === 'A' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
-                        }`}
+            <React.Fragment key={d.id}>
+              {i === 0 && at > 0 && (
+                <li className="bg-amber-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-800">Mới đăng ký tại chỗ</li>
+              )}
+              {i === pinned.length && i > 0 && (
+                <li className="bg-zinc-50 px-4 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-400">Danh sách</li>
+              )}
+              <li
+                className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 ${
+                  highlightId === d.id ? 'bg-emerald-50' : at > 0 ? 'bg-amber-50/40' : ''
+                }`}
+              >
+                {/* Phones: no avatar, the name needs the width */}
+                <img loading="lazy" decoding="async"
+                  src={getDancerAvatarUrl(d, storageConfig.placeholders)}
+                  alt=""
+                  className="hidden sm:block w-11 h-11 rounded-full object-cover bg-zinc-100 shrink-0"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="font-condensed font-black text-lg uppercase leading-tight text-zinc-900 truncate">{d.name}</p>
+                  <p className="text-xs text-zinc-500 truncate">
+                    {at > 0 && <span className="font-bold text-amber-700">Đăng ký {formatTime(at)} · </span>}
+                    {[d.realName, d.crew, d.gender === 'female' ? 'Nữ' : 'Nam'].filter(Boolean).join(' · ')}
+                  </p>
+                </div>
+  
+                <div className="w-16 sm:w-20 text-center shrink-0">
+                  {d.checkedInAt ? (
+                    <>
+                      <span className="block font-condensed font-black text-2xl leading-none text-zinc-900 tabular-nums">{d.sbd}</span>
+                      {d.panel && (
+                        <span
+                          className={`mt-0.5 inline-block rounded px-1.5 text-[11px] font-black ${
+                            d.panel === 'A' ? 'bg-amber-100 text-amber-800' : 'bg-sky-100 text-sky-800'
+                          }`}
+                        >
+                          Bảng {d.panel}
+                        </span>
+                      )}
+                    </>
+                  ) : hasNumber ? (
+                    <span className="text-[11px] font-bold text-zinc-400" title="Đã huỷ check-in, check-in lại sẽ dùng lại số này">
+                      giữ số {d.sbd}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-bold text-zinc-400">Chưa có SBD</span>
+                  )}
+                </div>
+  
+                <div className="flex justify-end shrink-0 sm:w-32">
+                  {d.checkedInAt ? (
+                    <div className="flex items-center gap-1 sm:gap-2">
+                      <span className="text-[11px] font-bold text-emerald-700 tabular-nums">✓ {formatTime(d.checkedInAt)}</span>
+                      <button
+                        onClick={() => handleUndo(d)}
+                        disabled={busy}
+                        aria-label={`Huỷ check-in ${d.name}`}
+                        title="Huỷ check-in"
+                        className="p-3 sm:p-2 rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
                       >
-                        Bảng {d.panel}
-                      </span>
-                    )}
-                  </>
-                ) : hasNumber ? (
-                  <span className="text-[11px] font-bold text-zinc-400" title="Đã huỷ check-in, check-in lại sẽ dùng lại số này">
-                    giữ số {d.sbd}
-                  </span>
-                ) : (
-                  <span className="text-[11px] font-bold text-zinc-400">Chưa có SBD</span>
-                )}
-              </div>
-
-              <div className="flex justify-end shrink-0 sm:w-32">
-                {d.checkedInAt ? (
-                  <div className="flex items-center gap-1 sm:gap-2">
-                    <span className="text-[11px] font-bold text-emerald-700 tabular-nums">✓ {formatTime(d.checkedInAt)}</span>
+                        {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={() => handleUndo(d)}
+                      onClick={() => handleCheckIn(d)}
                       disabled={busy}
-                      aria-label={`Huỷ check-in ${d.name}`}
-                      title="Huỷ check-in"
-                      className="p-3 sm:p-2 rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+                      className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 sm:px-4 py-3 sm:py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
                     >
-                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
+                      {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+                      Check-in
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleCheckIn(d)}
-                    disabled={busy}
-                    className="flex items-center gap-1.5 rounded-full bg-amber-500 px-3 sm:px-4 py-3 sm:py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
-                  >
-                    {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
-                    Check-in
-                  </button>
-                )}
-              </div>
-            </li>
+                  )}
+                </div>
+              </li>
+            </React.Fragment>
           );
         })}
       </ul>

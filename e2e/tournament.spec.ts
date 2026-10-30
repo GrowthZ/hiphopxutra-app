@@ -202,5 +202,20 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
   // Check-in also puts the dancer in a prelim panel: A for odd numbers, B for even (default).
   expect(snap.docs[0].get('panel')).toBe(Number(snap.docs[0].get('sbd').slice(1)) % 2 === 1 ? 'A' : 'B');
   await expect(desk.getByText(/Bảng [AB]/).first()).toBeVisible();
+
+  // Both categories, no number yet: the name is tidied (lower-case "s" kept), BGIRL is a girl, pinned at the top.
+  await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
+  await desk.getByLabel('Tên thi đấu *').fill('bgirl  sass - y');
+  await desk.getByRole('radio', { name: 'Cả 2' }).click();
+  await desk.getByLabel('Check-in và cấp SBD luôn').uncheck();
+  await desk.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+  await expect(desk.getByText('Đã đăng ký BGIRL SASS-Y')).toBeVisible();
+  await expect(desk.getByRole('dialog')).toBeHidden();
+  await expect(desk.getByText('Mới đăng ký tại chỗ')).toBeVisible();
+  for (const col of ['newbieDancers', 'proDancers']) {
+    const girl = await event.collection(col).where('name', '==', 'BGIRL SASS-Y').get();
+    expect(girl.size).toBe(1);
+    expect(girl.docs[0].get('gender')).toBe('female');
+  }
   await context.close();
 });
