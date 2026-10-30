@@ -13,23 +13,23 @@ export const CheckInDesk: React.FC = () => {
 
   return (
     <div className="min-h-[100dvh] bg-zinc-100">
-      <header className="sticky top-0 z-40 bg-white border-b border-zinc-200 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-3">
+      <header className="bg-white border-b border-zinc-200 px-4 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-9 w-auto" />
           <span className="text-[11px] font-bold uppercase tracking-wider text-red-600">Bàn check-in</span>
         </div>
         <div className="flex items-center gap-3 text-xs">
-          <span className="hidden sm:inline font-bold text-zinc-600">{usernameOf(email) ?? email}</span>
+          <span className="max-w-28 truncate font-bold text-zinc-600 sm:max-w-none">{usernameOf(email) ?? email}</span>
           <button
             onClick={() => signOut(auth)}
-            className="flex items-center gap-1.5 font-bold text-zinc-600 hover:text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            className="flex items-center gap-1.5 py-2 font-bold text-zinc-600 hover:text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
           >
             <LogOut className="w-3.5 h-3.5" />
             Đăng xuất
           </button>
         </div>
       </header>
-      <CheckInView />
+      <CheckInView stickySearch />
     </div>
   );
 };

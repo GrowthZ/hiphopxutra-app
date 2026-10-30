@@ -12,9 +12,13 @@ type WalkInCategory = CategoryType | 'both';
 const normalize = (s = '') =>
   s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase().trim();
 
+// Phones: no autofocus (it would pop the keyboard over the list). Inputs are 16px there, or iOS zooms in.
+const finePointer = typeof window !== 'undefined' && window.matchMedia('(pointer: fine)').matches;
+
 const formatTime = (ts: number) => new Date(ts).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
 
-export const CheckInView: React.FC = () => {
+/** stickySearch: pin the search bar on phones (the check-in desk, where the page itself scrolls). */
+export const CheckInView: React.FC<{ stickySearch?: boolean }> = ({ stickySearch = false }) => {
   const { newbieDancers, proDancers, storageConfig, prelimPanels } = useTournament();
   const [category, setCategory] = useState<CategoryType>('newbie_1v1');
   const [status, setStatus] = useState<StatusFilter>('pending');
@@ -130,9 +134,9 @@ export const CheckInView: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto space-y-5">
+    <div className={`px-3 py-4 sm:p-6 max-w-5xl mx-auto space-y-4 sm:space-y-5 ${lastIssued || error ? 'pb-40 sm:pb-6' : ''}`}>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-zinc-200 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 border-b border-zinc-200 pb-3 sm:pb-4">
         <div>
           <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
             Bàn check-in BTC
@@ -141,8 +145,8 @@ export const CheckInView: React.FC = () => {
             Check-in thí sinh
           </h1>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex gap-3 text-xs font-bold text-zinc-600 tabular-nums">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex gap-3 text-sm sm:text-xs font-bold text-zinc-600 tabular-nums">
             <span>
               Newbie <span className="text-zinc-900">{countDone(newbieDancers)}</span>/{newbieDancers.length}
             </span>
@@ -153,7 +157,7 @@ export const CheckInView: React.FC = () => {
           <button
             onClick={() => setWalkInOpen((o) => !o)}
             aria-expanded={walkInOpen}
-            className="flex items-center gap-1.5 rounded bg-amber-500 px-3 py-2 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
+            className="flex items-center gap-1.5 rounded bg-amber-500 px-3 py-2.5 sm:py-2 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
           >
             <UserPlus className="w-4 h-4" />
             Đăng ký tại chỗ
@@ -162,7 +166,7 @@ export const CheckInView: React.FC = () => {
       </div>
 
       {walkInOpen && (
-        <form onSubmit={handleWalkIn} className="rounded-lg border border-amber-300 bg-amber-50/50 p-4 space-y-3">
+        <form onSubmit={handleWalkIn} className="rounded-lg border border-amber-300 bg-amber-50/50 p-3 sm:p-4 space-y-3">
           <h2 className="text-sm font-black uppercase text-zinc-900">Đăng ký thí sinh tại chỗ</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {(
@@ -172,7 +176,7 @@ export const CheckInView: React.FC = () => {
                 ['crew', 'CLB / Đội', 'không bắt buộc'],
               ] as const
             ).map(([key, label, placeholder]) => (
-              <label key={key} className="space-y-1">
+              <label key={key} className="block space-y-1">
                 <span className="text-xs font-bold text-zinc-600">{label}</span>
                 <input
                   value={walkIn[key]}
@@ -181,13 +185,13 @@ export const CheckInView: React.FC = () => {
                   required={key === 'name'}
                   maxLength={60}
                   autoFocus={key === 'name'}
-                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
+                  className="w-full rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus-visible:outline-2 focus-visible:outline-amber-500"
                 />
               </label>
             ))}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex rounded border border-zinc-300 bg-white p-0.5" role="radiogroup" aria-label="Hạng mục đăng ký">
+            <div className="flex w-full rounded border border-zinc-300 bg-white p-0.5 sm:w-auto" role="radiogroup" aria-label="Hạng mục đăng ký">
               {(
                 [
                   ['newbie_1v1', 'Newbie'],
@@ -201,7 +205,7 @@ export const CheckInView: React.FC = () => {
                   role="radio"
                   aria-checked={walkIn.category === id}
                   onClick={() => setWalkIn((w) => ({ ...w, category: id }))}
-                  className={`rounded px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                  className={`flex-1 rounded px-3 py-2.5 sm:py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
                     walkIn.category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                   }`}
                 >
@@ -209,27 +213,27 @@ export const CheckInView: React.FC = () => {
                 </button>
               ))}
             </div>
-            <label className="flex items-center gap-2 text-xs font-bold text-zinc-700 cursor-pointer">
+            <label className="flex items-center gap-2 py-1 text-sm sm:text-xs font-bold text-zinc-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={walkIn.checkIn}
                 onChange={(e) => setWalkIn((w) => ({ ...w, checkIn: e.target.checked }))}
-                className="w-4 h-4 accent-zinc-900"
+                className="w-5 h-5 sm:w-4 sm:h-4 accent-zinc-900"
               />
               Check-in và cấp SBD luôn
             </label>
-            <div className="flex gap-2 sm:ml-auto">
+            <div className="flex w-full gap-2 sm:w-auto sm:ml-auto">
               <button
                 type="button"
                 onClick={() => setWalkInOpen(false)}
-                className="rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+                className="flex-1 rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
               >
                 Huỷ
               </button>
               <button
                 type="submit"
                 disabled={walkInBusy}
-                className="flex items-center gap-1.5 rounded bg-zinc-900 px-4 py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded bg-zinc-900 px-4 py-2.5 sm:py-2 text-xs font-black uppercase text-white hover:bg-zinc-700 disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none"
               >
                 {walkInBusy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
                 Đăng ký
@@ -239,52 +243,64 @@ export const CheckInView: React.FC = () => {
         </form>
       )}
 
-      {/* Last issued SBD: big enough to copy onto the bib */}
-      {lastIssued && (
-        <div
-          aria-live="polite"
-          className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3"
-        >
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-            <div>
-              <p className="text-xs font-bold text-emerald-800">Đã check-in {lastIssued.name}</p>
-              <p className="font-condensed font-black text-4xl leading-none text-zinc-900 tabular-nums">{lastIssued.sbd}</p>
+      {/* Last issued SBD + errors: pinned to the bottom on phones so they stay in view while scrolling */}
+      {(lastIssued || error) && (
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 space-y-2 sm:static sm:space-y-5">
+          {/* Last issued SBD: big enough to copy onto the bib */}
+          {lastIssued && (
+            <div
+              aria-live="polite"
+              className="flex items-center justify-between gap-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 shadow-lg sm:shadow-none"
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="truncate text-xs font-bold text-emerald-800">Đã check-in {lastIssued.name}</p>
+                  <p className="font-condensed font-black text-3xl sm:text-4xl leading-none text-zinc-900 tabular-nums">{lastIssued.sbd}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setLastIssued(null)}
+                aria-label="Đóng thông báo"
+                className="p-3 sm:p-2 rounded text-emerald-700 hover:bg-emerald-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          </div>
-          <button
-            onClick={() => setLastIssued(null)}
-            aria-label="Đóng thông báo"
-            className="p-2 rounded text-emerald-700 hover:bg-emerald-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-emerald-600"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          )}
+
+          {error && (
+            <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shadow-lg sm:shadow-none">
+              {error}
+            </p>
+          )}
         </div>
       )}
 
-      {error && (
-        <p role="alert" className="rounded border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
-          {error}
-        </p>
-      )}
-
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-3">
+      <div
+        className={`flex flex-col md:flex-row gap-2 sm:gap-3 ${
+          stickySearch
+            ? 'sticky top-0 z-30 -mx-3 bg-zinc-100/95 px-3 pt-[max(0.5rem,env(safe-area-inset-top))] pb-2 backdrop-blur sm:static sm:mx-0 sm:bg-transparent sm:p-0 sm:backdrop-blur-none'
+            : ''
+        }`}
+      >
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="search"
-            autoFocus
+            autoFocus={finePointer}
+            enterKeyHint="go"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={onSearchKeyDown}
             placeholder="Tìm theo tên, tên thật hoặc SBD…"
             aria-label="Tìm thí sinh"
-            className="w-full rounded border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-2 focus:outline-amber-500"
+            className="w-full rounded border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-2 focus:outline-amber-500"
           />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="flex rounded border border-zinc-300 bg-white p-0.5" role="group" aria-label="Hạng mục">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+          <div className="col-span-2 flex rounded border border-zinc-300 bg-white p-0.5" role="group" aria-label="Hạng mục">
             {(
               [
                 ['newbie_1v1', 'Newbie'],
@@ -295,7 +311,7 @@ export const CheckInView: React.FC = () => {
                 key={id}
                 onClick={() => setCategory(id)}
                 aria-pressed={category === id}
-                className={`rounded px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                className={`flex-1 rounded px-3 py-2 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 sm:flex-none ${
                   category === id ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -307,7 +323,7 @@ export const CheckInView: React.FC = () => {
             value={status}
             onChange={(e) => setStatus(e.target.value as StatusFilter)}
             aria-label="Trạng thái check-in"
-            className="rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 cursor-pointer"
+            className="min-w-0 rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-sm sm:text-xs font-bold text-zinc-900 cursor-pointer"
           >
             <option value="pending">Chưa check-in</option>
             <option value="done">Đã check-in</option>
@@ -317,7 +333,7 @@ export const CheckInView: React.FC = () => {
             value={crew}
             onChange={(e) => setCrew(e.target.value)}
             aria-label="Lọc theo CLB / Crew"
-            className="max-w-full rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-900 cursor-pointer sm:max-w-56"
+            className="min-w-0 max-w-full rounded border border-zinc-300 bg-white px-3 py-2.5 sm:py-2 text-sm sm:text-xs font-bold text-zinc-900 cursor-pointer sm:max-w-56"
           >
             <option value="">Tất cả CLB / Crew</option>
             {crews.map(([key, g]) => (
@@ -342,12 +358,13 @@ export const CheckInView: React.FC = () => {
           return (
             <li
               key={d.id}
-              className={`flex items-center gap-3 px-3 sm:px-4 py-3 ${lastIssued?.id === d.id ? 'bg-emerald-50' : ''}`}
+              className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 ${lastIssued?.id === d.id ? 'bg-emerald-50' : ''}`}
             >
+              {/* Phones: no avatar, the name needs the width */}
               <img loading="lazy" decoding="async"
                 src={getDancerAvatarUrl(d, storageConfig.placeholders)}
                 alt=""
-                className="w-11 h-11 rounded-full object-cover bg-zinc-100 shrink-0"
+                className="hidden sm:block w-11 h-11 rounded-full object-cover bg-zinc-100 shrink-0"
               />
               <div className="min-w-0 flex-1">
                 <p className="font-condensed font-black text-lg uppercase leading-tight text-zinc-900 truncate">{d.name}</p>
@@ -356,7 +373,7 @@ export const CheckInView: React.FC = () => {
                 </p>
               </div>
 
-              <div className="w-20 text-center shrink-0">
+              <div className="w-16 sm:w-20 text-center shrink-0">
                 {d.checkedInAt ? (
                   <>
                     <span className="block font-condensed font-black text-2xl leading-none text-zinc-900 tabular-nums">{d.sbd}</span>
@@ -379,16 +396,16 @@ export const CheckInView: React.FC = () => {
                 )}
               </div>
 
-              <div className="w-32 flex justify-end shrink-0">
+              <div className="flex justify-end shrink-0 sm:w-32">
                 {d.checkedInAt ? (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 sm:gap-2">
                     <span className="text-[11px] font-bold text-emerald-700 tabular-nums">✓ {formatTime(d.checkedInAt)}</span>
                     <button
                       onClick={() => handleUndo(d)}
                       disabled={busy}
                       aria-label={`Huỷ check-in ${d.name}`}
                       title="Huỷ check-in"
-                      className="p-2 rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+                      className="p-3 sm:p-2 rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
                     >
                       {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}
                     </button>
@@ -397,7 +414,7 @@ export const CheckInView: React.FC = () => {
                   <button
                     onClick={() => handleCheckIn(d)}
                     disabled={busy}
-                    className="flex items-center gap-1.5 rounded bg-amber-500 px-4 py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
+                    className="flex items-center gap-1.5 rounded bg-amber-500 px-3 sm:px-4 py-3 sm:py-2.5 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-60 transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
                     Check-in
