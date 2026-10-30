@@ -12,14 +12,14 @@ const SIDE_STYLE: Record<Side, { label: string; on: string; off: string; text: s
   red: {
     label: 'Đỏ',
     on: 'border-red-600 bg-red-600 text-white',
-    off: 'border-red-200 bg-white text-zinc-900',
+    off: 'border-red-200 bg-red-50 text-zinc-900',
     text: 'text-red-600',
     button: 'bg-red-600 active:bg-red-700',
   },
   blue: {
     label: 'Xanh',
     on: 'border-blue-600 bg-blue-600 text-white',
-    off: 'border-blue-200 bg-white text-zinc-900',
+    off: 'border-blue-200 bg-blue-50 text-zinc-900',
     text: 'text-blue-600',
     button: 'bg-blue-600 active:bg-blue-700',
   },
@@ -136,8 +136,8 @@ export const BattleScoringPanel: React.FC = () => {
         })}
       </div>
 
-      {/* Two corners fill the screen: tap one to pick it */}
-      <div className="flex flex-col gap-2 flex-1 min-h-0">
+      {/* Two corners side by side, as on stage and the LED: red left, blue right. Tap one to pick it. */}
+      <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
         {(['red', 'blue'] as const).map((s) => {
           const data = s === 'red' ? match.sideRed : match.sideBlue;
           const style = SIDE_STYLE[s];
@@ -151,28 +151,32 @@ export const BattleScoringPanel: React.FC = () => {
               disabled={locked}
               aria-pressed={selected}
               aria-label={`Chọn góc ${style.label.toLowerCase()}: ${sideName(data)}`}
-              className={`relative flex-1 min-h-0 rounded-2xl border-2 px-4 py-3 text-left flex items-center gap-3 cursor-pointer disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 ${
+              className={`relative min-h-0 min-w-0 rounded-2xl border-2 px-2 py-4 text-center flex flex-col items-center justify-center gap-2 cursor-pointer disabled:cursor-default focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 ${
                 selected ? style.on : style.off
               } ${locked && !selected ? 'opacity-50' : ''}`}
             >
+              <p className={`text-sm font-black uppercase tracking-wider ${selected ? 'text-white' : style.text}`}>Góc {style.label}</p>
               {photos.length > 0 && (
-                <div className="flex -space-x-3 shrink-0">
-                  {photos.map((url) => (
-                    <img key={url} src={url} alt="" className="w-14 h-14 rounded-full object-cover border-2 border-white bg-zinc-100" />
+                <div className="flex -space-x-4 shrink-0">
+                  {photos.map((url, i) => (
+                    <img
+                      key={i}
+                      src={url}
+                      alt=""
+                      className={`${photos.length > 1 ? 'w-16 h-16' : 'w-20 h-20'} rounded-full object-cover border-2 border-white bg-zinc-100`}
+                    />
                   ))}
                 </div>
               )}
-              <div className="min-w-0 flex-1">
-                <p className={`text-xs font-black uppercase tracking-wider ${selected ? 'text-white/80' : style.text}`}>
-                  Góc {style.label} {data.sbdText && <span className="font-mono font-bold">· {data.sbdText}</span>}
-                </p>
-                <p className="font-condensed text-[1.75rem] font-black uppercase leading-[1.05] line-clamp-2 break-words">
-                  {sideName(data)}
-                </p>
-                {sub && <p className={`text-xs truncate ${selected ? 'text-white/80' : 'text-zinc-500'}`}>{sub}</p>}
-              </div>
+              <p className="w-full font-condensed text-[1.75rem] font-black uppercase leading-[1.05] line-clamp-3 break-words">
+                {sideName(data)}
+              </p>
+              {data.sbdText && (
+                <p className={`font-mono text-xs font-bold ${selected ? 'text-white/80' : 'text-zinc-500'}`}>{data.sbdText}</p>
+              )}
+              {sub && <p className={`w-full text-xs truncate ${selected ? 'text-white/80' : 'text-zinc-500'}`}>{sub}</p>}
               {selected && (
-                <span className="shrink-0 w-9 h-9 rounded-full bg-white flex items-center justify-center">
+                <span className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white flex items-center justify-center">
                   <Check className={`w-5 h-5 stroke-[3] ${style.text}`} />
                 </span>
               )}
