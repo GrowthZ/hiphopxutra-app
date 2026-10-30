@@ -18,3 +18,6 @@ playwright-report/
 docs/thi-sinh.md
 public/ảnh mẫu/
 public/man-led.jpg
+
+# Local sample photos of real dancers (minors), used by `bun run test:db battle`: never committed
+public/image/

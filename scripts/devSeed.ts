@@ -143,7 +143,26 @@ function category(cat: CategoryType, stage: SeedStage, rnd: () => number, people
   return { dancers: recalculateDancers(dancers, DEFAULT_PANELS), issued: at >= STAGE_INDEX('check-in') ? arrivals.length : 0 };
 }
 
-export function buildSeed(stage: SeedStage): Record<string, Docs> {
+/** A local sample photo (scripts/sample-photos.ts): half-body cut-out + avatar, BBOY or BGIRL. */
+export type SamplePhoto = Pick<Dancer, 'halfBodyUrl' | 'avatarUrl'> & { gender: Dancer['gender'] };
+
+/**
+ * Gives every dancer a photo of their gender, in turn, so neighbours in the list (and the two members of a team,
+ * handed out back to back) get different ones. A dancer entered in both categories keeps the same photo.
+ */
+function givePhotos(dancers: Dancer[], photos: SamplePhoto[], byName: Map<string, SamplePhoto>, turn: Record<string, number>) {
+  for (const d of dancers) {
+    let photo = byName.get(d.name);
+    if (!photo) {
+      const pool = photos.some((p) => p.gender === d.gender) ? photos.filter((p) => p.gender === d.gender) : photos;
+      photo = pool[(turn[d.gender] = (turn[d.gender] ?? -1) + 1) % pool.length];
+      byName.set(d.name, photo);
+    }
+    Object.assign(d, { halfBodyUrl: photo.halfBodyUrl, avatarUrl: photo.avatarUrl });
+  }
+}
+
+export function buildSeed(stage: SeedStage, photos: SamplePhoto[] = []): Record<string, Docs> {
   const rnd = prng(2026);
   const nicks = shuffle(NICKNAMES, rnd);
   const newbiePeople = nicks.slice(0, ROSTER.newbie_1v1.count).map((n) => person(n, rnd));
@@ -167,6 +186,16 @@ export function buildSeed(stage: SeedStage): Record<string, Docs> {
     dancer2: proPool[i * 2 + 1],
   }));
   const matches: BattleMatch[] = [...seedProTop16(teams), ...seedNewbieTop32(top32(newbie.dancers))];
+
+  // Photos in first-round order (red, then blue; a team's two members back to back), so the two sides of a battle
+  // and the members of a team look different on the LED; then everyone else.
+  if (photos.length) {
+    const all = new Map([...newbie.dancers, ...pro.dancers].map((d) => [d.id, d]));
+    const inBattle = matches
+      .flatMap((m) => [m.sideRed, m.sideBlue].flatMap((s) => s.dancers.map((d) => all.get(d?.id))))
+      .filter((d): d is Dancer => Boolean(d));
+    givePhotos([...new Set([...inBattle, ...newbie.dancers, ...pro.dancers])], photos, new Map(), {});
+  }
 
   const byId = <T extends { id: string }>(list: T[], toDoc: (x: T) => object) =>
     Object.fromEntries(list.map((x) => [x.id, plain(toDoc(x))]));

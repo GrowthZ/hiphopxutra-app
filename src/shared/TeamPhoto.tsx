@@ -36,7 +36,7 @@ export const TeamPhoto: React.FC<Props & { className: string; boxClassName: stri
     <div role="img" aria-label={alt} className={`flex items-end justify-center ${boxClassName}`}>
       {pair.map((url, i) => (
         <img
-          key={url}
+          key={i} // the two members may share a photo
           src={url}
           alt=""
           className={`h-full w-auto min-w-0 max-w-[58%] object-contain object-bottom ${i === 1 ? '-ml-[10%]' : ''} ${cutoutClassName}`}
@@ -60,7 +60,7 @@ export const TeamThumb: React.FC<Props & { className: string; overlapClassName?:
   return (
     <span role="img" aria-label={alt} className="flex shrink-0">
       {avatars.map((url, i) => (
-        <img key={url} loading="lazy" decoding="async" src={url} alt="" className={`${className} ${i === 1 ? overlapClassName : ''}`} />
+        <img key={i} loading="lazy" decoding="async" src={url} alt="" className={`${className} ${i === 1 ? overlapClassName : ''}`} />
       ))}
     </span>
   );

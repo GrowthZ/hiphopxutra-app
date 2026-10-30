@@ -23,13 +23,14 @@ import { createInterface } from 'node:readline/promises';
 import { applicationDefault, cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { DocumentReference, FieldValue, getFirestore, Timestamp, WriteBatch } from 'firebase-admin/firestore';
-import { buildSeed, SEED_STAGES, SeedStage } from './devSeed';
+import { buildSeed, SamplePhoto, SEED_STAGES, SeedStage } from './devSeed';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const PROD_EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts
 const DEV_EVENT_ID = 'hiphopxutra-2026-dev'; // keep in sync with .env.devdb
 const EMULATOR_PROJECT_ID = 'demo-hiphopxutra'; // keep in sync with src/services/firebase.ts
 const KEY_FILE = path.join(ROOT, 'secrets', 'service-account.json');
+const SAMPLE_PHOTOS = path.join(ROOT, 'public', 'image', 'seed', 'manifest.json'); // written by scripts/sample-photos.ts
 const STAFF_EMAIL_DOMAIN = 'btc.hiphopxutra.vn'; // keep in sync with src/services/staffAccounts.ts
 const PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'staffSecrets'];
@@ -263,7 +264,10 @@ const commands: Record<string, () => Promise<void>> = {
       log(`Chép ${copies.length} tài khoản (admin, PIN giám khảo, mật khẩu BTC) từ giải thật.`);
     }
 
-    const data = buildSeed(stage);
+    // Local sample photos (`bun scripts/sample-photos.ts`), served by the dev server from public/image/seed.
+    const photos: SamplePhoto[] = existsSync(SAMPLE_PHOTOS) ? JSON.parse(readFileSync(SAMPLE_PHOTOS, 'utf8')) : [];
+    log(photos.length ? `Ảnh mẫu: ${photos.length} ảnh từ public/image/seed.` : 'Không có ảnh mẫu (chạy bun scripts/sample-photos.ts để có).');
+    const data = buildSeed(stage, photos);
     const writes = Object.entries(data).flatMap(([col, docs]) =>
       Object.entries(docs).map(([id, value]) => [event.collection(col).doc(id), value] as const)
     );

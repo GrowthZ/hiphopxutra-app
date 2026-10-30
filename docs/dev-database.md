@@ -31,6 +31,21 @@ không vào bản build, không ảnh hưởng `test:e2e`. Chỉ mở được t
 | BTC check-in (2 bàn) | `checkin` / `checkin123`, `checkin2` / `checkin123` ở `/checkin` |
 | Giám khảo | `/giam-khao`, chọn GK 01 … GK 09, PIN `111111` … `999999` |
 
+### Ảnh thí sinh mẫu (thử màn LED)
+
+Ảnh thật của thí sinh (trẻ vị thành niên) **không bao giờ lên git**: để ở `public/image/` (đã gitignore), chỉ dùng trên máy.
+
+```bash
+bun scripts/sample-photos.ts --female IMG_8850   # 1 lần, hoặc khi thêm ảnh: liệt kê ảnh BGIRL, còn lại là BBOY
+bun run test:db battle                            # mọi thí sinh có ảnh nửa người + avatar theo đúng giới tính
+```
+
+Script đọc ảnh cắt nền 3:4 trong `public/image/*.png`, ghi ra `public/image/seed/` ảnh nửa người WebP và avatar vuông
+cắt quanh mặt, kèm `manifest.json`. Mỗi lần `seed` thấy file này thì gán ảnh: theo thứ tự cặp đấu vòng đầu, nên hai
+bên một trận và hai người một đội có ảnh khác nhau; người thi cả 2 hạng mục giữ một ảnh. Đội 2vs2 không có ảnh đội:
+LED ghép ảnh 2 thành viên. Mở `/admin/battle` chọn trận, `/admin/led` → *Trận Battle*, rồi xem `/led` (`/led?khung=vom`
+cho màn vòm).
+
 ## 1. Chuẩn bị (1 lần)
 
 1. Có khoá service account ở `secrets/service-account.json` (xem [firebase-setup.md](firebase-setup.md) mục 3).
