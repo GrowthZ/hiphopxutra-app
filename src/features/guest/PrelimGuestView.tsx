@@ -1,26 +1,54 @@
-import React, { useMemo, useState } from 'react';
-import { Check, ChevronRight, Medal, Search, X } from 'lucide-react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Check, ChevronRight, Crown, Download, Loader2, Search, Share2, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { VIEW_PATHS } from '../../app/routes';
+import { isIOS } from '../../services/pwa';
 import { GuestHeader } from './GuestBattleView';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 
 // Public prelim results (/ket-qua/prelim), phone first: one column, total score only; tap a dancer for details.
 // Reads the published copy: a dancer's scores appear only once all 4 prelim judges have scored (KG-06).
 // While judging is on only a provisional top 10 is public. Afterwards everyone below rank 40 is shown as "40+"
-// in a shuffled order without scores, so nobody can tell who came last.
+// in a shuffled order (scores still shown), so the order gives nothing away.
+// `?sbd=N012` opens that dancer's card: the link parents share along with the card.
 
 type Scope = 'top10' | 'top32' | 'all';
 export const QUALIFY = 32;
 const RANKED_UNTIL = 40;
 export const LIVE_LIMIT = 10;
-// Gold, silver, bronze: row tint and rank badge.
-export const PODIUM = [
-  { row: 'bg-amber-50', badge: 'bg-amber-400 text-amber-950' },
-  { row: 'bg-zinc-100', badge: 'bg-zinc-300 text-zinc-800' },
-  { row: 'bg-orange-50', badge: 'bg-orange-300 text-orange-950' },
+// Gold, silver, bronze: metal tones for medals and rings, plus the row tint.
+const METALS = [
+  { name: 'Vàng', light: '#FFF3C4', mid: '#E3B23C', dark: '#8C6510', row: 'bg-amber-50' },
+  { name: 'Bạc', light: '#FFFFFF', mid: '#BFC4CB', dark: '#6B717A', row: 'bg-zinc-100' },
+  { name: 'Đồng', light: '#FFDDBA', mid: '#C27A3A', dark: '#6E3D14', row: 'bg-orange-50' },
 ];
+const metalGradient = (m: (typeof METALS)[number]) => `linear-gradient(135deg, ${m.light}, ${m.mid} 45%, ${m.dark})`;
+
+/** Medal on a red ribbon (the event's colour), in the real metal tone of the rank. */
+const MedalIcon: React.FC<{ rank: number; className?: string }> = ({ rank, className }) => {
+  const m = METALS[rank - 1];
+  const id = useId().replace(/:/g, '');
+  return (
+    <svg viewBox="0 0 40 48" className={className} role="img" aria-label={`Vé ${m.name}, hạng ${rank}`}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={m.light} />
+          <stop offset="0.5" stopColor={m.mid} />
+          <stop offset="1" stopColor={m.dark} />
+        </linearGradient>
+      </defs>
+      <path d="M8 0h9l7 18h-9z" fill="#991B1B" />
+      <path d="M32 0h-9l-7 18h9z" fill="#DC2626" />
+      <circle cx="20" cy="31" r="15" fill={`url(#${id})`} stroke={m.dark} strokeWidth="1.5" />
+      <circle cx="20" cy="31" r="11" fill="none" stroke={m.light} strokeOpacity="0.8" />
+      <text x="20" y="36.5" textAnchor="middle" fontSize="16" fontWeight="900" fill={m.dark} fontFamily="'Barlow Condensed', sans-serif">
+        {rank}
+      </text>
+    </svg>
+  );
+};
 const CHEERS = [
   'Cảm ơn bạn đã cháy hết mình trên sàn hôm nay! Mỗi lần thi đấu là một bước tiến, hẹn gặp bạn ở mùa giải sau với phiên bản mạnh hơn.',
   'Dám bước lên sàn đấu đã là chiến thắng đầu tiên. Tiếp tục luyện tập nhé, sân khấu luôn chờ bạn quay lại!',
@@ -51,9 +79,8 @@ export const GenderBadge: React.FC<{ dancer: Dancer }> = ({ dancer }) =>
 
 const RankBadge: React.FC<{ rank: number; scored: boolean }> = ({ rank, scored }) =>
   scored && rank <= 3 ? (
-    <span className={`flex h-8 shrink-0 items-center gap-0.5 rounded-full px-1.5 text-xs font-black tabular-nums ${PODIUM[rank - 1].badge}`}>
-      <Medal className="h-3.5 w-3.5" />
-      {rank}
+    <span className="flex w-8 shrink-0 justify-center">
+      <MedalIcon rank={rank} className="h-10 w-8" />
     </span>
   ) : (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-black tabular-nums text-zinc-500">
@@ -115,6 +142,20 @@ export const PrelimGuestView: React.FC = () => {
     if (q) return pool.filter(({ dancer }) => [dancer.name, dancer.sbd].some((f) => f.toLowerCase().includes(q)));
     return pool.slice(0, limit);
   }, [ranked, query, limit, locked]);
+
+  // Shared card link (?sbd=): open it once the data is in, switching category if needed; hidden ranks stay hidden.
+  const [linkedSbd, setLinkedSbd] = useState(() => new URLSearchParams(window.location.search).get('sbd'));
+  useEffect(() => {
+    if (!linkedSbd) return;
+    const index = ranked.findIndex((d) => d.sbd === linkedSbd);
+    if (index < 0) {
+      const other = activeCategory === 'newbie_1v1' ? 'pro_2v2' : 'newbie_1v1';
+      if ((other === 'newbie_1v1' ? newbieDancers : proDancers).some((d) => d.sbd === linkedSbd)) setActiveCategory(other);
+      return;
+    }
+    setLinkedSbd(null);
+    if (locked || index < LIVE_LIMIT) setSelected(ranked[index]);
+  }, [linkedSbd, ranked, locked, activeCategory, newbieDancers, proDancers, setActiveCategory]);
 
   const podium = ranked.slice(0, 3).filter((d) => isScored(d, judgeCount));
   const scopes: [Scope, string][] = locked
@@ -186,28 +227,52 @@ export const PrelimGuestView: React.FC = () => {
           </p>
         )}
 
-        {/* Top 3 */}
+        {/* Top 3 podium: 2 · 1 · 3, the winner raised in the middle */}
         {podium.length > 0 && !query && (
-          <section aria-label="Top 3" className="grid grid-cols-3 gap-2">
-            {podium.map((d, i) => (
-              <button
-                key={d.id}
-                onClick={() => setSelected(d)}
-                className={`flex flex-col items-center rounded-2xl border bg-white px-2 pb-3 pt-2 text-center cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
-                  i === 0 ? 'border-amber-300 shadow-sm' : 'border-zinc-200'
-                }`}
-              >
-                <span className={`mb-1.5 flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-black ${PODIUM[i].badge}`}>
-                  <Medal className="h-3 w-3" />
-                  {i + 1}
-                </span>
-                <Avatar dancer={d} size={i === 0 ? 'h-16 w-16 text-2xl' : 'h-14 w-14 text-xl'} />
-                <span className="mt-1.5 w-full truncate font-condensed text-base font-black uppercase leading-tight">
-                  {stripBreakerPrefix(d.name)}
-                </span>
-                <span className="font-condensed text-2xl font-black tabular-nums leading-none text-zinc-900">{d.prelimScoreTotal}</span>
-              </button>
-            ))}
+          <section
+            aria-label="Top 3"
+            className="grid grid-cols-3 items-end gap-2 overflow-hidden rounded-3xl border border-zinc-200 bg-gradient-to-b from-white to-amber-50/60 px-3 pt-4"
+          >
+            {[1, 0, 2].map((i) => {
+              const d = podium[i];
+              if (!d) return <div key={i} />;
+              const m = METALS[i];
+              const first = i === 0;
+              return (
+                <button
+                  key={d.id}
+                  onClick={() => setSelected(d)}
+                  aria-label={`Hạng ${i + 1}: ${stripBreakerPrefix(d.name)}, ${d.prelimScoreTotal} điểm`}
+                  className="group flex min-w-0 flex-col items-center text-center cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 rounded-t-2xl"
+                >
+                  {first && <Crown className="mb-0.5 h-6 w-6 text-amber-500" fill="currentColor" aria-hidden />}
+                  <span className="relative transition-transform motion-safe:group-active:scale-95">
+                    <span className="block rounded-full p-[3px] shadow-md" style={{ background: metalGradient(m) }}>
+                      <Avatar dancer={d} size={first ? 'h-24 w-24 text-4xl' : 'h-[4.5rem] w-[4.5rem] text-2xl'} />
+                    </span>
+                    <MedalIcon
+                      rank={i + 1}
+                      className={`absolute left-1/2 -translate-x-1/2 drop-shadow ${first ? '-bottom-5 h-11 w-9' : '-bottom-4 h-9 w-[30px]'}`}
+                    />
+                  </span>
+                  <span className={`${first ? 'mt-6 text-lg' : 'mt-5 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
+                    {stripBreakerPrefix(d.name)}
+                  </span>
+                  <span className="w-full truncate px-0.5 text-[11px] text-zinc-500">{d.crew || d.sbd}</span>
+                  <span
+                    className={`mt-2 flex w-full flex-col items-center justify-center rounded-t-xl border-t-4 text-zinc-900 ${
+                      first ? 'h-[4.5rem]' : i === 1 ? 'h-14' : 'h-12'
+                    }`}
+                    style={{ borderTopColor: m.mid, background: `linear-gradient(180deg, ${m.light}, ${m.mid}59)` }}
+                  >
+                    <span className={`font-condensed font-black tabular-nums leading-none ${first ? 'text-3xl' : 'text-2xl'}`}>
+                      {d.prelimScoreTotal}
+                    </span>
+                    <span className="text-[10px] font-bold text-zinc-600">/ {judgeCount * 100}</span>
+                  </span>
+                </button>
+              );
+            })}
           </section>
         )}
 
@@ -229,7 +294,7 @@ export const PrelimGuestView: React.FC = () => {
           {visible.length === 0 && <li className="px-4 py-8 text-center text-sm text-zinc-500">Không tìm thấy thí sinh.</li>}
           {visible.map(({ dancer: d, rank }, i) => {
             const scored = isScored(d, judgeCount);
-            const podium = scored && rank <= 3 ? PODIUM[rank - 1] : null;
+            const podium = scored && rank <= 3 ? METALS[rank - 1] : null;
             const unranked = rank > RANKED_UNTIL;
             return (
               <React.Fragment key={d.id}>
@@ -266,7 +331,7 @@ export const PrelimGuestView: React.FC = () => {
                       </span>
                     </span>
                     <GenderBadge dancer={d} />
-                    {scored && unranked ? null : scored ? (
+                    {scored ? (
                       <span className="w-11 text-right">
                         <span className="block font-condensed text-2xl font-black tabular-nums leading-none">{d.prelimScoreTotal}</span>
                         <span className="text-[10px] text-zinc-400">/ {judgeCount * 100}</span>
@@ -290,6 +355,7 @@ export const PrelimGuestView: React.FC = () => {
           cheer={CHEERS[hashOf(selected.id) % CHEERS.length]}
           judges={prelimJudgeIdsFor(selected, prelimPanels).map((id) => ({ id, code: judges.find((j) => j.id === id)?.code ?? id }))}
           locked={locked}
+          categoryLabel={activeCategory === 'newbie_1v1' ? 'Newbie 1vs1' : 'Pro 2vs2'}
           onClose={() => setSelected(null)}
         />
       )}
@@ -297,72 +363,219 @@ export const PrelimGuestView: React.FC = () => {
   );
 };
 
-/** Bottom sheet: one dancer's score per judge. */
+/** One dancer's card: photo, rank, every judge's score. Made to be screenshotted and posted, with a share link. */
 const DancerSheet: React.FC<{
   dancer: Dancer;
   rank: number;
   cheer: string;
   judges: { id: string; code: string }[];
   locked: boolean;
+  categoryLabel: string;
   onClose: () => void;
-}> = ({ dancer, rank, cheer, judges, locked, onClose }) => {
+}> = ({ dancer, rank, cheer, judges, locked, categoryLabel, onClose }) => {
+  const [copied, setCopied] = useState(false);
   const scored = isScored(dancer, PANEL_SIZE);
   const unranked = scored && rank > RANKED_UNTIL;
+  const medal = scored && rank <= 3 ? METALS[rank - 1] : null;
+  const qualified = locked && scored && rank <= QUALIFY;
+  const name = stripBreakerPrefix(dancer.name);
+  const rankLabel = !scored
+    ? 'Đang chấm'
+    : unranked
+      ? `Top ${RANKED_UNTIL}+`
+      : medal
+        ? `Hạng ${rank} · Vé ${medal.name}`
+        : `Hạng ${rank}`;
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const share = async () => {
+    const url = `${window.location.origin}${VIEW_PATHS.prelim_guest}${dancer.sbd ? `?sbd=${encodeURIComponent(dancer.sbd)}` : ''}`;
+    const text = scored
+      ? `${name} · ${rankLabel} vòng loại ${categoryLabel} · ${dancer.prelimScoreTotal}/${judges.length * 100} điểm · HIPHOP XỨ TRÀ 2026`
+      : `${name} · vòng loại ${categoryLabel} · HIPHOP XỨ TRÀ 2026`;
+    if (navigator.share) {
+      await navigator.share({ title: `${name} · HIPHOP XỨ TRÀ 2026`, text, url }).catch(() => {});
+      return;
+    }
+    await navigator.clipboard?.writeText(`${text}\n${url}`);
+    setCopied(true);
+  };
+
+  // The card as a PNG, drawn as soon as the sheet opens: iPhone only shows the share sheet while the tap is fresh.
+  const cardRef = useRef<HTMLElement>(null);
+  const image = useRef<Promise<Blob | null> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const renderCard = () => {
+    const node = cardRef.current;
+    if (!node) return Promise.resolve(null);
+    return import('html-to-image').then(async ({ toBlob }) => {
+      const options = { pixelRatio: 3, filter: (n: HTMLElement) => n.dataset?.export !== 'skip' };
+      await toBlob(node, options); // Safari draws the photos only from the second pass
+      return toBlob(node, options);
+    });
+  };
+  useEffect(() => {
+    image.current = null;
+    const timer = setTimeout(() => (image.current = renderCard().catch(() => null)), 400);
+    return () => clearTimeout(timer);
+  }, [dancer]);
+
+  const saveImage = async () => {
+    setSaving(true);
+    setSaveError(false);
+    try {
+      const blob = await (image.current ?? renderCard());
+      if (!blob) throw new Error('no image');
+      const file = new File([blob], `hiphopxutra-${dancer.sbd || name}.png`, { type: 'image/png' });
+      // iPhone: the share sheet's "Lưu hình ảnh" puts it in Photos (a download would land in Files).
+      if (isIOS() && navigator.canShare?.({ files: [file] })) {
+        const shared = await navigator.share({ files: [file] }).then(
+          () => true,
+          (e: Error) => e.name === 'AbortError'
+        );
+        if (shared) return;
+      }
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = file.name;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch {
+      setSaveError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-900/40 sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/75 backdrop-blur-sm sm:items-center" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={stripBreakerPrefix(dancer.name)}
+        aria-label={name}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-t-3xl bg-white p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:rounded-3xl"
+        className="max-h-[100dvh] w-full max-w-sm space-y-3 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
-        <div className="flex items-start gap-3">
-          <Avatar dancer={dancer} size="h-16 w-16 text-2xl" />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-bold text-zinc-500">
-              {!scored ? 'Đang chấm' : unranked ? `Hạng ${RANKED_UNTIL}+` : `Hạng ${rank}`}
-              {dancer.sbd && <span className="font-mono"> · {dancer.sbd}</span>}
-            </p>
-            <h2 className="flex items-center gap-2 font-condensed text-3xl font-black uppercase leading-none">
-              {stripBreakerPrefix(dancer.name)}
-              <GenderBadge dancer={dancer} />
-            </h2>
-            {dancer.crew && <p className="mt-0.5 truncate text-sm text-zinc-500">{dancer.crew}</p>}
-          </div>
-          <button onClick={onClose} aria-label="Đóng" className="-m-1 rounded-full p-2 text-zinc-400 hover:bg-zinc-100 cursor-pointer">
+        <article ref={cardRef} className="relative overflow-hidden rounded-3xl bg-zinc-950 text-white shadow-2xl ring-1 ring-white/10">
+          {/* Glow in the rank's colour and a faint diagonal texture */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-28 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+            style={{ background: medal ? medal.mid : qualified ? '#10B981' : '#DC2626' }}
+          />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.05] bg-[repeating-linear-gradient(135deg,#fff_0_2px,transparent_2px_14px)]"
+          />
+          <button
+            onClick={onClose}
+            aria-label="Đóng"
+            data-export="skip"
+            className="absolute right-2 top-2 z-10 rounded-full p-2.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-400"
+          >
             <X className="h-5 w-5" />
           </button>
-        </div>
 
-        {unranked ? (
-          <p className="mt-4 rounded-xl bg-amber-50 px-4 py-4 text-center text-sm leading-relaxed text-amber-900">{cheer}</p>
-        ) : scored ? (
-          <>
-            <div className="mt-4 grid grid-cols-4 gap-2">
-              {judges.map((j) => (
-                <div key={j.id} className="rounded-xl bg-zinc-50 py-2 text-center">
-                  <p className="text-[10px] font-bold text-zinc-400">{j.code}</p>
-                  <p className="font-condensed text-2xl font-black tabular-nums">{dancer.prelimScores[j.id] ?? '–'}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 flex items-end justify-between rounded-xl bg-zinc-900 px-4 py-3 text-white">
-              <span className="text-sm font-bold">Tổng điểm</span>
-              <span className="font-condensed text-4xl font-black tabular-nums leading-none">
-                {dancer.prelimScoreTotal}
-                <span className="text-base text-zinc-400"> / {judges.length * 100}</span>
+          <div className="relative flex flex-col items-center px-5 pb-5 pt-5 text-center">
+            <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-12 w-auto" />
+            <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Vòng loại · {categoryLabel}</p>
+
+            <div className="relative mt-4">
+              <span
+                className="block rounded-full p-1 shadow-xl"
+                style={{
+                  background: medal
+                    ? metalGradient(medal)
+                    : qualified
+                      ? 'linear-gradient(135deg, #6EE7B7, #047857)'
+                      : 'linear-gradient(135deg, #F87171, #7F1D1D)',
+                }}
+              >
+                <Avatar dancer={dancer} size="h-32 w-32 text-5xl" dark />
               </span>
+              {medal && <MedalIcon rank={rank} className="absolute -bottom-5 left-1/2 h-14 w-12 -translate-x-1/2 drop-shadow-lg" />}
             </div>
-            {locked && (
-              <p className={`mt-3 text-center text-sm font-bold ${rank <= QUALIFY ? 'text-emerald-600' : 'text-zinc-500'}`}>
-                {rank <= QUALIFY ? `Vào vòng Battle (Top ${QUALIFY})` : 'Dừng ở vòng loại'}
+
+            <p
+              className={`${medal ? 'mt-7' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
+              style={{ color: medal ? medal.mid : '#FBBF24' }}
+            >
+              {rankLabel}
+            </p>
+            <h2 className="mt-0.5 max-w-full break-words font-condensed text-4xl font-black uppercase leading-none">{name}</h2>
+            <p className="mt-2 flex max-w-full items-center justify-center gap-2 text-sm text-white/60">
+              <GenderBadge dancer={dancer} />
+              <span className="truncate">{[dancer.crew, dancer.sbd && `SBD ${dancer.sbd}`].filter(Boolean).join(' · ')}</span>
+            </p>
+
+            {scored ? (
+              <>
+                <div className="mt-4 grid w-full grid-cols-4 gap-1.5">
+                  {judges.map((j) => (
+                    <div key={j.id} className="rounded-xl bg-white/[0.07] py-2 ring-1 ring-white/10">
+                      <p className="text-[10px] font-bold text-white/50">{j.code}</p>
+                      <p className="font-condensed text-2xl font-black tabular-nums leading-tight">{dancer.prelimScores[j.id] ?? '–'}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-2 flex w-full items-end justify-between rounded-2xl bg-white px-4 py-3 text-zinc-950">
+                  <span className="text-sm font-black uppercase">Tổng điểm</span>
+                  <span className="font-condensed text-5xl font-black tabular-nums leading-none">
+                    {dancer.prelimScoreTotal}
+                    <span className="text-base text-zinc-400"> / {judges.length * 100}</span>
+                  </span>
+                </div>
+                {qualified && (
+                  <p className="mt-3 flex items-center gap-1.5 rounded-full bg-emerald-400 px-3 py-1 text-xs font-black uppercase text-emerald-950">
+                    <Check className="h-3.5 w-3.5" /> Vào vòng Battle · Top {QUALIFY}
+                  </p>
+                )}
+                {locked && !qualified && <p className="mt-3 text-sm leading-relaxed text-white/75">{cheer}</p>}
+              </>
+            ) : (
+              <p className="mt-4 w-full rounded-xl bg-white/[0.07] px-4 py-5 text-sm text-white/70">
+                Điểm sẽ hiện khi cả {judges.length} giám khảo chấm xong.
               </p>
             )}
-          </>
-        ) : (
-          <p className="mt-4 rounded-xl bg-zinc-50 px-4 py-6 text-center text-sm text-zinc-500">
-            Điểm sẽ hiện khi cả {judges.length} giám khảo chấm xong.
+
+            <p className="mt-4 text-[11px] font-bold uppercase tracking-[0.25em] text-white/35">#HiphopXuTra2026</p>
+          </div>
+        </article>
+
+        <div className="flex gap-2">
+          <button
+            onClick={saveImage}
+            disabled={saving}
+            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3.5 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-70 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
+          >
+            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            Lưu ảnh
+          </button>
+          <button
+            onClick={share}
+            aria-label={copied ? 'Đã chép liên kết' : 'Chia sẻ'}
+            title={copied ? 'Đã chép liên kết' : 'Chia sẻ'}
+            className="flex w-14 items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white/20 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-300"
+          >
+            {copied ? <Check className="h-5 w-5 text-emerald-400" /> : <Share2 className="h-5 w-5" />}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-2xl bg-white/10 px-5 py-3.5 text-sm font-bold text-white hover:bg-white/20 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-300"
+          >
+            Đóng
+          </button>
+        </div>
+        {saveError && (
+          <p role="alert" className="text-center text-xs font-bold text-red-300">
+            Không lưu được ảnh. Thử lại hoặc chụp màn hình thẻ.
           </p>
         )}
       </div>
