@@ -64,6 +64,7 @@ export const rankForDisplay = (list: Dancer[], judges: number) =>
       Number(isScored(b, judges)) - Number(isScored(a, judges)) ||
       b.prelimScoreTotal - a.prelimScoreTotal ||
       (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) || // tie across the cut-off: settled by all 8 judges
+      Number(Boolean(b.judgesPick)) - Number(Boolean(a.judgesPick)) || // ... or, still level, by the judges' pick
       a.sbd.localeCompare(b.sbd)
   );
 

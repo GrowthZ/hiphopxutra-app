@@ -68,12 +68,29 @@ export function cutoffTie(ranked: Dancer[], qualify = 32): Dancer[] {
   return ranked.filter((d) => d.prelimScoreTotal === last.prelimScoreTotal);
 }
 
-/** The cut-off is still undecided: a tie across it that the tie-break hasn't separated yet. */
+/**
+ * The cut-off is still undecided: a tie across it that neither the tie-break nor (tie-break level too) the judges'
+ * pick has separated yet.
+ */
 export function isCutoffUndecided(ranked: Dancer[], qualify = 32): boolean {
   const last = ranked[qualify - 1];
   const next = ranked[qualify];
   if (!last || !next || last.prelimScoreTotal !== next.prelimScoreTotal) return false;
-  return last.tieBreakTotal === undefined || next.tieBreakTotal === undefined || last.tieBreakTotal === next.tieBreakTotal;
+  if (last.tieBreakTotal === undefined || next.tieBreakTotal === undefined) return true;
+  return last.tieBreakTotal === next.tieBreakTotal && !(last.judgesPick && !next.judgesPick);
+}
+
+/**
+ * Tie-break done and still level across the cut-off: the dancers still sharing rank 32's score and tie-break total,
+ * and how many Top 32 places they share. The judges confer and pick that many; an admin enters the pick.
+ */
+export function cutoffStillTied(ranked: Dancer[], qualify = 32): { group: Dancer[]; places: number } {
+  const last = ranked[qualify - 1];
+  const next = ranked[qualify];
+  if (!last || !next || last.tieBreakTotal === undefined || next.tieBreakTotal === undefined) return { group: [], places: 0 };
+  if (last.prelimScoreTotal !== next.prelimScoreTotal || last.tieBreakTotal !== next.tieBreakTotal) return { group: [], places: 0 };
+  const group = ranked.filter((d) => d.prelimScoreTotal === last.prelimScoreTotal && d.tieBreakTotal === last.tieBreakTotal);
+  return { group, places: qualify - ranked.indexOf(group[0]) };
 }
 
 export const isPrelimComplete = (d: Dancer, panels: PrelimPanels) => {
@@ -100,10 +117,13 @@ export function recalculateDancers(list: Dancer[], panels: PrelimPanels = DEFAUL
     };
   });
 
-  // Total score, then (same total) the tie-break total, then SBD
+  // Total score, then (same total) the tie-break total, then the judges' pick when the tie-break is level too, then SBD
   updated.sort(
     (a, b) =>
-      b.prelimScoreTotal - a.prelimScoreTotal || (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) || a.sbd.localeCompare(b.sbd)
+      b.prelimScoreTotal - a.prelimScoreTotal ||
+      (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) ||
+      Number(Boolean(b.judgesPick)) - Number(Boolean(a.judgesPick)) ||
+      a.sbd.localeCompare(b.sbd)
   );
 
   return updated.map((d, idx) => ({ ...d, prelimRank: idx + 1, isQualifiedTop32: idx < 32 }));

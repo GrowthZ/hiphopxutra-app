@@ -23,6 +23,7 @@ import { BankingScoreKeypadModal } from './BankingScoreKeypadModal';
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
 import {
   allPrelimJudgeIds,
+  cutoffStillTied,
   cutoffTie,
   isCutoffUndecided,
   PANEL_SIZE,
@@ -43,8 +44,8 @@ export const PrelimView: React.FC = () => {
     updatePrelimScore,
     isNewbieTop32Locked,
     isProTop32Locked,
-    lockTop32,
-    openTieBreak,
+    publishPrelim,
+    setJudgesPick,
     setActiveView,
     syncWithGoogleSheet,
     sheetConfig,
@@ -120,6 +121,44 @@ export const PrelimView: React.FC = () => {
   const tieJudgeIds = allPrelimJudgeIds(prelimPanels);
   const tieBreakDancers = currentDancers.filter((d) => d.tieBreak);
   const tieNotOpened = tiedAtCutoff.filter((d) => !d.tieBreak);
+
+  // Tie-break level again: the judges' pick, ticked here by the admin (as many as the places left in the Top 32).
+  const stillTied = cutoffStillTied(currentDancers);
+  const pickedCount = stillTied.group.filter((d) => d.judgesPick).length;
+  const togglePick = (id: string) => {
+    const picked = stillTied.group.filter((d) => (d.id === id ? !d.judgesPick : d.judgesPick)).map((d) => d.id);
+    if (picked.length > stillTied.places) return;
+    setJudgesPick(activeCategory, stillTied.group.map((d) => d.id), picked);
+  };
+
+  // "Công bố Prelim", one button through the steps: scores complete → tie-break if the cut-off is tied → lock Top 32.
+  const scoringDone = totalExpectedVotes > 0 && totalVotesReceived === totalExpectedVotes;
+  const tieScored = tieBreakDancers.every((d) => d.tieBreakTotal !== undefined);
+  const publishStep = !scoringDone
+    ? { label: `Chờ chấm xong · ${totalVotesReceived}/${totalExpectedVotes} phiếu`, hint: 'Công bố khi cả 2 bảng đã chấm đủ.', disabled: true }
+    : hasTieAtThreshold && tieNotOpened.length > 0
+      ? {
+          label: 'Công bố Prelim',
+          hint: `Có ${tiedAtCutoff.length} thí sinh đồng điểm ở ngưỡng 32: công bố sẽ mở tie-break cho cả ${tieJudgeIds.length} GK.`,
+          disabled: false,
+        }
+      : hasTieAtThreshold && !tieScored
+        ? { label: 'Đang chấm tie-break…', hint: 'Chốt Top 32 khi cả 8 GK chấm xong tie-break.', disabled: true }
+        : hasTieAtThreshold
+          ? {
+              label: `Chờ BGK chọn · ${pickedCount}/${stillTied.places}`,
+              hint: 'Tie-break vẫn đồng điểm: chọn thí sinh đi tiếp theo quyết định của BGK ở khung bên trên.',
+              disabled: true,
+            }
+          : { label: 'Công bố Prelim & chốt Top 32', hint: 'Công bố bảng xếp hạng chính thức và chuyển sang vòng Battle.', disabled: false };
+
+  const publish = () => {
+    const opensTie = hasTieAtThreshold && tieNotOpened.length > 0;
+    const question = opensTie
+      ? `Công bố Prelim: ${tiedAtCutoff.length} thí sinh đồng điểm ở ngưỡng Top 32 sẽ được chấm tie-break bởi cả ${tieJudgeIds.length} giám khảo. Tiếp tục?`
+      : 'Công bố kết quả Prelim và chốt Top 32? Sau khi chốt không sửa điểm Prelim được nữa.';
+    if (window.confirm(question)) publishPrelim(activeCategory);
+  };
 
   // Display filtering: Sát ngưỡng Top 32 (Hạng 27 - 36) or Tất cả
   const displayedDancers =
@@ -545,12 +584,9 @@ export const PrelimView: React.FC = () => {
                       </div>
                     </div>
                     {tieNotOpened.length > 0 && !isLocked && (
-                      <button
-                        onClick={() => openTieBreak(activeCategory, tieNotOpened.map((d) => d.id))}
-                        className="w-full rounded bg-red-600 px-2 py-2 text-[11px] font-black uppercase tracking-wider text-white hover:bg-red-700 cursor-pointer"
-                      >
-                        Mở tie-break cho {tieNotOpened.length} thí sinh
-                      </button>
+                      <div className="text-[11px] font-bold text-amber-800">
+                        Bấm “Công bố Prelim” để mở tie-break: giám khảo chỉ thấy phần này sau khi công bố.
+                      </div>
                     )}
                   </div>
                 </div>
@@ -585,6 +621,49 @@ export const PrelimView: React.FC = () => {
               </div>
             )}
 
+            {/* Tie-break level again: the judges confer, then the admin ticks the dancers they chose */}
+            {stillTied.group.length > 0 && !isLocked && (
+              <div className="space-y-2 rounded border-2 border-amber-400 bg-amber-50 p-2.5 text-xs">
+                <div className="flex items-center gap-1.5 font-black uppercase tracking-wide text-amber-900">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                  Tie-break vẫn đồng điểm · BGK quyết định
+                </div>
+                <p className="text-[11px] leading-snug text-amber-800">
+                  {stillTied.group.length} thí sinh cùng {stillTied.group[0].prelimScoreTotal} điểm vòng loại và{' '}
+                  {stillTied.group[0].tieBreakTotal} điểm tie-break, tranh {stillTied.places} suất cuối Top 32. Ban giám
+                  khảo hội ý rồi báo lại: chọn {stillTied.places} thí sinh đi tiếp.
+                </p>
+                <div className="space-y-1" role="group" aria-label="Thí sinh BGK chọn đi tiếp">
+                  {stillTied.group.map((d) => {
+                    const picked = Boolean(d.judgesPick);
+                    const full = pickedCount >= stillTied.places && !picked;
+                    return (
+                      <label
+                        key={d.id}
+                        className={`flex items-center gap-2 rounded border px-2 py-1.5 ${
+                          picked ? 'border-emerald-400 bg-emerald-50' : 'border-amber-200 bg-white'
+                        } ${full ? 'opacity-50' : 'cursor-pointer'}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={picked}
+                          disabled={full}
+                          onChange={() => togglePick(d.id)}
+                          className="h-4 w-4 accent-emerald-600"
+                        />
+                        <span className="font-mono font-bold text-zinc-500">{d.sbd}</span>
+                        <span className="min-w-0 flex-1 truncate font-bold text-zinc-900">{d.name}</span>
+                        {picked && <span className="text-[10px] font-black uppercase text-emerald-700">Đi tiếp</span>}
+                      </label>
+                    );
+                  })}
+                </div>
+                <div className={`text-[11px] font-bold ${pickedCount === stillTied.places ? 'text-emerald-700' : 'text-amber-800'}`}>
+                  Đã chọn {pickedCount}/{stillTied.places}
+                </div>
+              </div>
+            )}
+
             {/* Main Action Button */}
             <div className="pt-2 border-t border-zinc-200">
               {isLocked ? (
@@ -613,14 +692,17 @@ export const PrelimView: React.FC = () => {
                   )}
                 </div>
               ) : (
-                <button
-                  onClick={() => lockTop32(activeCategory)}
-                  disabled={hasTieAtThreshold}
-                  className="w-full py-2.5 px-3 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Chốt Top 32 & Chuyển Vòng</span>
-                </button>
+                <div className="space-y-1.5">
+                  <button
+                    onClick={publish}
+                    disabled={publishStep.disabled}
+                    className="w-full py-2.5 px-3 rounded bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:bg-zinc-200 disabled:text-zinc-500 disabled:cursor-not-allowed"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>{publishStep.label}</span>
+                  </button>
+                  <p className="text-[11px] text-zinc-500">{publishStep.hint}</p>
+                </div>
               )}
             </div>
           </div>

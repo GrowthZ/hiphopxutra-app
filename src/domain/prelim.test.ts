@@ -1,6 +1,6 @@
 /// <reference types="bun" />
 import { describe, expect, test } from 'bun:test';
-import { cutoffTie, DEFAULT_PANELS, isCutoffUndecided, panelOf, panelOfJudge, prelimJudgeIdsFor, recalculateDancers, toPublicDancer } from './model';
+import { cutoffStillTied, cutoffTie, DEFAULT_PANELS, isCutoffUndecided, panelOf, panelOfJudge, prelimJudgeIdsFor, recalculateDancers, toPublicDancer } from './model';
 import { Dancer } from './types';
 
 const dancer = (sbd: string, prelimScores: Record<string, number> = {}) =>
@@ -72,6 +72,21 @@ describe('tie-break across the Top 32 cut-off', () => {
     expect(done[31].tieBreakTotal).toBe(480);
     expect(done[31].prelimScoreTotal).toBe(280); // prelim total unchanged
     expect(isCutoffUndecided(done)).toBe(false);
+  });
+
+  test('a tie-break that is level again goes to the judges: the pick takes the place', () => {
+    const level = field({ tieBreak: true, tieBreakScores: all8(60) }, { tieBreak: true, tieBreakScores: all8(60) });
+    expect(isCutoffUndecided(level)).toBe(true);
+    const { group, places } = cutoffStillTied(level);
+    expect(group.map((d) => d.sbd)).toEqual(['P033', 'P035']);
+    expect(places).toBe(1);
+
+    // The judges confer and pick P035 (higher SBD, so not first by default); an admin enters it.
+    const picked = field({ tieBreak: true, tieBreakScores: all8(60) }, { tieBreak: true, tieBreakScores: all8(60), judgesPick: true });
+    expect(picked[31].sbd).toBe('P035');
+    expect(picked[31].isQualifiedTop32).toBe(true);
+    expect(picked[32].sbd).toBe('P033');
+    expect(isCutoffUndecided(picked)).toBe(false);
   });
 
   test('tie-break scores stay hidden from guests until all 8 judges are in', () => {

@@ -63,6 +63,7 @@ export interface Dancer {
   tieBreak?: boolean; // đồng điểm ở ngưỡng Top 32: cả 8 GK chấm thêm 1 lượt
   tieBreakScores?: Record<string, number>; // judgeId -> score (0-100), 8 GK
   tieBreakTotal?: number; // tổng tie-break khi đủ 8 GK (tính ra, không lưu)
+  judgesPick?: boolean; // tie-break vẫn hoà: BGK hội ý chọn thí sinh này đi tiếp, BTC nhập (xếp trên người cùng điểm)
   prelimScoreTotal: number;
   prelimScoreAvg: number;
   prelimRank?: number;

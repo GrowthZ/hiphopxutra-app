@@ -42,7 +42,7 @@ export const PrelimResultsView: React.FC = () => {
     prelimPanels,
     isNewbieTop32Locked,
     isProTop32Locked,
-    lockTop32,
+    publishPrelim,
     setActiveView,
     playAudioEffect,
     storageConfig,
@@ -144,14 +144,25 @@ export const PrelimResultsView: React.FC = () => {
     }
   };
 
+  // Same steps as "Công bố Prelim" on the prelim desk: a tie at the cut-off goes to the tie-break first.
   const handleToggleLock = () => {
-    playAudioEffect('champion');
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-    lockTop32(activeCategory);
+    const result = publishPrelim(activeCategory);
+    if (result === 'locked') {
+      playAudioEffect('champion');
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+      });
+      return;
+    }
+    window.alert(
+      result === 'incomplete'
+        ? 'Chưa thể công bố: còn thí sinh chưa đủ 4 điểm Prelim.'
+        : result === 'tie-opened'
+          ? 'Có đồng điểm ở ngưỡng Top 32: đã mở tie-break cho cả 8 giám khảo. Công bố lại sau khi chấm xong tie-break.'
+          : 'Chưa thể chốt Top 32: tie-break đang được chấm, hoặc vẫn đồng điểm và chờ chọn thí sinh đi tiếp theo quyết định của BGK ở Bàn chấm Prelim.'
+    );
   };
 
   return (

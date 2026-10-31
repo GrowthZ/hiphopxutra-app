@@ -35,6 +35,10 @@ import {
   toJudgeBallot,
   JudgeBallot,
   sortJudges,
+  cutoffTie,
+  isCutoffUndecided,
+  isPrelimComplete,
+  prelimJudgeIdsFor,
 } from '../domain/model';
 import * as battle from '../domain/battle';
 import { IS_PUBLIC_SOURCE } from '../app/routes';
@@ -51,6 +55,8 @@ import { legacy } from './legacyStorage';
 
 export type DancerMediaUpdate = Partial<Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop' | 'gender'>>;
 type Side = 'red' | 'blue';
+/** incomplete: scores still missing · tie-opened: tie-break just opened · tie-pending: tie-break still being scored (or tied again) */
+export type PublishPrelimResult = 'incomplete' | 'locked' | 'tie-opened' | 'tie-pending';
 
 interface TournamentContextType {
   // Judges
@@ -92,6 +98,8 @@ interface TournamentContextType {
   isNewbieTop32Locked: boolean;
   isProTop32Locked: boolean;
   lockTop32: (category: CategoryType) => void;
+  publishPrelim: (category: CategoryType) => PublishPrelimResult;
+  setJudgesPick: (category: CategoryType, groupIds: string[], pickedIds: string[]) => void;
 
   // Teams (Pro 2vs2)
   proTeams: Team2v2[];
@@ -442,6 +450,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     else setProDancers(flag);
   };
 
+  /** Tie-break level again: the judges' pick among the still-tied dancers (`groupIds`), entered by an admin. */
+  const setJudgesPick = (category: CategoryType, groupIds: string[], pickedIds: string[]) => {
+    const mark = (list: Dancer[]) =>
+      list.map((d) => (groupIds.includes(d.id) ? { ...d, judgesPick: pickedIds.includes(d.id) } : d));
+    if (category === 'newbie_1v1') setNewbieDancers(mark);
+    else setProDancers(mark);
+  };
+
   const lockTop32 = (category: CategoryType) => {
     if (category === 'newbie_1v1') {
       setIsNewbieTop32Locked(true);
@@ -451,6 +467,25 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       shuffleProTeams();
     }
     cues.top32Locked();
+  };
+
+  /**
+   * "Công bố Prelim": only once every checked-in dancer has all 4 scores. A tie across the Top 32 cut-off then goes
+   * to the tie-break (the tied dancers of both panels, scored by all 8 judges, who see it from now on); with no
+   * undecided tie the Top 32 is locked and published.
+   */
+  const publishPrelim = (category: CategoryType): PublishPrelimResult => {
+    const list = category === 'newbie_1v1' ? newbieDancers : proDancers;
+    const pending = list.filter((d) => prelimJudgeIdsFor(d, prelimPanels).length > 0 && !isPrelimComplete(d, prelimPanels));
+    if (pending.length) return 'incomplete';
+    if (!isCutoffUndecided(list)) {
+      lockTop32(category);
+      return 'locked';
+    }
+    const toOpen = cutoffTie(list).filter((d) => !d.tieBreak);
+    if (!toOpen.length) return 'tie-pending';
+    openTieBreak(category, toOpen.map((d) => d.id));
+    return 'tie-opened';
   };
 
   // Teams and matches store dancer ids and are hydrated from the dancer lists, so photos only change here.
@@ -610,6 +645,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         isNewbieTop32Locked,
         isProTop32Locked,
         lockTop32,
+        publishPrelim,
+        setJudgesPick,
         proTeams,
         shuffleProTeams,
         matches,
