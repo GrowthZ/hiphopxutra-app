@@ -32,6 +32,29 @@ if (home) {
   env.PATH = `${path.join(home, 'bin')}${path.delimiter}${env.PATH}`;
 }
 
+const answers = (port: number) => fetch(`http://127.0.0.1:${port}/`).then(() => true, () => false);
+const portsBusy = async () => (await answers(8080)) || (await answers(9099));
+
+// An earlier run can leave the Java Firestore emulator behind (window closed, process killed) holding port 8080:
+// the new run then can't start, and the app fails to sign in (auth/network-request-failed). Stop leftovers first.
+if (await portsBusy()) {
+  console.log('Đang tắt emulator còn sót từ lần chạy trước…');
+  const pattern = 'cloud-firestore-emulator|firebase-tools.+emulators:';
+  if (process.platform === 'win32') {
+    Bun.spawnSync([
+      'powershell',
+      '-NoProfile',
+      '-Command',
+      `Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -match '${pattern}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }`,
+    ]);
+  } else Bun.spawnSync(['pkill', '-f', pattern]);
+  for (let i = 0; i < 40 && (await portsBusy()); i++) await Bun.sleep(250);
+  if (await portsBusy()) {
+    console.error('Cổng 8080 hoặc 9099 vẫn bị chiếm bởi chương trình khác. Tắt chương trình đó rồi chạy lại.');
+    process.exit(1);
+  }
+}
+
 const cli = [mode === 'exec' ? 'emulators:exec' : 'emulators:start', '--only', 'auth,firestore', '--project', PROJECT];
 if (mode === 'exec') cli.push(rest.join(' '));
 
@@ -42,7 +65,6 @@ const proc = Bun.spawn(['node', firebaseBin, ...cli], { env, stdio: ['inherit', 
 // test [stage]: once the emulators answer, load the sample data (events/hiphopxutra-2026-dev + fixed logins).
 if (mode === 'test') {
   const stage = rest[0] ?? 'dang-ky';
-  const answers = (port: number) => fetch(`http://127.0.0.1:${port}/`).then(() => true, () => false);
   while (proc.exitCode === null && !((await answers(8080)) && (await answers(9099)))) await Bun.sleep(500);
   const seed =
     proc.exitCode === null &&
