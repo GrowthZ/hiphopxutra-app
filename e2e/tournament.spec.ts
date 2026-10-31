@@ -1,5 +1,5 @@
 import { BrowserContext, Dialog, expect, Page, test } from '@playwright/test';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { adminAuth, createJudge, event, signInAdmin, waitForDoc } from './emulator';
 
 // The three flows that must work on competition day, in order, sharing one emulator database:
@@ -59,6 +59,9 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
   // Battle vote for the active match, round 1 (goes through the votes rule).
   const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
   await openScoring(judge, 'Main Battle');
+  // Only the match the operator put on stage: the judge can't pick another one.
+  await expect(judge.getByText('Đang đấu')).toBeVisible();
+  await expect(judge.getByLabel('Chọn trận')).toHaveCount(0);
   await judge.getByRole('button', { name: /Chọn góc đỏ/ }).click();
   await judge.getByRole('button', { name: /Gửi phiếu: Đỏ/ }).click();
   await waitForDoc<{ r1?: Record<string, string> }>(`votes/${activeMatchId}`, (v) => v?.r1?.['gk-1'] === 'red');
@@ -133,6 +136,13 @@ test('MC logs in with a PIN, sees their panel’s running order, and cannot read
   // Reloading keeps the MC signed in, on the tab they chose.
   await mc.reload();
   await expect(mc.getByRole('tab', { name: /Bảng A/ })).toHaveAttribute('aria-selected', 'true');
+
+  // No admin tab publishing (heartbeat gone stale) → the MC is warned; the admin's next beat clears it.
+  const noPublisher = mc.getByRole('alert').filter({ hasText: 'Không có máy admin nào đang mở' });
+  await expect(noPublisher).toBeHidden();
+  await event.collection('presence').doc('publisher').set({ lastSeen: Timestamp.fromMillis(Date.now() - 5 * 60_000) });
+  await expect(noPublisher).toBeVisible();
+  await expect(noPublisher).toBeHidden({ timeout: 30_000 });
   await context.close();
 
   // An MC only reads the published copy, like guests: the raw dancer docs stay admin-only.
@@ -198,6 +208,53 @@ test('admin announces a battle round and the result is published', async () => {
   expect(match.currentRound).toBe(2);
   // Guests see the real sides only after the announcement (before it they are 'hidden').
   await waitForDoc<{ r1?: Record<string, string> }>(`publicVotes/${activeMatchId}`, (v) => v?.r1?.['gk-1'] === 'red');
+});
+
+test('judges vote only in the match on stage; past matches are read-only', async ({ browser }) => {
+  const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
+  const [next, later] = (await event.collection('matches').get()).docs.filter((d) => d.id !== activeMatchId).map((d) => d.id);
+  await event.collection('meta').doc('current').update({ activeMatchId: next });
+
+  const context = await browser.newContext();
+  const judge = await context.newPage();
+  await judge.goto('/giam-khao');
+  await judge.getByRole('button', { name: /GK 01/ }).click();
+  for (const digit of '123456') await judge.getByRole('button', { name: digit, exact: true }).click();
+  await judge.getByRole('button', { name: /Vào bàn chấm điểm/ }).click();
+  await openScoring(judge, 'Main Battle');
+
+  // Looking back at the earlier match: their red vote and the announced round, nothing to send.
+  await judge.getByLabel('Xem lại trận đã chấm').selectOption(activeMatchId);
+  await expect(judge.getByText('Đang xem lại · chỉ xem')).toBeVisible();
+  await expect(judge.getByRole('button', { name: /Chọn góc đỏ/ })).toBeDisabled();
+  await expect(judge.getByRole('button', { name: /Round đã công bố|Chỉ xem/ })).toBeDisabled();
+  await judge.getByRole('button', { name: 'Trận đang đấu' }).click();
+  await expect(judge.getByText('Đang xem lại · chỉ xem')).toBeHidden();
+  await context.close();
+
+  // The rules refuse a vote for any match but the one on stage, even sent around the app.
+  const { idToken } = await (
+    await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'gk-1@giamkhao.hiphopxutra.vn', password: '123456', returnSecureToken: true }),
+    })
+  ).json();
+  const vote = (matchId: string) =>
+    fetch(
+      `http://127.0.0.1:8080/v1/projects/demo-hiphopxutra/databases/(default)/documents/${event.collection('votes').doc(matchId).path}?updateMask.fieldPaths=r1`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { r1: { mapValue: { fields: { 'gk-1': { stringValue: 'blue' } } } } } }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+  expect((await vote(later)).status).toBe(403); // not started yet
+  expect((await vote(next)).status).toBe(200);
+
+  await event.collection('votes').doc(next).delete();
+  await event.collection('meta').doc('current').update({ activeMatchId });
 });
 
 test('LED follows the scene chosen at /admin/led', async ({ browser }) => {

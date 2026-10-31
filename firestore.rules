@@ -102,8 +102,8 @@ service cloud.firestore {
           && meta.get(lockField, false) == false;
       }
 
-      // Battle: votes/{matchId} = { r1: { gk-1: 'red', ... }, ... }. A judge changes one round,
-      // only their own key, only while that round isn't announced and the match isn't finished.
+      // Battle: votes/{matchId} = { r1: { gk-1: 'red', ... }, ... }. A judge changes one round, only their own key,
+      // only in the match the operator has on stage, while that round isn't announced and the match isn't finished.
       // Rules have no loops and a Set can't be indexed, so each possible round key (r1-r5) is checked on its own.
       function validRoundVote(key, before, battle) {
         let afterRound = request.resource.data[key];
@@ -120,6 +120,7 @@ service cloud.firestore {
         return isJudge()
           && changed.size() == 1
           && changed.hasOnly(['r1', 'r2', 'r3', 'r4', 'r5'])
+          && eventData('meta', 'current').get('activeMatchId', '') == matchId
           && battle.status != 'finished'
           && (!changed.hasAny(['r1']) || validRoundVote('r1', before, battle))
           && (!changed.hasAny(['r2']) || validRoundVote('r2', before, battle))

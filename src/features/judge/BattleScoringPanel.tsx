@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronDown, Loader2, Lock, Send, Zap } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Eye, History, Loader2, Lock, Send, Swords, Zap } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { soundFX } from '../../services/soundEffects';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
@@ -39,20 +39,30 @@ const Photo: React.FC<{ dancer: Dancer; size: string }> = ({ dancer, size }) =>
   );
 
 /**
- * Judge's battle screen, one phone screen: which match and round, two balanced corners to tap, one button to send.
+ * Judge's battle screen, one phone screen: the match the operator has on stage (judges can't switch it), the round,
+ * two balanced corners to tap, one button to send.
  * Every round of the match's format has a tab, plus the tie-break (open once the operator adds it).
  * The round follows the operator (current round) unless the judge picks another tab.
+ * Past matches can be looked back at, read-only (firestore.rules only takes votes for the match on stage).
  */
 export const BattleScoringPanel: React.FC = () => {
-  const { matches, activeMatchId, setActiveMatchId, selectedJudgeId, submitJudgeVote } = useTournament();
+  const { matches, activeMatchId, selectedJudgeId, submitJudgeVote } = useTournament();
 
-  const match = matches.find((m) => m.id === activeMatchId) || matches[0];
+  // Matches this judge can look back at: finished ones and any they voted in, apart from the one on stage.
+  const history = matches.filter(
+    (m) =>
+      m.id !== activeMatchId &&
+      (m.status === 'finished' || m.rounds.some((r) => r.votes[selectedJudgeId]))
+  );
+  const [reviewId, setReviewId] = useState<string | null>(null);
+  const reviewing = history.find((m) => m.id === reviewId);
+  const match = reviewing ?? matches.find((m) => m.id === activeMatchId);
   const [pickedRound, setPickedRound] = useState<number | null>(null);
   const roundNum = pickedRound ?? (match?.currentRound || 1);
   const round = match?.rounds.find((r) => r.roundNumber === roundNum) || match?.rounds[0];
   const vote = round?.votes[selectedJudgeId];
   const sentSide: Side | null = vote === 'red' || vote === 'blue' ? vote : null;
-  const locked = Boolean(round?.isConfirmed) || match?.status === 'finished';
+  const locked = Boolean(reviewing) || Boolean(round?.isConfirmed) || match?.status === 'finished';
 
   const [side, setSide] = useState<Side | null>(null);
   const [save, setSave] = useState<SaveState>('idle');
@@ -82,8 +92,51 @@ export const BattleScoringPanel: React.FC = () => {
     if (ok) setPickedRound(null);
   };
 
+  // Look back at a past match (read-only), or return to the one on stage.
+  const reviewBar = reviewing ? (
+    <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-900">
+      <span className="flex items-center gap-1.5">
+        <Eye className="h-3.5 w-3.5" /> Đang xem lại · chỉ xem
+      </span>
+      <button
+        onClick={() => setReviewId(null)}
+        className="flex items-center gap-1 rounded-lg bg-zinc-900 px-2.5 py-1.5 text-[11px] font-black uppercase text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+      >
+        <ArrowLeft className="h-3.5 w-3.5" /> Trận đang đấu
+      </button>
+    </div>
+  ) : history.length > 0 ? (
+    <label className="relative flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-xs font-bold text-zinc-600">
+      <History className="h-3.5 w-3.5" /> Xem lại trận đã chấm ({history.length})
+      <ChevronDown className="h-3.5 w-3.5 text-zinc-400" />
+      <select
+        value=""
+        onChange={(e) => e.target.value && setReviewId(e.target.value)}
+        aria-label="Xem lại trận đã chấm"
+        className="absolute inset-0 opacity-0 cursor-pointer"
+      >
+        <option value="">Chọn trận</option>
+        {history.map((m) => (
+          <option key={m.id} value={m.id}>
+            {m.category === 'pro_2v2' ? 'Pro 2v2' : 'Newbie 1v1'} · {m.stageName} · Trận {m.matchNumber}
+            {m.status === 'finished' ? ` · ${m.roundWinsRed}-${m.roundWinsBlue}` : ''}
+          </option>
+        ))}
+      </select>
+    </label>
+  ) : null;
+
   if (!match || !round) {
-    return <p className="flex-1 p-6 text-center text-sm text-zinc-500">Chưa có trận đấu nào.</p>;
+    return (
+      <div className="flex flex-1 flex-col gap-2 p-2.5">
+        {reviewBar}
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center">
+          <Swords className="h-10 w-10 text-zinc-300" />
+          <p className="font-condensed text-2xl font-black uppercase text-zinc-900">Chờ trận đấu</p>
+          <p className="max-w-xs text-sm text-zinc-500">Ban tổ chức chưa chọn trận lên sàn. Trận sẽ tự hiện ở đây khi bắt đầu.</p>
+        </div>
+      </div>
+    );
   }
 
   const alreadySent = side !== null && side === sentSide;
@@ -104,8 +157,9 @@ export const BattleScoringPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-2 p-2.5">
-      {/* Match (tap to switch) */}
-      <label className="relative flex shrink-0 items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+      {reviewBar}
+      {/* The match on stage, chosen by the operator (or the past one being looked at) */}
+      <div className="flex shrink-0 items-center justify-between gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
         <span className="min-w-0">
           <span className="block text-[11px] font-bold uppercase tracking-wide text-zinc-500">
             {pro ? 'Pro 2vs2' : 'Newbie 1vs1'} · {regular.length} round
@@ -114,20 +168,14 @@ export const BattleScoringPanel: React.FC = () => {
             {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
           </span>
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 text-zinc-400" />
-        <select
-          value={match.id}
-          onChange={(e) => setActiveMatchId(e.target.value)}
-          aria-label="Chọn trận"
-          className="absolute inset-0 opacity-0 cursor-pointer"
-        >
-          {matches.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.category === 'pro_2v2' ? 'Pro 2v2' : 'Newbie 1v1'} · {m.stageName} · Trận {m.matchNumber}
-            </option>
-          ))}
-        </select>
-      </label>
+        {reviewing || match.status === 'finished' ? (
+          <span className="shrink-0 rounded-full bg-zinc-200 px-2.5 py-1 text-[11px] font-black uppercase text-zinc-600">Đã xong</span>
+        ) : (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-red-600 px-2.5 py-1 text-[11px] font-black uppercase text-white">
+            <span className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" /> Đang đấu
+          </span>
+        )}
+      </div>
 
       {/* Round tabs: every round of the format + tie-break. Dot = my vote, lock = announced. */}
       <div
@@ -272,7 +320,12 @@ export const BattleScoringPanel: React.FC = () => {
       >
         {locked ? (
           <>
-            <Lock className="w-4 h-4" /> {match.status === 'finished' && !round.isConfirmed ? 'Trận đã kết thúc' : 'Round đã công bố'}
+            <Lock className="w-4 h-4" />{' '}
+            {reviewing
+              ? 'Chỉ xem · không sửa được'
+              : match.status === 'finished' && !round.isConfirmed
+                ? 'Trận đã kết thúc'
+                : 'Round đã công bố'}
           </>
         ) : !side ? (
           'Chọn đỏ hoặc xanh'

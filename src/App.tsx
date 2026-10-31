@@ -26,6 +26,7 @@ import { StaffAccountsView } from './features/admin/StaffAccountsView';
 import { RehearsalView } from './features/admin/RehearsalView';
 import { CheckInDesk } from './features/dancers/CheckInDesk';
 import { isAdminView } from './app/routes';
+import { PublisherOfflineBanner } from './shared/PublisherOfflineBanner';
 import { CAN_SWITCH_TO_REHEARSAL, EVENT_ID, PROD_EVENT_ID, REHEARSAL_EVENT_ID, watchEventTree } from './services/firestore';
 import { ArrowLeft, Tv, CloudOff } from 'lucide-react';
 
@@ -143,6 +144,7 @@ const MainContent: React.FC = () => {
           Đang tổng duyệt: mọi máy dùng dữ liệu mẫu, không phải giải thật · Bấm để tắt
         </button>
       )}
+      <PublisherOfflineBanner />
       <div className="flex-1 flex max-w-full">
         {/* Left Sidebar */}
         <AdminSidebar />

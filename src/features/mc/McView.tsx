@@ -6,6 +6,7 @@ import { PANEL_SIZE, PanelId, panelOfDancer } from '../../domain/model';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { useMcs } from '../../state/useMcs';
 import { Avatar, GenderBadge, isScored, QUALIFY, rankForDisplay } from '../guest/PrelimGuestView';
+import { PublisherOfflineBanner } from '../../shared/PublisherOfflineBanner';
 
 // /mc: the MCs' screen. Each MC picks the prelim panel they call (and swaps when needed):
 // who is on the floor now, who is next, the whole running order with the scores once published, and the ranking.
@@ -86,6 +87,7 @@ export const McView: React.FC = () => {
   return (
     <div className="min-h-[100dvh] bg-zinc-50 text-zinc-900">
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur pt-[env(safe-area-inset-top)]">
+        <PublisherOfflineBanner />
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-2">
           <div className="flex min-w-0 items-center gap-3">
             <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-10 w-auto" />

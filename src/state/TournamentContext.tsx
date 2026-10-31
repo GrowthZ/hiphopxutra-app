@@ -52,6 +52,7 @@ import { useNavigation } from './useNavigation';
 import { useAuthSession } from './useAuthSession';
 import { useSoundSettings, AudioEffect } from './useSoundSettings';
 import { useGoogleSheets } from './useGoogleSheets';
+import { usePublisherHeartbeat } from './usePublisher';
 import { legacy } from './legacyStorage';
 
 export type DancerMediaUpdate = Partial<Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop' | 'gender'>>;
@@ -364,6 +365,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }),
     useSyncedCollection('judgeBallots', judgeBallots, () => {}, { canWrite: canPublish, enabled: canWrite }),
   ];
+  usePublisherHeartbeat(canPublish);
   const syncError = actionError ?? [...syncStates, ...publicSync].find((s) => s.error)?.error ?? null;
 
   function applyRemotePublicDancers(list: Dancer[]) {
