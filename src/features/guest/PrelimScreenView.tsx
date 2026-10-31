@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize, Medal, Radio } from 'lucide-react';
+import { Maximize, Medal, Moon, Radio, Sun } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { VIEW_PATHS } from '../../app/routes';
@@ -12,7 +12,7 @@ import { Avatar, GenderBadge, isScored, LIVE_LIMIT, QUALIFY, rankForDisplay } fr
 // /ket-qua/trinh-chieu-led (dark, LED wall). Laid out on a fixed 1920x1080 stage scaled to the window, so it
 // fits any screen without scrolling. Same public rules as the guest page: top 10 while judging, top 32 once
 // official. Newbie / Pro tabs (?hang-muc=newbie|pro picks the first one). A dancer whose 4th score lands is
-// highlighted and announced in the ticker.
+// highlighted and announced in the ticker. Either page can switch between the two looks (remembered per page).
 
 const W = 1920;
 const H = 1080;
@@ -42,7 +42,6 @@ const THEMES: Record<
     live: string;
     official: string;
     qr: string;
-    qrText: string;
     row: string;
     rank: string;
     name: string;
@@ -68,7 +67,6 @@ const THEMES: Record<
     live: 'bg-red-50 text-red-600',
     official: 'bg-emerald-100 text-emerald-700',
     qr: 'border border-zinc-200',
-    qrText: 'text-zinc-600',
     row: 'bg-white shadow-sm',
     rank: 'text-zinc-400',
     name: 'text-zinc-900',
@@ -107,7 +105,6 @@ const THEMES: Record<
     live: 'bg-red-600/20 text-red-400 ring-1 ring-red-500/50 shadow-[0_0_30px_rgba(239,68,68,0.4)]',
     official: 'bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-400/50',
     qr: 'bg-white/5 ring-1 ring-white/15',
-    qrText: 'text-white/70',
     row: 'bg-white/[0.06] ring-1 ring-white/10 backdrop-blur-sm',
     rank: 'text-white/40',
     name: 'text-white',
@@ -175,7 +172,26 @@ interface Fresh {
   at: number;
 }
 
-export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' }) => {
+const themeKey = (start: Theme) => `hiphop_xu_tra_prelim_screen_theme_${start}`;
+function savedTheme(start: Theme): Theme {
+  try {
+    const saved = localStorage.getItem(themeKey(start));
+    return saved === 'light' || saved === 'led' ? saved : start;
+  } catch {
+    return start;
+  }
+}
+
+export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = 'light' }) => {
+  const [theme, setThemeState] = useState<Theme>(() => savedTheme(start));
+  const setTheme = (next: Theme) => {
+    setThemeState(next);
+    try {
+      localStorage.setItem(themeKey(start), next);
+    } catch {
+      // private mode: the choice lasts for this visit only
+    }
+  };
   const t = THEMES[theme];
   const { newbieDancers, proDancers, isNewbieTop32Locked, isProTop32Locked } = useTournament();
   const judgeCount = PANEL_SIZE; // the 4 judges of each dancer's panel
@@ -273,12 +289,8 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' 
             </span>
           )}
           {/* Top-right corner: QR to the phone page */}
-          <div className={`flex items-center gap-4 rounded-2xl p-2.5 ${t.qr}`}>
+          <div className={`rounded-2xl p-2.5 ${t.qr}`}>
             <QrImage value={guestUrl} label="Mã QR trang kết quả trên điện thoại" className="h-[118px] w-[118px] rounded-lg bg-white" />
-            <div className={`w-44 leading-tight ${t.qrText}`}>
-              <p className="text-xl font-black uppercase">Xem trên điện thoại</p>
-              <p className="mt-1 text-base font-semibold opacity-80">{guestUrl.replace(/^https?:\/\//, '')}</p>
-            </div>
           </div>
         </header>
 
@@ -321,13 +333,25 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme = 'light' 
         </footer>
       </div>
 
-      {!idle && document.fullscreenEnabled && !document.fullscreenElement && (
-        <button
-          onClick={() => document.documentElement.requestFullscreen().catch(() => undefined)}
-          className="fixed bottom-5 right-5 flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/20 cursor-pointer"
-        >
-          <Maximize className="h-4 w-4" /> Toàn màn hình
-        </button>
+      {/* Operator controls, hidden with the cursor */}
+      {!idle && (
+        <div className="fixed bottom-5 right-5 flex gap-2">
+          <button
+            onClick={() => setTheme(theme === 'led' ? 'light' : 'led')}
+            className="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/20 cursor-pointer"
+          >
+            {theme === 'led' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'led' ? 'Theme sáng' : 'Theme tối'}
+          </button>
+          {document.fullscreenEnabled && !document.fullscreenElement && (
+            <button
+              onClick={() => document.documentElement.requestFullscreen().catch(() => undefined)}
+              className="flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm font-bold text-white shadow-lg ring-1 ring-white/20 cursor-pointer"
+            >
+              <Maximize className="h-4 w-4" /> Toàn màn hình
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

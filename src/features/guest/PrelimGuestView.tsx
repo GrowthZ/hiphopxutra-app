@@ -1,10 +1,8 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, ChevronRight, Crown, Download, Loader2, Search, Share2, X } from 'lucide-react';
+import React, { useEffect, useId, useMemo, useState } from 'react';
+import { Check, ChevronRight, Crown, Search, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
-import { VIEW_PATHS } from '../../app/routes';
-import { isIOS } from '../../services/pwa';
 import { GuestHeader } from './GuestBattleView';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 
@@ -364,7 +362,7 @@ export const PrelimGuestView: React.FC = () => {
   );
 };
 
-/** One dancer's card: photo, rank, every judge's score. Made to be screenshotted and posted, with a share link. */
+/** One dancer's card, centred on screen: photo, rank, every judge's score. Tap outside, Esc or the × below to close. */
 const DancerSheet: React.FC<{
   dancer: Dancer;
   rank: number;
@@ -374,7 +372,6 @@ const DancerSheet: React.FC<{
   categoryLabel: string;
   onClose: () => void;
 }> = ({ dancer, rank, cheer, judges, locked, categoryLabel, onClose }) => {
-  const [copied, setCopied] = useState(false);
   const scored = isScored(dancer, PANEL_SIZE);
   const unranked = scored && rank > RANKED_UNTIL;
   const medal = scored && rank <= 3 ? METALS[rank - 1] : null;
@@ -394,77 +391,16 @@ const DancerSheet: React.FC<{
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const share = async () => {
-    const url = `${window.location.origin}${VIEW_PATHS.prelim_guest}${dancer.sbd ? `?sbd=${encodeURIComponent(dancer.sbd)}` : ''}`;
-    const text = scored
-      ? `${name} · ${rankLabel} vòng loại ${categoryLabel} · ${dancer.prelimScoreTotal}/${judges.length * 100} điểm · HIPHOP XỨ TRÀ 2026`
-      : `${name} · vòng loại ${categoryLabel} · HIPHOP XỨ TRÀ 2026`;
-    if (navigator.share) {
-      await navigator.share({ title: `${name} · HIPHOP XỨ TRÀ 2026`, text, url }).catch(() => {});
-      return;
-    }
-    await navigator.clipboard?.writeText(`${text}\n${url}`);
-    setCopied(true);
-  };
-
-  // The card as a PNG, drawn as soon as the sheet opens: iPhone only shows the share sheet while the tap is fresh.
-  const cardRef = useRef<HTMLElement>(null);
-  const image = useRef<Promise<Blob | null> | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState(false);
-  const renderCard = () => {
-    const node = cardRef.current;
-    if (!node) return Promise.resolve(null);
-    return import('html-to-image').then(async ({ toBlob }) => {
-      const options = { pixelRatio: 3, filter: (n: HTMLElement) => n.dataset?.export !== 'skip' };
-      await toBlob(node, options); // Safari draws the photos only from the second pass
-      return toBlob(node, options);
-    });
-  };
-  useEffect(() => {
-    image.current = null;
-    const timer = setTimeout(() => (image.current = renderCard().catch(() => null)), 400);
-    return () => clearTimeout(timer);
-  }, [dancer]);
-
-  const saveImage = async () => {
-    setSaving(true);
-    setSaveError(false);
-    try {
-      const blob = await (image.current ?? renderCard());
-      if (!blob) throw new Error('no image');
-      const file = new File([blob], `hiphopxutra-${dancer.sbd || name}.png`, { type: 'image/png' });
-      // iPhone: the share sheet's "Lưu hình ảnh" puts it in Photos (a download would land in Files).
-      if (isIOS() && navigator.canShare?.({ files: [file] })) {
-        const shared = await navigator.share({ files: [file] }).then(
-          () => true,
-          (e: Error) => e.name === 'AbortError'
-        );
-        if (shared) return;
-      }
-      const href = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = href;
-      a.download = file.name;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(href), 1000);
-    } catch {
-      setSaveError(true);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-zinc-950/75 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/75 backdrop-blur-sm" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label={name}
         onClick={(e) => e.stopPropagation()}
-        className="max-h-[100dvh] w-full max-w-sm space-y-3 overflow-y-auto px-3 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+        className="flex max-h-[100dvh] w-full max-w-sm flex-col items-center gap-4 overflow-y-auto px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))]"
       >
-        <article ref={cardRef} className="relative overflow-hidden rounded-3xl bg-zinc-950 text-white shadow-2xl ring-1 ring-white/10">
+        <article className="relative w-full overflow-hidden rounded-3xl bg-zinc-950 text-white shadow-2xl ring-1 ring-white/10">
           {/* Glow in the rank's colour and a faint diagonal texture */}
           <div
             aria-hidden
@@ -475,15 +411,6 @@ const DancerSheet: React.FC<{
             aria-hidden
             className="pointer-events-none absolute inset-0 opacity-[0.05] bg-[repeating-linear-gradient(135deg,#fff_0_2px,transparent_2px_14px)]"
           />
-          <button
-            onClick={onClose}
-            aria-label="Đóng"
-            data-export="skip"
-            className="absolute right-2 top-2 z-10 rounded-full p-2.5 text-white/60 hover:bg-white/10 hover:text-white cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-400"
-          >
-            <X className="h-5 w-5" />
-          </button>
-
           <div className="relative flex flex-col items-center px-5 pb-5 pt-5 text-center">
             <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-12 w-auto" />
             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.2em] text-white/60">Vòng loại · {categoryLabel}</p>
@@ -550,35 +477,13 @@ const DancerSheet: React.FC<{
           </div>
         </article>
 
-        <div className="flex gap-2">
-          <button
-            onClick={saveImage}
-            disabled={saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-amber-500 py-3.5 text-sm font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-70 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-300"
-          >
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-            Lưu ảnh
-          </button>
-          <button
-            onClick={share}
-            aria-label={copied ? 'Đã chép liên kết' : 'Chia sẻ'}
-            title={copied ? 'Đã chép liên kết' : 'Chia sẻ'}
-            className="flex w-14 items-center justify-center rounded-2xl bg-white/10 text-white hover:bg-white/20 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-300"
-          >
-            {copied ? <Check className="h-5 w-5 text-emerald-400" /> : <Share2 className="h-5 w-5" />}
-          </button>
-          <button
-            onClick={onClose}
-            className="rounded-2xl bg-white/10 px-5 py-3.5 text-sm font-bold text-white hover:bg-white/20 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-300"
-          >
-            Đóng
-          </button>
-        </div>
-        {saveError && (
-          <p role="alert" className="text-center text-xs font-bold text-red-300">
-            Không lưu được ảnh. Thử lại hoặc chụp màn hình thẻ.
-          </p>
-        )}
+        <button
+          onClick={onClose}
+          aria-label="Đóng"
+          className="rounded-full p-3 text-white/40 hover:bg-white/10 hover:text-white/80 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-400"
+        >
+          <X className="h-7 w-7" />
+        </button>
       </div>
     </div>
   );
