@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, Delete, Loader2, Lock, Zap } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { soundFX } from '../../services/soundEffects';
@@ -9,7 +9,7 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back']
 
 // Pro and Newbie each have their own colour, so a judge sees at a glance which list is being scored.
 // Red stays for the tie-break (and red / blue for the battle corners), so neither category uses them.
-const THEMES: Record<CategoryType, { short: string; page: string; pad: string; pill: string; card: string; ring: string; badge: string }> = {
+const THEMES: Record<CategoryType, { short: string; page: string; pad: string; pill: string; card: string; ring: string; glow: string; text: string; badge: string }> = {
   pro_2v2: {
     short: 'Pro',
     page: 'bg-violet-100',
@@ -17,6 +17,8 @@ const THEMES: Record<CategoryType, { short: string; page: string; pad: string; p
     pill: 'bg-violet-600 text-white',
     card: 'border-violet-300',
     ring: 'ring-violet-500',
+    glow: 'shadow-violet-500/70',
+    text: 'text-violet-700',
     badge: 'bg-violet-600 text-white',
   },
   newbie_1v1: {
@@ -26,6 +28,8 @@ const THEMES: Record<CategoryType, { short: string; page: string; pad: string; p
     pill: 'bg-sky-600 text-white',
     card: 'border-sky-300',
     ring: 'ring-sky-500',
+    glow: 'shadow-sky-500/70',
+    text: 'text-sky-700',
     badge: 'bg-sky-600 text-white',
   },
 };
@@ -76,10 +80,18 @@ export const PrelimScoringPanel: React.FC = () => {
   // Tracked by id: the list re-sorts as scores arrive, an index would jump to someone else.
   const [dancerId, setDancerId] = useState<string | null>(null);
   const index = Math.max(0, dancers.findIndex((d) => d.id === dancerId));
-  // The avatar strip starts at the dancer being scored; its arrows page through the order without changing dancer.
-  const STRIP = 4;
-  const [stripStart, setStripStart] = useState(0);
-  useEffect(() => setStripStart(index), [index, dancers.length]);
+  // Avatar strip: 4 in view, scrolled one dancer at a time (arrows or a swipe); it follows the dancer being scored.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const scrollStrip = (step: number) => {
+    const strip = stripRef.current;
+    if (strip) strip.scrollBy({ left: step * (strip.clientWidth / 4), behavior: 'smooth' });
+  };
+  const currentId = dancers[index]?.id;
+  useEffect(() => {
+    const strip = stripRef.current;
+    const item = currentId ? strip?.querySelector<HTMLElement>(`[data-dancer="${currentId}"]`) : null;
+    if (strip && item) strip.scrollTo({ left: item.offsetLeft - strip.offsetLeft, behavior: 'smooth' });
+  }, [currentId]);
   const dancer = dancers[index];
   const saved = scoreOf(dancer);
 
@@ -179,7 +191,7 @@ export const PrelimScoringPanel: React.FC = () => {
   const tieTotal = tieDancers[0]?.prelimScoreTotal;
 
   return (
-    <div className={`grid flex-1 min-h-0 grid-rows-[minmax(0,2fr)_minmax(13.25rem,1fr)] transition-colors ${theme.page}`}>
+    <div className={`grid flex-1 min-h-0 grid-cols-[minmax(0,1fr)] grid-rows-[minmax(0,2fr)_minmax(13.25rem,1fr)] transition-colors ${theme.page}`}>
       {/* Top two thirds: who, the score, confirm */}
       <div className="flex min-h-0 flex-col gap-2 p-2.5">
         {/* Category (coloured, so Pro and Newbie never get mixed up) + panel / tie-break + progress */}
@@ -281,32 +293,37 @@ export const PrelimScoringPanel: React.FC = () => {
           )
         )}
 
-        {/* Running order: the dancer being scored first, then who's next; scored ones greyed out. Arrows page by 4. */}
+        {/* Running order, scrolled one dancer at a time: the one being scored lit up, scored ones greyed out */}
         {!tie && dancers.length > 1 && (
           <nav aria-label="Thứ tự thí sinh" className="flex shrink-0 items-center gap-1">
             <button
-              onClick={() => setStripStart((s) => Math.max(0, s - STRIP))}
-              disabled={stripStart === 0}
-              aria-label="Xem nhóm trước"
-              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 disabled:opacity-30 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              onClick={() => scrollStrip(-1)}
+              aria-label="Cuộn sang trái"
+              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <div className="grid flex-1 grid-cols-4 gap-1">
-              {dancers.slice(stripStart, stripStart + STRIP).map((d) => {
+            <div
+              ref={stripRef}
+              className="flex min-w-0 flex-1 snap-x snap-mandatory overflow-x-auto overscroll-x-contain py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
+              {dancers.map((d) => {
                 const done = typeof scoreOf(d) === 'number';
                 const current = d.id === dancer?.id;
                 return (
                   <button
                     key={d.id}
+                    data-dancer={d.id}
                     onClick={() => setDancerId(d.id)}
                     aria-current={current ? 'step' : undefined}
                     aria-label={`${d.sbd} ${d.name}${done ? ', đã chấm' : ''}`}
-                    className={`flex min-w-0 flex-col items-center gap-0.5 rounded-xl py-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
-                      current ? `bg-white shadow-sm ring-2 ${THEMES[activeCategory].ring}` : ''
-                    }`}
+                    className="flex w-1/4 shrink-0 snap-start flex-col items-center gap-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
                   >
-                    <span className={`relative ${done && !current ? 'opacity-40 grayscale' : ''}`}>
+                    <span
+                      className={`relative rounded-full transition-shadow ${
+                        current ? `ring-[3px] ${THEMES[activeCategory].ring} shadow-[0_0_14px_3px] ${THEMES[activeCategory].glow}` : ''
+                      } ${done && !current ? 'opacity-40 grayscale' : ''}`}
+                    >
                       {d.avatarUrl ? (
                         <img src={d.avatarUrl} alt="" className="h-10 w-10 rounded-full bg-zinc-100 object-cover [@media(max-height:600px)]:h-8 [@media(max-height:600px)]:w-8" />
                       ) : (
@@ -320,7 +337,11 @@ export const PrelimScoringPanel: React.FC = () => {
                         </span>
                       )}
                     </span>
-                    <span className={`font-mono text-[11px] font-black leading-none ${done && !current ? 'text-zinc-400' : 'text-zinc-800'}`}>
+                    <span
+                      className={`font-mono text-[11px] font-black leading-none ${
+                        current ? THEMES[activeCategory].text : done ? 'text-zinc-400' : 'text-zinc-800'
+                      }`}
+                    >
                       {d.sbd || '—'}
                     </span>
                   </button>
@@ -328,10 +349,9 @@ export const PrelimScoringPanel: React.FC = () => {
               })}
             </div>
             <button
-              onClick={() => setStripStart((s) => Math.min(Math.max(0, dancers.length - 1), s + STRIP))}
-              disabled={stripStart + STRIP >= dancers.length}
-              aria-label="Xem nhóm sau"
-              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 disabled:opacity-30 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              onClick={() => scrollStrip(1)}
+              aria-label="Cuộn sang phải"
+              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
             >
               <ChevronRight className="h-5 w-5" />
             </button>

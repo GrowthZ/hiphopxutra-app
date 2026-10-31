@@ -2,7 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, KeyRound, Loader2, Mic, RefreshCw, UserPlus } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { changeJudgePin, createJudgeAccount, subscribeJudgePins } from '../../services/judgeAccounts';
-import { changeMcPin, createMcAccount, MCS, subscribeMcPins } from '../../services/mcAccounts';
+import { changeMcPin, createMcAccount, subscribeMcPins } from '../../services/mcAccounts';
+import { renameMc } from '../../services/firestore';
+import { useMcs } from '../../state/useMcs';
+import { InlineRename } from '../../shared/InlineRename';
 import { useOnlineJudgeIds } from '../../state/useJudgePresence';
 import { getJudgeAvatarUrl } from '../../shared/placeholderAssets';
 import { VIEW_PATHS } from '../../app/routes';
@@ -51,6 +54,7 @@ const PinRow: React.FC<{
   avatar: React.ReactNode;
   code: string;
   name: string;
+  onRename: (name: string) => Promise<void> | void;
   online?: boolean;
   pin?: string;
   loaded: boolean;
@@ -60,12 +64,17 @@ const PinRow: React.FC<{
   anyBusy: boolean;
   onCreate: () => void;
   onChangePin: () => void;
-}> = ({ avatar, code, name, online, pin, loaded, revealed, onToggle, busy, anyBusy, onCreate, onChangePin }) => (
+}> = ({ avatar, code, name, onRename, online, pin, loaded, revealed, onToggle, busy, anyBusy, onCreate, onChangePin }) => (
   <li className="flex items-center gap-3 px-3 sm:px-4 py-3">
     {avatar}
     <div className="min-w-0 flex-1">
       <p className="font-mono text-xs font-black text-amber-600">{code}</p>
-      <p className="font-condensed text-lg font-black uppercase leading-tight text-zinc-900 truncate">{name}</p>
+      <InlineRename
+        value={name}
+        label={`${code} ${name}`}
+        onSave={onRename}
+        className="font-condensed text-lg font-black uppercase leading-tight text-zinc-900"
+      />
     </div>
 
     {online !== undefined && (
@@ -120,7 +129,8 @@ const PinRow: React.FC<{
 
 /** /admin/cai-dat/giam-khao: create the 9 judge logins and the 2 MC logins, hand out and rotate their PINs. */
 export const JudgeAccountsView: React.FC = () => {
-  const { judges } = useTournament();
+  const { judges, updateJudgePhotos } = useTournament();
+  const mcs = useMcs();
   const onlineIds = useOnlineJudgeIds();
   const [error, setError] = useState<string | null>(null);
   const judgePins = usePinAccounts(subscribeJudgePins, setError);
@@ -178,6 +188,7 @@ export const JudgeAccountsView: React.FC = () => {
             avatar={<img src={getJudgeAvatarUrl(j)} alt="" className="w-10 h-10 rounded-full object-cover bg-zinc-100 shrink-0" />}
             code={j.code}
             name={j.judgeName || j.name.split('•')[1]?.trim() || j.code}
+            onRename={(v) => updateJudgePhotos(j.id, { name: `${j.code} • ${v}`, judgeName: v })}
             online={onlineIds.has(j.id)}
             pin={judgePins.pins[j.id]}
             loaded={judgePins.loaded}
@@ -200,7 +211,7 @@ export const JudgeAccountsView: React.FC = () => {
           </p>
         </div>
         <ul className="divide-y divide-zinc-200 rounded-lg border border-zinc-200 bg-white" aria-label="MC">
-          {MCS.map((m) => (
+          {mcs.map((m) => (
             <PinRow
               key={m.id}
               avatar={
@@ -210,6 +221,7 @@ export const JudgeAccountsView: React.FC = () => {
               }
               code="MC"
               name={m.name}
+              onRename={(v) => renameMc(m.id, v)}
               pin={mcPins.pins[m.id]}
               loaded={mcPins.loaded}
               revealed={Boolean(mcPins.revealed[m.id])}

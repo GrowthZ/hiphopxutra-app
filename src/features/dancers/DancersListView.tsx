@@ -11,9 +11,11 @@ import {
   Image as ImageIcon,
   Sliders,
   Filter,
+  Pencil,
 } from 'lucide-react';
 import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from './DancerPhotoUploadModal';
+import { DancerInfoModal } from './DancerInfoModal';
 import {
   getDancerAvatarUrl,
   getDancerHalfBodyUrl,
@@ -34,6 +36,7 @@ export const DancersListView: React.FC = () => {
   const [filterQualified, setFilterQualified] = useState<'all' | 'top32' | 'out'>('all');
   const [filterGender, setFilterGender] = useState<'all' | 'male' | 'female'>('all');
   const [selectedDancerForPhoto, setSelectedDancerForPhoto] = useState<Dancer | null>(null);
+  const [editingDancer, setEditingDancer] = useState<Dancer | null>(null);
 
   const currentList = activeCategory === 'newbie_1v1' ? newbieDancers : proDancers;
 
@@ -352,7 +355,16 @@ export const DancersListView: React.FC = () => {
                     </td>
 
                     {/* Photo Upload Action Button */}
-                    <td className="py-2 px-3 text-center">
+                    <td className="py-2 px-3 text-center whitespace-nowrap">
+                      <button
+                        onClick={() => setEditingDancer(d)}
+                        aria-label={`Sửa thông tin ${d.name}`}
+                        title="Sửa thông tin"
+                        className="mr-1 inline-flex items-center gap-1 px-2.5 py-1 rounded border border-zinc-300 hover:bg-zinc-100 text-zinc-700 font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer"
+                      >
+                        <Pencil className="w-3 h-3" />
+                        <span>Sửa</span>
+                      </button>
                       <button
                         onClick={() => setSelectedDancerForPhoto(d)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-zinc-900 hover:bg-zinc-800 text-white font-bold text-[11px] uppercase tracking-wider transition-colors cursor-pointer"
@@ -376,6 +388,7 @@ export const DancersListView: React.FC = () => {
         isOpen={Boolean(selectedDancerForPhoto)}
         onClose={() => setSelectedDancerForPhoto(null)}
       />
+      <DancerInfoModal dancer={editingDancer} category={activeCategory} onClose={() => setEditingDancer(null)} />
     </div>
   );
 };

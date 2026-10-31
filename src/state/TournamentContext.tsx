@@ -8,6 +8,7 @@ import {
   Judge,
   Team2v2,
   BattleMatch,
+  BattleSide,
   GoogleSheetConfig,
   StorageConfig,
 } from '../domain/types';
@@ -54,6 +55,12 @@ import { useGoogleSheets } from './useGoogleSheets';
 import { legacy } from './legacyStorage';
 
 export type DancerMediaUpdate = Partial<Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop' | 'gender'>>;
+export interface DancerInfoUpdate {
+  name: string;
+  realName: string;
+  crew: string;
+  gender: Dancer['gender'];
+}
 type Side = 'red' | 'blue';
 /** incomplete: scores still missing · tie-opened: tie-break just opened · tie-pending: tie-break still being scored (or tied again) */
 export type PublishPrelimResult = 'incomplete' | 'locked' | 'tie-opened' | 'tie-pending';
@@ -125,6 +132,7 @@ interface TournamentContextType {
   setStorageConfig: (config: StorageConfig) => void;
   updateDancerMedia: (category: CategoryType, dancerId: string, photos: DancerMediaUpdate) => void;
   updateDancerGender: (category: CategoryType, dancerId: string, gender: 'male' | 'female') => void;
+  updateDancerInfo: (category: CategoryType, dancerId: string, info: DancerInfoUpdate) => void;
   updateTeamPhoto: (teamId: string, teamPhotoUrl: string) => void;
   isStorageModalOpen: boolean;
   setIsStorageModalOpen: (open: boolean) => void;
@@ -511,6 +519,35 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const updateDancerGender = (category: CategoryType, dancerId: string, gender: 'male' | 'female') =>
     updateDancerMedia(category, dancerId, { gender });
 
+  /** Admin edits a dancer's details; an empty real name or club removes it. SBD, panel, photos and scores stay. */
+  const updateDancerInfo = (category: CategoryType, dancerId: string, info: DancerInfoUpdate) => {
+    const update = (prev: Dancer[]) =>
+      prev.map((d) => {
+        if (d.id !== dancerId) return d;
+        const { realName: _r, crew: _c, ...rest } = d;
+        return {
+          ...rest,
+          name: info.name,
+          gender: info.gender,
+          ...(info.realName.trim() && { realName: info.realName.trim() }),
+          ...(info.crew.trim() && { crew: info.crew.trim() }),
+        };
+      });
+    if (category === 'newbie_1v1') setNewbieDancers(update);
+    else setProDancers(update);
+    // A 1vs1 battle side carries the dancer's name too.
+    setMatches((prev) =>
+      prev.map((m) => {
+        const rename = (side: BattleSide) =>
+          side.dancers.length === 1 && side.dancers[0].id === dancerId
+            ? { ...side, name: info.name, dancers: [{ ...side.dancers[0], name: info.name }] }
+            : side;
+        const [red, blue] = [rename(m.sideRed), rename(m.sideBlue)];
+        return red === m.sideRed && blue === m.sideBlue ? m : { ...m, sideRed: red, sideBlue: blue };
+      })
+    );
+  };
+
   // Match sides pick the team photo up through hydrateMatch.
   const updateTeamPhoto = (teamId: string, teamPhotoUrl: string) =>
     setProTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, teamPhotoUrl } : t)));
@@ -668,6 +705,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setStorageConfig,
         updateDancerMedia,
         updateDancerGender,
+        updateDancerInfo,
         updateTeamPhoto,
         isStorageModalOpen,
         setIsStorageModalOpen,

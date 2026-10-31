@@ -123,6 +123,18 @@ export const watchEventTree = (onSwitch: () => void) =>
 
 export const setRehearsalMode = (on: boolean) => setDoc(configDoc(), { rehearsal: on, updatedAt: Date.now() }, { merge: true });
 
+// ---------- MC names (config/app.mcNames, app-wide like the switch above) ----------
+
+export const subscribeMcNames = (onChange: (names: Record<string, string>) => void) =>
+  onSnapshot(
+    configDoc(),
+    (snap) => onChange(snap.data()?.mcNames ?? {}),
+    () => onChange({})
+  );
+
+export const renameMc = (mcId: string, name: string) =>
+  setDoc(configDoc(), { mcNames: { [mcId]: name }, updatedAt: Date.now() }, { merge: true });
+
 export const dancersCollectionOf = (category: CategoryType): SyncedCollection =>
   category === 'newbie_1v1' ? 'newbieDancers' : 'proDancers';
 

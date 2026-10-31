@@ -4,7 +4,7 @@ import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { PANEL_SIZE, PanelId, panelOfDancer } from '../../domain/model';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
-import { mcById } from '../../services/mcAccounts';
+import { useMcs } from '../../state/useMcs';
 import { Avatar, GenderBadge, isScored, QUALIFY, rankForDisplay } from '../guest/PrelimGuestView';
 
 // /mc: the MCs' screen. Each MC picks the prelim panel they call (and swaps when needed):
@@ -52,7 +52,7 @@ export const McView: React.FC = () => {
     isNewbieTop32Locked,
     isProTop32Locked,
   } = useTournament();
-  const mc = mcById(mcAccountId);
+  const mc = useMcs().find((m) => m.id === mcAccountId);
   const [tab, setTabState] = useState<Tab>(savedTab);
   const setTab = (t: Tab) => {
     setTabState(t);

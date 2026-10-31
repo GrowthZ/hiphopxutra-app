@@ -58,6 +58,7 @@ export async function createStaffAccount(username: string, password: string, rol
 }
 
 export const setStaffRole = (email: string, role: StaffRole) => updateDoc(eventDoc('admins', email), { role });
+export const renameStaff = (email: string, name: string) => updateDoc(eventDoc('admins', email), { name });
 
 /** Replaces the password (needs the stored one); the member's other sessions are signed out by Firebase. */
 export async function resetStaffPassword(email: string, currentPassword: string) {

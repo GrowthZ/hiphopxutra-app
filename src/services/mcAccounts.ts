@@ -14,7 +14,6 @@ export type Mc = (typeof MCS)[number];
 export const mcEmail = (mcId: string) => `${mcId}@${MC_EMAIL_DOMAIN}`;
 export const mcIdFromEmail = (email?: string | null) =>
   email?.endsWith(`@${MC_EMAIL_DOMAIN}`) ? email.split('@')[0] : null;
-export const mcById = (mcId: string | null) => MCS.find((m) => m.id === mcId);
 
 const MC_ACCOUNTS: PinAccountKind = { email: mcEmail, secrets: 'mcSecrets' };
 

@@ -227,6 +227,37 @@ test('admin gives a BTC member a check-in account', async () => {
   await waitForDoc<{ role: string }>('admins/checkin1@btc.hiphopxutra.vn', (a) => a?.role === 'checkin');
 });
 
+test('admin renames a judge, an MC and a BTC member, and edits a dancer', async () => {
+  const rename = async (who: string, name: string) => {
+    await admin.getByRole('button', { name: `Đổi tên ${who}` }).click();
+    await admin.getByLabel(`Tên mới của ${who}`).fill(name);
+    await admin.getByRole('button', { name: 'Lưu tên' }).click();
+  };
+
+  await admin.goto('/admin/cai-dat/giam-khao');
+  await rename('GK 09 Huco', 'Huco Jr');
+  await waitForDoc<{ judgeName: string; name: string }>('judges/gk-9', (j) => j?.judgeName === 'Huco Jr' && j.name === 'GK 09 • Huco Jr');
+  await rename('MC Caramel', 'Caramel Pop');
+  await expect
+    .poll(async () => (await getFirestore().doc('config/app').get()).data()?.mcNames?.['mc-1'])
+    .toBe('Caramel Pop');
+
+  await admin.goto('/admin/cai-dat/nguoi-dung');
+  await rename('checkin1', 'Bàn check-in 1');
+  await waitForDoc<{ name: string }>('admins/checkin1@btc.hiphopxutra.vn', (a) => a?.name === 'Bàn check-in 1');
+
+  await admin.goto('/admin/thi-sinh');
+  await admin.getByRole('button', { name: /^Sửa thông tin / }).first().click();
+  const dialog = admin.getByRole('dialog', { name: /Sửa thông tin/ });
+  await dialog.getByLabel('Tên thi đấu').fill('bboy  renamed ');
+  await dialog.getByLabel('CLB / Đội').fill('Xứ Trà Crew');
+  await dialog.getByRole('button', { name: 'Lưu' }).click();
+  await expect(dialog).toBeHidden();
+  await expect
+    .poll(async () => (await event.collection('proDancers').where('name', '==', 'BBOY RENAMED').get()).docs[0]?.data().crew)
+    .toBe('Xứ Trà Crew');
+});
+
 test('check-in staff registers a walk-in and hands out an SBD, nothing else', async ({ browser }) => {
   const context = await browser.newContext();
   const desk = await context.newPage();

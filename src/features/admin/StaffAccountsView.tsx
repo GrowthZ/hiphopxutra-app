@@ -7,6 +7,7 @@ import {
   generatePassword,
   removeStaffAccount,
   resetStaffPassword,
+  renameStaff,
   ROLE_LABELS,
   setStaffRole,
   StaffAccount,
@@ -14,6 +15,7 @@ import {
   usernameOf,
 } from '../../services/staffAccounts';
 import { VIEW_PATHS } from '../../app/routes';
+import { InlineRename } from '../../shared/InlineRename';
 
 const ROLE_HINTS: Record<StaffRole, string> = {
   admin: 'Toàn quyền điều hành giải',
@@ -223,10 +225,10 @@ export const StaffAccountsView: React.FC = () => {
           return (
             <li key={a.email} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 sm:px-4 py-3">
               <div className="min-w-0 flex-1 basis-40">
-                <p className="font-bold text-zinc-900 truncate">
-                  {a.name}
-                  {a.email === myEmail && <span className="ml-1.5 text-[10px] font-bold text-amber-600 uppercase">Bạn</span>}
-                </p>
+                <div className="flex min-w-0 items-center font-bold text-zinc-900">
+                  <InlineRename value={a.name} label={a.name} onSave={(name) => renameStaff(a.email, name)} />
+                  {a.email === myEmail && <span className="ml-1.5 shrink-0 text-[10px] font-bold text-amber-600 uppercase">Bạn</span>}
+                </div>
                 <p className="font-mono text-xs text-zinc-500 truncate">{user ?? `${a.email} · Google`}</p>
               </div>
 
