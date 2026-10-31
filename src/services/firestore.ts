@@ -190,9 +190,12 @@ export const isIssuedSbd = (category: CategoryType, sbd: string) => new RegExp(`
 
 /**
  * Check a dancer in and return their SBD. Numbers come from a counter in a transaction, so two desks
- * checking in at once never get the same number. A dancer who already had a number keeps it.
+ * checking in at once never get the same number. A number given back by an undone check-in (counters/sbd
+ * `freeN` / `freeP`) goes to the next dancer first, smallest first, so the list has no gaps.
  * `highestIssued` covers a missing/reset counter when numbers were already handed out.
  */
+const freeKey = (prefix: string) => `free${prefix}`;
+
 /** Prelim panel for a freshly issued number: A takes odd numbers when `aIsOdd`, else the even ones. */
 const panelForNumber = (n: number, aIsOdd: boolean): 'A' | 'B' => ((n % 2 === 1) === aIsOdd ? 'A' : 'B');
 
@@ -219,10 +222,17 @@ export async function checkInDancer(
       return { sbd: currentSbd, panel };
     }
 
-    const next = Math.max(Number(counter.data()?.[prefix] ?? 0), highestIssued) + 1;
+    const free = ((counter.data()?.[freeKey(prefix)] ?? []) as unknown[]).filter((n): n is number => Number.isInteger(n) && Number(n) > 0);
+    let next: number;
+    if (free.length) {
+      next = Math.min(...free);
+      tx.set(counterRef, { [freeKey(prefix)]: free.filter((n) => n !== next) }, { merge: true });
+    } else {
+      next = Math.max(Number(counter.data()?.[prefix] ?? 0), highestIssued) + 1;
+      tx.set(counterRef, { [prefix]: next }, { merge: true });
+    }
     const sbd = `${prefix}${String(next).padStart(3, '0')}`;
     const panel = panelForNumber(next, aIsOdd);
-    tx.set(counterRef, { [prefix]: next }, { merge: true });
     tx.update(dancerRef, { sbd, panel, checkedInAt: Date.now() });
     return { sbd, panel };
   });
@@ -257,8 +267,28 @@ export async function registerWalkIn(category: CategoryType, dancer: WalkInDance
   return id;
 }
 
-export const undoCheckIn = (category: CategoryType, dancerId: string) =>
-  updateDoc(eventDoc(dancersCollectionOf(category), dancerId), { checkedInAt: deleteField() });
+/**
+ * A check-in pressed by mistake: the dancer goes back to "not checked in", without a number or a panel, and the
+ * number is given back for the next check-in. Not once the dancer has prelim scores (they belong to that number).
+ */
+export async function undoCheckIn(category: CategoryType, dancerId: string) {
+  const prefix = sbdPrefixOf(category);
+  const counterRef = eventDoc('counters', 'sbd');
+  const dancerRef = eventDoc(dancersCollectionOf(category), dancerId);
+  await runTransaction(db, async (tx) => {
+    const counter = await tx.get(counterRef);
+    const dancer = await tx.get(dancerRef);
+    if (!dancer.exists()) throw new Error('Không tìm thấy thí sinh trên Firestore');
+    if (Object.keys(dancer.data().prelimScores ?? {}).length) throw new Error('thí sinh đã có điểm Prelim');
+    const sbd = String(dancer.data().sbd ?? '');
+    if (isIssuedSbd(category, sbd)) {
+      const free = new Set<number>((counter.data()?.[freeKey(prefix)] ?? []) as number[]);
+      free.add(Number(sbd.slice(1)));
+      tx.set(counterRef, { [freeKey(prefix)]: [...free].sort((a, b) => a - b) }, { merge: true });
+    }
+    tx.update(dancerRef, { sbd: '', panel: deleteField(), checkedInAt: deleteField() });
+  });
+}
 
 export async function clearVotes(matchIds: string[]) {
   if (matchIds.length === 0) return;

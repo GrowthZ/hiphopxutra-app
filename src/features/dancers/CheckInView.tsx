@@ -191,11 +191,14 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
     }
   };
 
+  // Pressed by mistake: back to "not checked in", and the number goes to the next dancer checked in.
   const handleUndo = async (dancer: Dancer) => {
+    if (!window.confirm(`Huỷ check-in ${dancer.name}? Số ${dancer.sbd} được trả lại và cấp cho người check-in tiếp theo.`)) return;
     setBusyId(dancer.id);
     try {
       await undoCheckIn(category, dancer.id);
       if (highlightId === dancer.id) setHighlightId(null);
+      notify({ kind: 'ok', title: `Đã huỷ check-in ${dancer.name}`, sbd: `Trả lại số ${dancer.sbd}` });
     } catch (e) {
       setError(`Không huỷ được check-in: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -563,9 +566,9 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
                       <span className="text-[11px] font-bold text-emerald-700 tabular-nums">✓ {formatTime(d.checkedInAt)}</span>
                       <button
                         onClick={() => handleUndo(d)}
-                        disabled={busy}
+                        disabled={busy || Object.keys(d.prelimScores ?? {}).length > 0}
                         aria-label={`Huỷ check-in ${d.name}`}
-                        title="Huỷ check-in"
+                        title={Object.keys(d.prelimScores ?? {}).length ? 'Đã có điểm Prelim, không huỷ được' : 'Huỷ check-in, trả lại số'}
                         className="p-3 sm:p-2 rounded text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
                       >
                         {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Undo2 className="w-4 h-4" />}

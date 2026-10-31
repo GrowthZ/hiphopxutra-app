@@ -541,6 +541,21 @@ test('a Newbie dancer signs up for Pro too: one photo serves both, at the desk a
   for (const col of ['newbieDancers', 'proDancers']) {
     expect((await event.collection(col).where('name', '==', 'BBOY SOLO').get()).size).toBe(1);
   }
+
+  // A check-in pressed by mistake is undone: no number, no panel, and the next dancer checked in gets that number.
+  desk.on('dialog', (d) => d.accept());
+  const newbieByName = async (name: string) =>
+    (await event.collection('newbieDancers').where('name', '==', name).get()).docs[0].data();
+  await desk.getByRole('button', { name: /^Newbie/ }).click(); // the walk-in above left the desk on Pro
+  await desk.getByRole('listitem').filter({ hasText: 'BBOY SOLO' }).getByRole('button', { name: 'Check-in' }).click();
+  await expect.poll(async () => (await newbieByName('BBOY SOLO')).sbd).toMatch(/^N\d{3}$/);
+  const mistaken = (await newbieByName('BBOY SOLO')).sbd;
+  await desk.getByRole('button', { name: 'Huỷ check-in BBOY SOLO' }).click();
+  await expect(desk.getByText(`Trả lại số ${mistaken}`)).toBeVisible();
+  const undone = await newbieByName('BBOY SOLO');
+  expect([undone.sbd, undone.panel, undone.checkedInAt]).toEqual(['', undefined, undefined]);
+  await desk.getByRole('listitem').filter({ hasText: 'BGIRL SASS-Y' }).getByRole('button', { name: 'Check-in' }).click();
+  await expect.poll(async () => (await newbieByName('BGIRL SASS-Y')).sbd).toBe(mistaken);
   await context.close();
 });
 
@@ -625,6 +640,19 @@ test('rehearsal: sample data in its own tree, switched on for every device, then
   await expect(admin.getByRole('status')).toContainText('Đã xoá');
   expect((await rehearsal.collection('newbieDancers').count().get()).data().count).toBe(0);
   expect((await event.collection('newbieDancers').count().get()).data().count).toBe(realNewbies);
+
+  // On the real list: the real dancers with their photos, at the battle stage (topped up for the bracket if needed).
+  await admin.getByLabel('Dùng danh sách thí sinh thật').check();
+  await admin.getByLabel(/^Battle vòng đầu/).check();
+  await admin.getByRole('button', { name: 'Tạo dữ liệu mẫu' }).click();
+  await expect(admin.getByRole('status')).toContainText('Đã tạo');
+  const copied = (await rehearsal.collection('newbieDancers').where('name', '==', 'BBOY WALK IN').get()).docs[0]?.data();
+  expect(copied?.avatarUrl).toBe('https://media.test/walk-in-avatar.webp');
+  expect((await rehearsal.collection('newbieDancers').count().get()).data().count).toBeGreaterThanOrEqual(realNewbies);
+  expect((await rehearsal.collection('matches').count().get()).data().count).toBeGreaterThan(0);
+  expect((await event.collection('newbieDancers').count().get()).data().count).toBe(realNewbies); // still only read
+  await admin.getByRole('button', { name: 'Xoá dữ liệu mẫu' }).click();
+  await expect(admin.getByRole('status')).toContainText('Đã xoá');
   admin.off('dialog', accept);
   await guest.context().close();
 });
