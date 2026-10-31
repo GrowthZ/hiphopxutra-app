@@ -9,13 +9,14 @@ const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back']
 
 // Pro and Newbie each have their own colour, so a judge sees at a glance which list is being scored.
 // Red stays for the tie-break (and red / blue for the battle corners), so neither category uses them.
-const THEMES: Record<CategoryType, { short: string; page: string; pad: string; pill: string; card: string; badge: string }> = {
+const THEMES: Record<CategoryType, { short: string; page: string; pad: string; pill: string; card: string; ring: string; badge: string }> = {
   pro_2v2: {
     short: 'Pro',
     page: 'bg-violet-100',
     pad: 'bg-violet-200/60',
     pill: 'bg-violet-600 text-white',
     card: 'border-violet-300',
+    ring: 'ring-violet-500',
     badge: 'bg-violet-600 text-white',
   },
   newbie_1v1: {
@@ -24,6 +25,7 @@ const THEMES: Record<CategoryType, { short: string; page: string; pad: string; p
     pad: 'bg-sky-200/60',
     pill: 'bg-sky-600 text-white',
     card: 'border-sky-300',
+    ring: 'ring-sky-500',
     badge: 'bg-sky-600 text-white',
   },
 };
@@ -74,6 +76,10 @@ export const PrelimScoringPanel: React.FC = () => {
   // Tracked by id: the list re-sorts as scores arrive, an index would jump to someone else.
   const [dancerId, setDancerId] = useState<string | null>(null);
   const index = Math.max(0, dancers.findIndex((d) => d.id === dancerId));
+  // The avatar strip starts at the dancer being scored; its arrows page through the order without changing dancer.
+  const STRIP = 4;
+  const [stripStart, setStripStart] = useState(0);
+  useEffect(() => setStripStart(index), [index, dancers.length]);
   const dancer = dancers[index];
   const saved = scoreOf(dancer);
 
@@ -273,6 +279,63 @@ export const PrelimScoringPanel: React.FC = () => {
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           )
+        )}
+
+        {/* Running order: the dancer being scored first, then who's next; scored ones greyed out. Arrows page by 4. */}
+        {!tie && dancers.length > 1 && (
+          <nav aria-label="Thứ tự thí sinh" className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={() => setStripStart((s) => Math.max(0, s - STRIP))}
+              disabled={stripStart === 0}
+              aria-label="Xem nhóm trước"
+              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 disabled:opacity-30 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <div className="grid flex-1 grid-cols-4 gap-1">
+              {dancers.slice(stripStart, stripStart + STRIP).map((d) => {
+                const done = typeof scoreOf(d) === 'number';
+                const current = d.id === dancer?.id;
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => setDancerId(d.id)}
+                    aria-current={current ? 'step' : undefined}
+                    aria-label={`${d.sbd} ${d.name}${done ? ', đã chấm' : ''}`}
+                    className={`flex min-w-0 flex-col items-center gap-0.5 rounded-xl py-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                      current ? `bg-white shadow-sm ring-2 ${THEMES[activeCategory].ring}` : ''
+                    }`}
+                  >
+                    <span className={`relative ${done && !current ? 'opacity-40 grayscale' : ''}`}>
+                      {d.avatarUrl ? (
+                        <img src={d.avatarUrl} alt="" className="h-10 w-10 rounded-full bg-zinc-100 object-cover [@media(max-height:600px)]:h-8 [@media(max-height:600px)]:w-8" />
+                      ) : (
+                        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-200 font-condensed text-lg font-black text-zinc-500 [@media(max-height:600px)]:h-8 [@media(max-height:600px)]:w-8">
+                          {d.name.replace(/^(BBOY|BGIRL)\s+/i, '').charAt(0)}
+                        </span>
+                      )}
+                      {done && (
+                        <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-white">
+                          <Check className="h-2.5 w-2.5 stroke-[4]" />
+                        </span>
+                      )}
+                    </span>
+                    <span className={`font-mono text-[11px] font-black leading-none ${done && !current ? 'text-zinc-400' : 'text-zinc-800'}`}>
+                      {d.sbd || '—'}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setStripStart((s) => Math.min(Math.max(0, dancers.length - 1), s + STRIP))}
+              disabled={stripStart + STRIP >= dancers.length}
+              aria-label="Xem nhóm sau"
+              className="flex h-12 w-8 shrink-0 items-center justify-center rounded-lg bg-white/80 text-zinc-600 ring-1 ring-black/5 disabled:opacity-30 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </nav>
         )}
 
         {/* Who is dancing + the score being entered */}

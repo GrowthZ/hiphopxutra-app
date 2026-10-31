@@ -182,6 +182,20 @@ function givePhotos(dancers: Dancer[], photos: SamplePhoto[], byName: Map<string
   }
 }
 
+/**
+ * A drawn portrait for a sample dancer: DiceBear "Notionists" (CC0, no attribution needed), seeded by the name so a
+ * dancer in both categories keeps the same face. The avatar gets a soft background; the half-body one (LED, cards)
+ * stays transparent like the real cut-out photos.
+ */
+const PORTRAIT = 'https://api.dicebear.com/9.x/notionists/svg';
+const drawnPortrait = (name: string) => {
+  const seed = encodeURIComponent(name);
+  return {
+    avatarUrl: `${PORTRAIT}?seed=${seed}&backgroundColor=b6e3f4,c0aede,d1d4f9,ffd5dc,ffdfbf`,
+    halfBodyUrl: `${PORTRAIT}?seed=${seed}`,
+  };
+};
+
 const PLAYED_AT = new Date('2026-11-01T14:00:00+07:00').getTime(); // long past: no LED replays a win from it
 
 /**
@@ -273,6 +287,9 @@ export function buildSeed(
       .flatMap((m) => [m.sideRed, m.sideBlue].flatMap((s) => s.dancers.map((d) => all.get(d?.id))))
       .filter((d): d is Dancer => Boolean(d));
     givePhotos([...new Set([...inBattle, ...newbie.dancers, ...pro.dancers])], photos, new Map(), {});
+  } else {
+    // No local photos (the admin page on production): drawn avatars, one per name, so nobody real is shown.
+    for (const d of [...newbie.dancers, ...pro.dancers]) Object.assign(d, drawnPortrait(d.name));
   }
 
   const byId = <T extends { id: string }>(list: T[], toDoc: (x: T) => object) =>
