@@ -210,9 +210,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     );
   }, []);
 
-  /** Applies a pure battle transition to one match. */
+  /** Applies a pure battle transition to one match; a stage that is now complete draws the next one. */
   const updateMatch = (matchId: string, update: (m: BattleMatch) => BattleMatch) =>
-    setMatches((prev) => prev.map((m) => (m.id === matchId ? update(m) : m)));
+    setMatches((prev) => battle.advanceBracket(prev.map((m) => (m.id === matchId ? update(m) : m))));
 
   /** The match as the next updater will see it, for deciding which cues to play. */
   const currentMatch = (matchId: string) => {

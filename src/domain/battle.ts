@@ -1,4 +1,4 @@
-import { BattleMatch, BattleRound, Dancer, Team2v2 } from './types';
+import { BattleMatch, BattleRound, BattleSide, CategoryType, Dancer, RoundStage, Team2v2 } from './types';
 import { createInitialMatch } from './seed';
 
 // Battle rules as pure functions: no React, no Firebase, no sound. TournamentContext applies the returned
@@ -172,6 +172,43 @@ export function resetMatch(m: BattleMatch): BattleMatch {
     winnerSide: null,
     status: 'upcoming',
   };
+}
+
+// ---------- Bracket progression ----------
+
+const NEXT_STAGE: Record<RoundStage, RoundStage | null> = { top32: 'top16', top16: 'top8', top8: 'top4', top4: 'final', final: null };
+const CATEGORIES: CategoryType[] = ['newbie_1v1', 'pro_2v2'];
+
+/** No vote and no announced round yet: its sides can still change. */
+const notStarted = (m: BattleMatch) =>
+  m.status !== 'finished' && m.rounds.every((r) => !r.isConfirmed && Object.values(r.votes ?? {}).every((v) => !v));
+
+const winnerOf = (m: BattleMatch): BattleSide => (m.winnerSide === 'blue' ? m.sideBlue : m.sideRed);
+
+/**
+ * Winners move on: once every battle of a stage has a winner, the next stage is drawn, winner of match 1 vs winner of
+ * match 2 (red / blue), 3 vs 4, ... up to the final. A next-stage battle not started yet follows a changed result;
+ * one already under way is left alone. Returns the same array when nothing changes.
+ */
+export function advanceBracket(matches: BattleMatch[]): BattleMatch[] {
+  let out = matches;
+  for (const category of CATEGORIES) {
+    for (const [stage, next] of Object.entries(NEXT_STAGE) as [RoundStage, RoundStage | null][]) {
+      if (!next) continue;
+      const round = out.filter((m) => m.category === category && m.stage === stage).sort((a, b) => a.matchNumber - b.matchNumber);
+      if (round.length < 2 || round.some((m) => m.status !== 'finished' || !m.winnerSide)) continue;
+      for (let k = 0; k < Math.floor(round.length / 2); k++) {
+        const [red, blue] = [winnerOf(round[2 * k]), winnerOf(round[2 * k + 1])];
+        const drawn = { ...createInitialMatch(category, next, k + 1, red, blue), status: 'upcoming' as const };
+        const existing = out.find((m) => m.id === drawn.id);
+        if (!existing) out = [...out, drawn];
+        else if (notStarted(existing) && (existing.sideRed.id !== red.id || existing.sideBlue.id !== blue.id)) {
+          out = out.map((m) => (m.id === drawn.id ? { ...m, sideRed: red, sideBlue: blue } : m));
+        }
+      }
+    }
+  }
+  return out;
 }
 
 // ---------- Bracket seeding ----------

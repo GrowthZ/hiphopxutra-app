@@ -146,3 +146,40 @@ describe('rounds per stage (docs/main-battle.md 2.3)', () => {
     expect(confirm(tied.match, 5, 6)).toMatchObject({ matchWinner: 'red', match: { status: 'finished' } });
   });
 });
+
+describe('advanceBracket: winners move on up to the final', () => {
+  const finish = (m: BattleMatch, side: 'red' | 'blue') => battle.declareWinner(m, side, NOW);
+  const stageOf = (all: BattleMatch[], stage: string) => all.filter((m) => m.stage === stage).sort((a, b) => a.matchNumber - b.matchNumber);
+
+  test('Newbie Top 32 → Top 16 → ... → final, winner of match 1 vs winner of match 2', () => {
+    let all = battle.seedNewbieTop32(Array.from({ length: 32 }, (_, i) => dancer(i + 1)));
+    expect(battle.advanceBracket(all)).toBe(all); // nothing finished: nothing drawn
+    for (const [stage, size] of [['top32', 16], ['top16', 8], ['top8', 4], ['top4', 2]] as const) {
+      const round = stageOf(all, stage);
+      expect(round).toHaveLength(size);
+      // Red wins the odd matches, blue the even ones.
+      all = all.map((m) => (m.stage === stage ? finish(m, m.matchNumber % 2 ? 'red' : 'blue') : m));
+      all = battle.advanceBracket(all);
+      const next = stageOf(all, { top32: 'top16', top16: 'top8', top8: 'top4', top4: 'final' }[stage]);
+      expect(next).toHaveLength(size / 2);
+      expect(next[0].sideRed.id).toBe(round[0].sideRed.id); // match 1: red won
+      expect(next[0].sideBlue.id).toBe(round[1].sideBlue.id); // match 2: blue won
+      expect(next[0].rounds).toHaveLength(stage === 'top8' || stage === 'top4' ? 2 : 1); // semis and final: 2 rounds
+    }
+    expect(stageOf(all, 'final')[0]).toMatchObject({ stage: 'final', status: 'upcoming' });
+  });
+
+  test('a changed result moves into a next battle not started yet, never into one under way', () => {
+    let all = battle.seedNewbieTop32(Array.from({ length: 32 }, (_, i) => dancer(i + 1)));
+    all = battle.advanceBracket(all.map((m) => finish(m, 'red')));
+    const first = stageOf(all, 'top16')[0];
+    expect(first.sideRed.id).toBe('d1');
+
+    all = battle.advanceBracket(all.map((m) => (m.id === stageOf(all, 'top32')[0].id ? finish(m, 'blue') : m)));
+    expect(stageOf(all, 'top16')[0].sideRed.id).toBe('d32'); // seed 1 vs 32: blue (32) now goes through
+
+    all = all.map((m) => (m.id === first.id ? vote(m, 1, 6) : m)); // the Top 16 battle has started
+    all = battle.advanceBracket(all.map((m) => (m.id === stageOf(all, 'top32')[0].id ? finish(m, 'red') : m)));
+    expect(stageOf(all, 'top16')[0].sideRed.id).toBe('d32');
+  });
+});
