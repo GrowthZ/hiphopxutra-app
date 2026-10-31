@@ -359,60 +359,110 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
 
 const rise = (i: number): React.CSSProperties => ({ animationDelay: `${i * 70}ms` });
 
-/** Gold, silver, bronze: light edge, body, shadow, inner plate, number, outline. */
-const METALS = [
-  { hi: '#fff6c2', mid: '#fbbf24', lo: '#92400e', plate: '#b45309', text: '#fffbeb', line: '#78350f', glow: 'drop-shadow-[0_0_22px_rgba(251,191,36,0.75)]' },
-  { hi: '#ffffff', mid: '#d4d4d8', lo: '#52525b', plate: '#71717a', text: '#ffffff', line: '#3f3f46', glow: 'drop-shadow-[0_0_18px_rgba(228,228,231,0.6)]' },
-  { hi: '#ffedd5', mid: '#fb923c', lo: '#7c2d12', plate: '#9a3412', text: '#fff7ed', line: '#7c2d12', glow: 'drop-shadow-[0_0_18px_rgba(251,146,60,0.65)]' },
+/** Gold, silver, bronze spray paint: paint, its light and dark shades, LED glow. */
+const PAINTS = [
+  { paint: '#facc15', hi: '#fef08a', lo: '#a16207', glow: 'drop-shadow-[0_0_22px_rgba(250,204,21,0.7)]' },
+  { paint: '#d4d4d8', hi: '#ffffff', lo: '#71717a', glow: 'drop-shadow-[0_0_18px_rgba(228,228,231,0.55)]' },
+  { paint: '#f97316', hi: '#fdba74', lo: '#9a3412', glow: 'drop-shadow-[0_0_18px_rgba(249,115,22,0.6)]' },
 ];
 
-/** Top-3 emblem: a bevelled metal hexagon with the rank, crowned for first place. Height comes from className. */
+/** Deterministic wobble so every screen draws the same splat. */
+const wobble = (seed: number) => {
+  let s = seed;
+  return () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+};
+
+/** A spray-paint splat around (70,72): jagged blob, smoothed through the midpoints. */
+const splatPath = (seed: number) => {
+  const rnd = wobble(seed);
+  const pts = Array.from({ length: 22 }, (_, i) => {
+    const a = (i / 22) * Math.PI * 2;
+    const spike = rnd() > 0.62;
+    const r = 50 * (spike ? 1.06 + rnd() * 0.22 : 0.84 + rnd() * 0.14);
+    return [70 + Math.cos(a) * r * 1.08, 72 + Math.sin(a) * r];
+  });
+  const mid = (p: number[], q: number[]) => `${((p[0] + q[0]) / 2).toFixed(1)},${((p[1] + q[1]) / 2).toFixed(1)}`;
+  return (
+    `M${mid(pts[21], pts[0])} ` +
+    pts.map((p, i) => `Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${mid(p, pts[(i + 1) % 22])}`).join(' ') +
+    ' Z'
+  );
+};
+
+/** Paint drips running off the bottom of the splat: [x, length, width]. */
+const DRIPS = [
+  [44, 30, 7],
+  [63, 46, 9],
+  [92, 22, 6],
+];
+
+/** Top-3 tag: a sprayed paint splat with drips and a 3D graffiti number; first place gets a hand-drawn crown. */
 const RankEmblem: React.FC<{ rank: number; className: string; glow?: boolean }> = ({ rank, className, glow }) => {
   const id = React.useId().replace(/:/g, '');
-  const c = METALS[rank - 1];
+  const c = PAINTS[rank - 1];
   const crown = rank === 1;
+  const rnd = wobble(rank * 7);
+  const specks = Array.from({ length: 14 }, () => {
+    const a = rnd() * Math.PI * 2;
+    const r = 60 + rnd() * 14;
+    return [70 + Math.cos(a) * r, 72 + Math.sin(a) * r * 0.9, 0.8 + rnd() * 2.2];
+  });
   return (
     <svg
-      viewBox={crown ? '0 -30 120 162' : '0 0 120 132'}
-      className={`w-auto shrink-0 ${glow ? c.glow : 'drop-shadow-md'} ${className}`}
+      viewBox={crown ? '-6 -30 152 190' : '-6 -6 152 166'}
+      className={`w-auto shrink-0 overflow-visible ${glow ? c.glow : 'drop-shadow-md'} ${className}`}
       role="img"
       aria-label={`Hạng ${rank}`}
     >
       <defs>
-        <linearGradient id={`${id}m`} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={c.hi} />
-          <stop offset="0.45" stopColor={c.mid} />
-          <stop offset="1" stopColor={c.lo} />
-        </linearGradient>
-        <linearGradient id={`${id}p`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor={c.plate} />
-          <stop offset="1" stopColor={c.mid} />
+        <filter id={`${id}r`} x="-20%" y="-20%" width="140%" height="140%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.09" numOctaves="2" seed={rank} />
+          <feDisplacementMap in="SourceGraphic" scale="7" />
+        </filter>
+        <linearGradient id={`${id}t`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset="0.55" stopColor={c.hi} />
+          <stop offset="1" stopColor={c.paint} />
         </linearGradient>
       </defs>
-      {/* outer rim, inner plate, top-left glint */}
-      <polygon points="60,4 112,33 112,99 60,128 8,99 8,33" fill={`url(#${id}m)`} stroke={c.line} strokeWidth="3" />
-      <polygon points="60,18 99,40 99,92 60,114 21,92 21,40" fill={`url(#${id}p)`} stroke={c.hi} strokeOpacity="0.7" strokeWidth="2" />
-      <polygon points="60,18 21,40 21,62 60,40" fill="#fff" opacity="0.18" />
-      <text
-        x="60"
-        y="90"
-        textAnchor="middle"
-        fontFamily="var(--font-condensed)"
-        fontWeight="900"
-        fontSize="66"
-        fill={c.text}
-        stroke={c.line}
-        strokeWidth="3"
-        paintOrder="stroke"
-      >
-        {rank}
-      </text>
+
+      {/* black underspray, then the colour splat, drips and overspray specks, all roughened like real paint */}
+      <g filter={`url(#${id}r)`}>
+        <path d={splatPath(rank * 13)} fill="#0a0a0a" transform="translate(4 5)" />
+        <path d={splatPath(rank * 13)} fill={c.paint} />
+        {DRIPS.map(([x, len, w]) => (
+          <g key={x} fill={c.paint}>
+            <rect x={x - w / 2} y={100} width={w} height={len} />
+            <circle cx={x} cy={100 + len} r={w * 0.75} />
+          </g>
+        ))}
+        {specks.map(([x, y, r], i) => (
+          <circle key={i} cx={x} cy={y} r={r} fill={i % 3 ? c.paint : '#0a0a0a'} />
+        ))}
+        <path d={splatPath(rank * 13)} fill={c.lo} opacity="0.35" transform="translate(70 72) scale(0.72) translate(-70 -72)" />
+      </g>
+
+      {/* graffiti number: black 3D block, thick outline, light fill, tilted like a tag */}
+      <g transform="rotate(-8 70 72) skewX(-10)" fontFamily="var(--font-condensed)" fontWeight="900" fontSize="96" textAnchor="middle">
+        <text x="88" y="106" fill="#0a0a0a" stroke="#0a0a0a" strokeWidth="14" strokeLinejoin="round">
+          {rank}
+        </text>
+        <text x="82" y="100" fill={`url(#${id}t)`} stroke="#0a0a0a" strokeWidth="7" strokeLinejoin="round" paintOrder="stroke">
+          {rank}
+        </text>
+        <text x="82" y="100" fill="none" stroke="#fff" strokeOpacity="0.9" strokeWidth="1.5">
+          {rank}
+        </text>
+      </g>
+
       {crown && (
-        <g stroke={c.line} strokeWidth="3" strokeLinejoin="round">
-          <path d="M28 12 L33 -20 L48 -2 L60 -28 L72 -2 L87 -20 L92 12 Z" fill={`url(#${id}m)`} />
-          <circle cx="33" cy="-20" r="4.5" fill={c.hi} />
-          <circle cx="60" cy="-28" r="5" fill="#ef4444" />
-          <circle cx="87" cy="-20" r="4.5" fill={c.hi} />
+        // Hand-drawn three-point crown, slightly crooked
+        <g transform="translate(2 10) rotate(-10 70 -6)" strokeLinejoin="round" strokeLinecap="round">
+          <path d="M38 6 L34 -26 L54 -6 L70 -34 L84 -6 L106 -24 L100 8 Z" fill={c.paint} stroke="#0a0a0a" strokeWidth="6" />
+          <path d="M40 2 L98 4" stroke="#0a0a0a" strokeWidth="4" />
+          <circle cx="34" cy="-28" r="5" fill="#fff" stroke="#0a0a0a" strokeWidth="3" />
+          <circle cx="70" cy="-37" r="5" fill="#ef4444" stroke="#0a0a0a" strokeWidth="3" />
+          <circle cx="106" cy="-26" r="5" fill="#fff" stroke="#0a0a0a" strokeWidth="3" />
         </g>
       )}
     </svg>
@@ -503,7 +553,7 @@ const QualifiedGrid: React.FC<{ dancers: Dancer[]; flashing: string | null; them
               }`}
             >
               {m ? (
-                <RankEmblem rank={i + 1} className={i === 0 ? 'h-[70px]' : 'h-14'} glow={theme === 'led'} />
+                <RankEmblem rank={i + 1} className={i === 0 ? 'h-[74px]' : 'h-[62px]'} glow={theme === 'led'} />
               ) : (
                 <span className={`flex h-11 min-w-11 items-center justify-center rounded-full px-1.5 font-condensed text-2xl font-black tabular-nums ${t.rank}`}>
                   {i + 1}
