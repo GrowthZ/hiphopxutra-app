@@ -32,16 +32,20 @@ export const openInNewTab = (view: ActiveViewType) => window.open(VIEW_PATHS[vie
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */
 export const IS_LED_PREVIEW = new URLSearchParams(window.location.search).has('preview');
 
+/** A phone (narrow screen): /admin opens on the dancer list, where photos are taken and details fixed. */
+const IS_PHONE = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 767px)').matches;
+
 const PATH_ALIASES: Record<string, ActiveViewType> = {
   '/': 'prelim_guest',
   '/ket-qua': 'prelim_guest',
-  '/admin': 'prelim',
+  '/admin': IS_PHONE ? 'dancers' : 'prelim',
 };
 
 // Short links handed to each team (read out over the phone): rewritten to the full path on load.
 const SHORT_LINKS: Record<string, ActiveViewType> = {
   '/gk': 'judge',
   '/checkin': 'checkin',
+  '/ts': 'dancers', // "Cập nhật thí sinh" staff
   '/xem': 'prelim_guest',
   '/bxh': 'prelim_results',
   '/nhanh': 'bracket_guest',

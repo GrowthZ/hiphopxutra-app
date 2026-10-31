@@ -1,5 +1,6 @@
 // Media Worker in front of the R2 bucket.
-//   PUT /upload/{folder}/{name}.webp|.jpg|.png  admin-only (Firebase ID token), stores the image
+//   PUT /upload/{folder}/{name}.webp|.jpg|.png  admins (Firebase ID token), stores the image; "Cập nhật thí sinh"
+//                                               staff (role editor) only into dancers/
 //   GET /{folder}/{name}.webp|.jpg|.png     public, cached at the edge and in browsers for a year
 // (Safari can't encode WebP: iPhones upload JPEG, or PNG for cut-out photos that must keep their transparency.)
 // File names are content hashes, so a URL never changes meaning and can be cached as immutable.
@@ -21,8 +22,8 @@ const CORS = {
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
-// token -> expiry; per isolate, so a burst of uploads checks Firestore once
-const adminTokens = new Map();
+// token -> { role, expiry }; per isolate, so a burst of uploads checks Firestore once
+const staffTokens = new Map();
 
 function tokenPayload(token) {
   try {
@@ -34,18 +35,18 @@ function tokenPayload(token) {
 }
 
 /**
- * Admin = the same check firestore.rules makes: a verified email (or a BTC username account) listed in
- * events/{EVENT_ID}/admins with the admin role (no role = admin; check-in staff can't upload).
- * Reading that doc *with the caller's token* lets Firestore verify the token; a forged one is rejected.
+ * The caller's organizer role, the same check firestore.rules makes: a verified email (or a BTC username account)
+ * listed in events/{EVENT_ID}/admins. 'admin' (no role = admin) or 'editor' (updates dancers); check-in staff and
+ * everyone else get null. Reading that doc *with the caller's token* lets Firestore verify the token.
  */
-async function isAdmin(token, env) {
-  const cached = adminTokens.get(token);
-  if (cached && cached > Date.now()) return true;
+async function staffRole(token, env) {
+  const cached = staffTokens.get(token);
+  if (cached && cached.expiry > Date.now()) return cached.role;
 
   const payload = tokenPayload(token);
   const email = String(payload?.email || '').toLowerCase();
   const trusted = payload?.email_verified === true || email.endsWith(BTC_DOMAIN);
-  if (!email || !trusted || payload.aud !== env.FIREBASE_PROJECT_ID) return false;
+  if (!email || !trusted || payload.aud !== env.FIREBASE_PROJECT_ID) return null;
 
   // FIRESTORE_URL points at the emulator in local tests (wrangler dev --var).
   const base = env.FIRESTORE_URL || 'https://firestore.googleapis.com';
@@ -53,11 +54,12 @@ async function isAdmin(token, env) {
     `${base}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/events/${env.EVENT_ID}/admins/${encodeURIComponent(email)}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
-  if (!res.ok) return false;
+  if (!res.ok) return null;
   const { fields } = await res.json();
-  if (fields?.role?.stringValue === 'checkin') return false;
-  adminTokens.set(token, Math.min(Date.now() + ADMIN_CACHE_MS, payload.exp * 1000));
-  return true;
+  const stored = fields?.role?.stringValue;
+  const role = !stored || stored === 'admin' ? 'admin' : stored === 'editor' ? 'editor' : null;
+  if (role) staffTokens.set(token, { role, expiry: Math.min(Date.now() + ADMIN_CACHE_MS, payload.exp * 1000) });
+  return role;
 }
 
 /** Checks the file really is what its name says (a mislabelled PNG would be served with the wrong type). */
@@ -74,7 +76,8 @@ async function upload(request, env, key) {
   if (request.headers.get('Content-Type') !== TYPES[ext]) return json(415, { error: 'Chỉ nhận ảnh WebP, JPEG hoặc PNG.' });
 
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
-  if (!token || !(await isAdmin(token, env))) return json(403, { error: 'Chỉ admin được tải ảnh lên.' });
+  const role = token ? await staffRole(token, env) : null;
+  if (!role || (role === 'editor' && !key.startsWith('dancers/'))) return json(403, { error: 'Chỉ admin được tải ảnh lên.' });
 
   const body = await request.arrayBuffer();
   if (body.byteLength === 0 || body.byteLength > MAX_BYTES) return json(413, { error: 'Ảnh rỗng hoặc lớn hơn 3MB.' });

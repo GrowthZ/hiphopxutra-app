@@ -7,10 +7,13 @@
 //   &che=3                              bottom rows hidden behind the judges' table: nothing important drawn there
 //   &lech=1792                          arch's left edge in the HDMI picture (side screens 1792 px each: 6144 px in all)
 //   &luoi=1                             draw the cabinet grid, the cut-out outline and the hidden band (setup / preview)
-//   &bac=1                              draw right up to the stepped outline instead of the smooth dome inside it
+// The edge (full picture, cut by the wall itself, or a smooth dome inside the steps) is chosen at /admin/led.
 // The picture sits at the top of the HDMI output, `lech` px from the left (0 by default).
 
 const params = new URLSearchParams(window.location.search);
+
+/** 'full': the whole 2560×1536 picture, the stepped wall cuts it; 'dome': drawn inside a smooth dome. */
+export type ArchEdge = 'full' | 'dome';
 
 const DEFAULT_HALF = [6, 8, 9, 10, 10, 11, 11, 12, 12, 12];
 
@@ -30,7 +33,6 @@ const intParam = (name: string, fallback: number) => {
 
 export const IS_ARCH_LED = params.get('khung') === 'vom';
 export const SHOW_ARCH_GRID = params.get('luoi') === '1';
-const STEPPED_EDGE = params.get('bac') === '1';
 
 export const ARCH_COLUMNS = parseColumns(params.get('cot'));
 export const MODULE_PX = Math.max(16, Number(params.get('module')) || 128);
@@ -46,16 +48,6 @@ export const HIDDEN = HIDDEN_ROWS / ARCH_ROWS;
 /** Top edge (px from the top of the picture) of the LED at column `i`. */
 export const columnTop = (i: number) => (ARCH_ROWS - ARCH_COLUMNS[i]) * MODULE_PX;
 
-/** CSS clip-path tracing the stepped outline, so nothing is drawn where there is no LED. */
-const STEPPED_CLIP_PATH = (() => {
-  const points: string[] = [`0px ${ARCH_HEIGHT}px`];
-  ARCH_COLUMNS.forEach((_, i) => {
-    points.push(`${i * MODULE_PX}px ${columnTop(i)}px`, `${(i + 1) * MODULE_PX}px ${columnTop(i)}px`);
-  });
-  points.push(`${ARCH_WIDTH}px ${ARCH_HEIGHT}px`);
-  return `polygon(${points.join(', ')})`;
-})();
-
 /** Horizontal position as a fraction of the wall width (designs are written in fractions to survive a new map). */
 export const x = (fraction: number) => Math.round(fraction * ARCH_WIDTH);
 /** Height above the bottom edge as a fraction of the wall height, converted to px from the top. */
@@ -63,8 +55,8 @@ export const yFromBottom = (fraction: number) => Math.round(ARCH_HEIGHT * (1 - f
 
 /**
  * The largest smooth dome that fits inside the steps: height(u) = base + rise · (1 − u²)^0.8, u = −1…1 across the
- * wall, fitted to the cabinet map so it never rises above a column. Drawn inside it, the picture shows a clean curved
- * edge; the corners of the steps outside it stay black instead of showing the cabinets' staircase.
+ * wall, fitted to the cabinet map so it never rises above a column. With the "dome" edge the picture is drawn inside
+ * it: a clean curved edge, the corners of the steps outside it black instead of showing the cabinets' staircase.
  */
 const dome = (() => {
   const shape = (u: number) => Math.pow(Math.max(0, 1 - u * u), 0.8);
@@ -82,7 +74,7 @@ const dome = (() => {
   return (px: number) => best.base + best.rise * shape((px - ARCH_WIDTH / 2) / (ARCH_WIDTH / 2));
 })();
 
-const SMOOTH_CLIP_PATH = (() => {
+export const DOME_CLIP_PATH = (() => {
   const points = Array.from({ length: 97 }, (_, i) => {
     const px = (i / 96) * ARCH_WIDTH;
     return `${Math.round(px)}px ${Math.round(ARCH_HEIGHT - dome(px))}px`;
@@ -90,16 +82,14 @@ const SMOOTH_CLIP_PATH = (() => {
   return `polygon(0px ${ARCH_HEIGHT}px, ${points.join(', ')}, ${ARCH_WIDTH}px ${ARCH_HEIGHT}px)`;
 })();
 
-/** What the picture is clipped to: the smooth dome (default) or the stepped outline (&bac=1). */
-export const ARCH_CLIP_PATH = STEPPED_EDGE ? STEPPED_CLIP_PATH : SMOOTH_CLIP_PATH;
 
 /**
  * How far in from the side (px) the visible picture reaches `heightPx` above the bottom edge: text that starts at a
- * side (the name bars) is padded by this so the edge never cuts it.
+ * side (the name bars) is padded by this so the edge never cuts it. Full picture: the wall's own steps cut it.
  */
-export function edgeInset(heightPx: number) {
+export function edgeInset(heightPx: number, edge: ArchEdge = 'full') {
   const visible = (px: number) =>
-    STEPPED_EDGE ? ARCH_COLUMNS[Math.min(ARCH_COLUMNS.length - 1, Math.floor(px / MODULE_PX))] * MODULE_PX : dome(px);
+    edge === 'dome' ? dome(px) : ARCH_COLUMNS[Math.min(ARCH_COLUMNS.length - 1, Math.floor(px / MODULE_PX))] * MODULE_PX;
   for (let px = 0; px < ARCH_WIDTH / 2; px += 8) if (visible(px) >= heightPx) return px;
   return ARCH_WIDTH / 2;
 }

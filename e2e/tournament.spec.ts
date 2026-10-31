@@ -362,6 +362,58 @@ test('admin renames a judge, an MC and a BTC member, and edits a dancer', async 
     .toBe('Xứ Trà Crew');
 });
 
+test('"Cập nhật thí sinh" staff fix dancers from a phone, and nothing else', async ({ browser }) => {
+  await admin.goto('/admin/cai-dat/nguoi-dung');
+  await admin.getByLabel('Tên đăng nhập', { exact: true }).fill('anh1');
+  await admin.getByLabel('Mật khẩu', { exact: true }).fill('photo-pass-1');
+  await admin.getByText('Cập nhật thí sinh', { exact: true }).first().click();
+  await admin.getByRole('button', { name: 'Cấp tài khoản' }).click();
+  await waitForDoc<{ role: string }>('admins/anh1@btc.hiphopxutra.vn', (a) => a?.role === 'editor');
+
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  const phone = await context.newPage();
+  await phone.goto('/admin/prelim');
+  await phone.getByLabel('Tên đăng nhập').fill('anh1');
+  await phone.getByPlaceholder('Mật khẩu').fill('photo-pass-1');
+  await phone.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+
+  // Whatever /admin page they open, they get the dancer list only.
+  await expect(phone.getByText('Cập nhật thí sinh', { exact: true })).toBeVisible();
+  await expect(phone).toHaveURL(/\/admin\/thi-sinh$/);
+  await expect(phone.getByRole('button', { name: 'Mở menu' })).toHaveCount(0);
+
+  // Phone cards: fix a dancer's club.
+  await phone.getByRole('button', { name: /^Pro 2vs2/ }).click();
+  const card = phone.getByRole('list', { name: 'Thí sinh' }).getByRole('listitem').first();
+  await card.getByRole('button', { name: /^Sửa thông tin/ }).click();
+  await phone.getByRole('dialog').getByLabel('CLB / Đội').fill('Đội Ảnh');
+  await phone.getByRole('dialog').getByRole('button', { name: 'Lưu' }).click();
+  await expect.poll(async () => (await event.collection('proDancers').where('crew', '==', 'Đội Ảnh').count().get()).data().count).toBe(1);
+  await context.close();
+
+  // The rules let them touch details and photos only, never scores.
+  const { idToken } = await (
+    await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'anh1@btc.hiphopxutra.vn', password: 'photo-pass-1', returnSecureToken: true }),
+    })
+  ).json();
+  const dancer = (await event.collection('proDancers').where('crew', '==', 'Đội Ảnh').get()).docs[0].ref;
+  const patch = (field: string, value: object) =>
+    fetch(
+      `http://127.0.0.1:8080/v1/projects/demo-hiphopxutra/databases/(default)/documents/${dancer.path}?updateMask.fieldPaths=${field}`,
+      {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields: { [field]: value } }),
+        signal: AbortSignal.timeout(10_000),
+      }
+    );
+  expect((await patch('prelimScores', { mapValue: { fields: { 'gk-1': { integerValue: '100' } } } })).status).toBe(403);
+  expect((await patch('avatarUrl', { stringValue: 'https://example.test/a.webp' })).status).toBe(200);
+});
+
 test('check-in staff registers a walk-in and hands out an SBD, nothing else', async ({ browser }) => {
   const context = await browser.newContext();
   const desk = await context.newPage();

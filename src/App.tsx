@@ -17,6 +17,7 @@ import { PrelimResultsView } from './features/prelim/PrelimResultsView';
 import { PrelimGuestView } from './features/guest/PrelimGuestView';
 import { PrelimScreenView } from './features/guest/PrelimScreenView';
 import { BracketScreenView } from './features/guest/BracketScreenView';
+import { EditorShell } from './features/dancers/EditorShell';
 import { GuestBracketView, GuestMatchView } from './features/guest/GuestBattleView';
 import { DancersListView } from './features/dancers/DancersListView';
 import { GoogleSheetSyncModal } from './features/settings/GoogleSheetSyncModal';
@@ -59,13 +60,20 @@ const MainContent: React.FC = () => {
     isJudgeConfigModalOpen,
     setIsJudgeConfigModalOpen,
   } = useTournament();
+  const [menuOpen, setMenuOpen] = React.useState(false); // admin menu drawer on phones
 
   // Check-in staff get only the check-in desk, whatever /admin page they open: move them to its URL (and app).
   const misplacedCheckIn = isAdminView(activeView) && staffRole === 'checkin' && activeView !== 'checkin';
   React.useEffect(() => {
     if (misplacedCheckIn) setActiveView('checkin');
   }, [misplacedCheckIn, setActiveView]);
-  if (misplacedCheckIn) return null;
+  // "Cập nhật thí sinh" staff get only the dancer list, whatever /admin page they open.
+  const misplacedEditor = isAdminView(activeView) && staffRole === 'editor' && activeView !== 'dancers';
+  React.useEffect(() => {
+    if (misplacedEditor) setActiveView('dancers');
+  }, [misplacedEditor, setActiveView]);
+  if (misplacedCheckIn || misplacedEditor) return null;
+  if (activeView === 'dancers' && staffRole === 'editor') return <EditorShell />;
 
   // Admins get the same desk (hamburger menu, no sidebar) on the check-in page.
   if (activeView === 'checkin' && (staffRole === 'checkin' || isAdmin)) return <CheckInDesk />;
@@ -137,7 +145,7 @@ const MainContent: React.FC = () => {
   // Admin Views with Sidebar
   return (
     <div className="min-h-screen bg-zinc-100 flex flex-col">
-      <Navbar />
+      <Navbar onMenu={() => setMenuOpen(true)} />
       {CAN_SWITCH_TO_REHEARSAL && EVENT_ID === REHEARSAL_EVENT_ID && (
         <button
           onClick={() => setActiveView('rehearsal')}
@@ -149,10 +157,10 @@ const MainContent: React.FC = () => {
       <PublisherOfflineBanner />
       <div className="flex-1 flex max-w-full">
         {/* Left Sidebar */}
-        <AdminSidebar />
+        <AdminSidebar mobileOpen={menuOpen} onClose={() => setMenuOpen(false)} />
 
         {/* Content Area */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto">
           {activeView === 'prelim' && <PrelimView />}
           {activeView === 'teams' && <TeamDrawView />}
           {activeView === 'bracket' && <BracketView />}

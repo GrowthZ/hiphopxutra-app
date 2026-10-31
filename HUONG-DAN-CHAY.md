@@ -78,10 +78,15 @@ Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi
 | `module` | Số pixel mỗi cabinet trong khung HDMI | `128` |
 | `che` | Số hàng dưới cùng bị bàn giám khảo che (0,5 m mỗi hàng): không đặt thông tin quan trọng | `3` |
 | `lech` | Vị trí mép trái của vòm trong khung HDMI (px) | `0` |
-| `bac` | `1` = vẽ sát mép bậc thang của cabinet; mặc định vẽ trong một đường vòm cong nằm gọn trong các bậc (viền trơn, không răng cưa) | không |
 | `luoi=1` | Vẽ lưới cabinet, vùng bị cắt và vạch vùng bị che, để căn với màn thật | tắt |
 
 Ví dụ: `/led?khung=vom&che=2&lech=1792&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.
+
+**Viền màn vòm** chọn ở `/admin/led`: **Nền đầy đủ** (mặc định, vẽ kín 2560×1536, màn LED tự cắt theo bậc) hoặc **Viền vòm cong** (vẽ trong một đường vòm cong nằm gọn trong các bậc, góc bậc để đen). Đổi là màn LED đổi ngay, không cần tải lại.
+
+**Sơ đồ knockout** (cảnh mới ở `/admin/led`): hiện giữa các trận, chọn hạng mục và giao diện **Tối / Sáng**. Trên màn vòm cây nhánh nằm trong vùng các bậc cho phép, trên phần bàn giám khảo che; logo và ô Vô địch ở tháp giữa. Người thắng đi tiếp tự cập nhật.
+
+**Ảnh màn chờ**: chọn cảnh **Màn chờ (logo)** rồi **Tải ảnh lên** (nên 2560×1536 cho màn vòm; 1,5 m dưới cùng bị bàn giám khảo che). Ảnh hiện nguyên vẹn trên nền đen; **Bỏ ảnh** để về màn chữ mặc định.
 
 ## Yêu cầu
 
@@ -118,6 +123,7 @@ Nếu không vào được, mở cổng 3000 trong Windows Firewall.
 | Tài khoản giám khảo (tạo / xem / đổi PIN) | `/admin/cai-dat/giam-khao` | Google (admin) |
 | Bàn điều hành | `/admin` → `/admin/prelim`, `/admin/thi-sinh`, `/admin/boc-tham`, `/admin/nhanh-dau`, `/admin/battle` | Google (admin) |
 | Check-in thí sinh (cấp SBD N001… / P001…) | `/admin/check-in` | Google (admin) |
+| Cập nhật thông tin & ảnh thí sinh trên điện thoại (`/admin` trên điện thoại cũng mở thẳng trang này) | `/ts` → `/admin/thi-sinh` | Tài khoản BTC quyền **Cập nhật thí sinh** (cấp ở *Người dùng BTC*): chỉ sửa tên, họ tên, CLB, giới tính và ảnh thí sinh |
 | Cài đặt | `/admin/cai-dat/google-sheets`, `/admin/cai-dat/luu-tru` | Google (admin) |
 
 Trang `/ket-qua/*` và `/led` chỉ đọc **bản công bố** (khán giả không xem được điểm đang chấm dở, kể cả khi rành kỹ thuật).

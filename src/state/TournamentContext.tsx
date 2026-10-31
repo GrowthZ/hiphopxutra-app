@@ -44,7 +44,7 @@ import {
 import * as battle from '../domain/battle';
 import { IS_PUBLIC_SOURCE } from '../app/routes';
 import { getSavedStorageConfig, saveStorageConfig } from '../services/storageService';
-import { clearVotes, eventDoc, StaffRole, writeBattleVote, writePrelimScore, writeTieBreakScore } from '../services/firestore';
+import { clearVotes, eventDoc, StaffRole, writeBattleVote, writeDancerFields, writePrelimScore, writeTieBreakScore } from '../services/firestore';
 import { soundFX } from '../services/soundEffects';
 import * as cues from '../services/stageCues';
 import { useSyncedCollection } from './useSyncedCollection';
@@ -314,8 +314,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     [activeMatchId, isNewbieTop32Locked, isProTop32Locked, prelimPanels]
   );
   const privateOnly = { enabled: canWrite }; // raw scores and votes: admins only
-  // Check-in staff read the dancer lists (to check in / register), but never write through the sync.
-  const dancerRead = { enabled: canWrite || (staffRole === 'checkin' && !IS_PUBLIC_SOURCE) };
+  // Check-in and "Cập nhật thí sinh" staff read the dancer lists, but never write through the sync.
+  const editorMode = staffRole === 'editor' && !IS_PUBLIC_SOURCE;
+  const dancerRead = { enabled: canWrite || ((staffRole === 'checkin' || editorMode) && !IS_PUBLIC_SOURCE) };
   const syncStates = [
     useSyncedCollection('newbieDancers', newbieBase, setNewbieDancers, { canWrite, toDoc: dancerToDoc, ...dancerRead }),
     useSyncedCollection('proDancers', proBase, setProDancers, { canWrite, toDoc: dancerToDoc, ...dancerRead }),
@@ -559,6 +560,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       );
     if (category === 'newbie_1v1') setNewbieDancers(update);
     else setProDancers(update);
+    if (editorMode) {
+      writeDancerFields(category, dancerId, {
+        ...(photos.avatarUrl !== undefined && { avatarUrl: photos.avatarUrl }),
+        ...(photos.halfBodyUrl !== undefined && { halfBodyUrl: photos.halfBodyUrl }),
+        ...('avatarCrop' in photos && { avatarCrop: photos.avatarCrop }),
+        ...(photos.gender !== undefined && { gender: photos.gender }),
+      }).catch((err: Error) => setActionError(`Không lưu được ảnh thí sinh: ${err.message}`));
+    }
   };
 
   const updateDancerGender = (category: CategoryType, dancerId: string, gender: 'male' | 'female') =>
@@ -580,6 +589,15 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       });
     if (category === 'newbie_1v1') setNewbieDancers(update);
     else setProDancers(update);
+    if (editorMode) {
+      writeDancerFields(category, dancerId, {
+        name: info.name,
+        gender: info.gender,
+        realName: info.realName.trim() || undefined,
+        crew: info.crew.trim() || undefined,
+      }).catch((err: Error) => setActionError(`Không lưu được thông tin thí sinh: ${err.message}`));
+      return; // battles are the admins'; the bracket reads names from the dancers anyway
+    }
     // A 1vs1 battle side carries the dancer's name too.
     setMatches((prev) =>
       prev.map((m) => {

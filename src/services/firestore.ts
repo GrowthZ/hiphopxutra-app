@@ -152,18 +152,31 @@ export function stableStringify(value: unknown): string {
 }
 
 /** Throws when Firestore is unreachable, so callers can tell "not an admin" from "can't check". */
-export type StaffRole = 'admin' | 'checkin';
+export type StaffRole = 'admin' | 'checkin' | 'editor';
+
+/** A stored role; anything else (older entries, Google admins) is a full admin. */
+export const toStaffRole = (stored: unknown): StaffRole => (stored === 'checkin' || stored === 'editor' ? stored : 'admin');
 
 /** Organizer role from admins/{email}; entries without a role are full admins (older entries, Google admins). */
 export async function getStaffRole(email: string): Promise<StaffRole | null> {
   const snap = await getDoc(doc(db, 'events', BUILD_EVENT_ID, 'admins', email.toLowerCase()));
   if (!snap.exists()) return null;
-  return snap.data().role === 'checkin' ? 'checkin' : 'admin';
+  return toStaffRole(snap.data().role);
 }
 
 // Judge writes touch a single field so 9 judges scoring at once never overwrite each other.
 export const writePrelimScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) =>
   updateDoc(eventDoc(dancersCollectionOf(category), dancerId), new FieldPath('prelimScores', judgeId), score);
+
+/**
+ * "Cập nhật thí sinh" staff (role editor) don't sync whole lists like an admin client: they write a dancer's details
+ * and photos straight to its document (firestore.rules lets them touch only those fields). undefined removes a field.
+ */
+export const writeDancerFields = (category: CategoryType, dancerId: string, fields: Record<string, unknown>) =>
+  updateDoc(
+    eventDoc(dancersCollectionOf(category), dancerId),
+    Object.fromEntries(Object.entries(fields).map(([k, v]) => [k, v === undefined ? deleteField() : v]))
+  );
 
 export const writeTieBreakScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) =>
   updateDoc(eventDoc(dancersCollectionOf(category), dancerId), new FieldPath('tieBreakScores', judgeId), score);

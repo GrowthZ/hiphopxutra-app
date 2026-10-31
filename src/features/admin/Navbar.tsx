@@ -14,10 +14,11 @@ import {
   Sliders,
   Cloud,
   Camera,
+  Menu,
 } from 'lucide-react';
 import { AudioSettingsModal } from '../settings/AudioSettingsModal';
 
-export const Navbar: React.FC = () => {
+export const Navbar: React.FC<{ onMenu?: () => void }> = ({ onMenu }) => {
   const {
     judges,
     selectedJudgeId,
@@ -51,12 +52,21 @@ export const Navbar: React.FC = () => {
     <header className="bg-white border-b border-zinc-200 text-zinc-900 sticky top-0 z-50 select-none">
       <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
         {/* Brand Lockup: Clean Swiss Typographic Wordmark */}
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0 min-w-0">
+          {onMenu && (
+            <button
+              onClick={onMenu}
+              aria-label="Mở menu"
+              className="lg:hidden -ml-1 rounded p-2 text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              <Menu className="h-6 w-6" />
+            </button>
+          )}
           <button
             onClick={() => setActiveView('prelim')}
             className="flex items-center gap-2.5 text-left group cursor-pointer focus-visible:outline-none"
           >
-            <div className="w-8 h-8 bg-zinc-50 border border-zinc-300 rounded flex items-center justify-center text-zinc-900 shrink-0">
+            <div className="hidden sm:flex w-8 h-8 bg-zinc-50 border border-zinc-300 rounded items-center justify-center text-zinc-900 shrink-0">
               <Trophy className="w-4 h-4 text-zinc-700" />
             </div>
             <div>
@@ -162,8 +172,8 @@ export const Navbar: React.FC = () => {
           </button>
         </nav>
 
-        {/* Right Action Tools: Sports Broadcast Controls */}
-        <div className="flex items-center gap-2">
+        {/* Right Action Tools: Sports Broadcast Controls (wide screens; phones use the menu) */}
+        <div className="hidden md:flex items-center gap-2">
           {/* Active Judge Simulator Switcher */}
           <div className="hidden sm:flex items-center gap-1.5 bg-zinc-50 border border-zinc-200 rounded px-2 py-1">
             <span className="text-[10px] text-zinc-500 uppercase font-mono font-semibold">GK:</span>

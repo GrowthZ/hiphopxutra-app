@@ -1,7 +1,8 @@
 rules_version = '2';
 
 // Organizers: Google or BTC username accounts listed in events/{eventId}/admins/{email} with a role:
-//   'admin' (or no role) = everything; 'checkin' = check-in desk: read dancers, check in, register walk-ins.
+//   'admin' (or no role) = everything; 'checkin' = check-in desk: read dancers, check in, register walk-ins;
+//   'editor' = "Cập nhật thí sinh": read dancers, change their name, real name, club, gender and photos.
 // Judges: email/password accounts gk-N@giamkhao.hiphopxutra.vn (see src/services/judgeAccounts.ts);
 //         each judge may only write their own prelim score / battle vote, never other judges'.
 // LED PC: anonymous session, heartbeat only.
@@ -49,6 +50,20 @@ service cloud.firestore {
         return isStaff()
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sbd', 'checkedInAt', 'panel'])
           && request.resource.data.get('panel', 'A') in ['A', 'B'];
+      }
+
+      // "Cập nhật thí sinh" staff: a dancer's details and photos only, never SBD, panel, scores or flags.
+      function validDancerEdit() {
+        let d = request.resource.data;
+        return isStaff()
+          && get(staffEntry()).data.get('role', 'admin') == 'editor'
+          && d.diff(resource.data).affectedKeys().hasOnly(['name', 'realName', 'crew', 'gender', 'avatarUrl', 'halfBodyUrl', 'avatarCrop'])
+          && d.name is string && d.name.size() > 0 && d.name.size() <= 60
+          && d.gender in ['male', 'female']
+          && d.get('realName', '') is string && d.get('realName', '').size() <= 80
+          && d.get('crew', '') is string && d.get('crew', '').size() <= 80
+          && d.get('avatarUrl', '') is string && d.get('avatarUrl', '').size() <= 500
+          && d.get('halfBodyUrl', '') is string && d.get('halfBodyUrl', '').size() <= 500;
       }
 
       // Walk-in registration: a fresh, unscored dancer with only the desk's fields.
@@ -172,13 +187,15 @@ service cloud.firestore {
       match /newbieDancers/{dancerId} {
         allow read: if isStaff();
         allow create: if validWalkIn('newbie_1v1');
-        allow update: if validOwnPrelimScore('isNewbieTop32Locked') || validOwnTieBreakScore('isNewbieTop32Locked') || validCheckIn();
+        allow update: if validOwnPrelimScore('isNewbieTop32Locked') || validOwnTieBreakScore('isNewbieTop32Locked') || validCheckIn()
+          || validDancerEdit();
       }
 
       match /proDancers/{dancerId} {
         allow read: if isStaff();
         allow create: if validWalkIn('pro_2v2');
-        allow update: if validOwnPrelimScore('isProTop32Locked') || validOwnTieBreakScore('isProTop32Locked') || validCheckIn();
+        allow update: if validOwnPrelimScore('isProTop32Locked') || validOwnTieBreakScore('isProTop32Locked') || validCheckIn()
+          || validDancerEdit();
       }
 
       // SBD counter, shared by every check-in desk (transaction in checkInDancer).

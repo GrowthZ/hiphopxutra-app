@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { BattleMatch, BattleRound, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
@@ -6,19 +6,13 @@ import { regulationRounds } from '../../domain/battle';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
+import { ArchFrame } from './ArchFrame';
 import { JudgeBallotCard, useRevealedResult, useRevealStartTimes } from './StageDisplayView';
 import {
-  ARCH_CLIP_PATH,
-  ARCH_COLUMNS,
+  ArchEdge,
   ARCH_HEIGHT,
-  ARCH_OFFSET_X,
-  ARCH_WIDTH,
-  columnTop,
   edgeInset,
   HIDDEN,
-  HIDDEN_ROWS,
-  MODULE_PX,
-  SHOW_ARCH_GRID,
   x,
   yFromBottom,
 } from './archLayout';
@@ -54,21 +48,15 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
   return [sbd && `SBD ${sbd}`, team].filter(Boolean).join('  ·  ');
 };
 
-/** `winnerDelay`: seconds between the last pill turning and the result lighting up (set on the battle console). */
-export const ArchBattleView: React.FC<{ winnerDelay?: number }> = ({ winnerDelay }) => {
+/**
+ * `winnerDelay`: seconds between the last pill turning and the result lighting up (set on the battle console).
+ * `edge` (set at /admin/led): the full picture, cut by the wall itself (default), or drawn inside a smooth dome.
+ */
+export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge }> = ({ winnerDelay, edge = 'full' }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
   const revealStartTimes = useRevealStartTimes(match, judges.length);
   const revealed = useRevealedResult(match, revealStartTimes, judges.length, winnerDelay);
-
-  // The picture keeps its pixel size on the HDMI output; only a smaller preview window scales it down.
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const fit = () => setScale(Math.min(1, window.innerWidth / (ARCH_OFFSET_X + ARCH_WIDTH), window.innerHeight / ARCH_HEIGHT));
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, []);
 
   if (!match) return <div className="fixed inset-0 bg-black" />;
 
@@ -130,16 +118,10 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number }> = ({ winnerDelay
   const rowH = Math.min(Math.floor((gridPx - 52 - 2 * 10) / 4), Math.floor((gridPx - 52 - rows * 10) / rows));
   const cols = `260px repeat(${Math.max(judges.length, 1)}, minmax(0, 1fr))`;
   // Name text starts where the wall's edge is high enough to show the whole bar.
-  const barPad = edgeInset(BAR.top * ARCH_HEIGHT) + 40;
+  const barPad = edgeInset(BAR.top * ARCH_HEIGHT, edge) + 40;
 
   return (
-    <div className="fixed inset-0 overflow-hidden bg-black">
-      <div
-        className="absolute top-0 origin-top-left overflow-hidden text-white"
-        style={{ left: ARCH_OFFSET_X * scale, width: ARCH_WIDTH, height: ARCH_HEIGHT, transform: `scale(${scale})` }}
-      >
-        {/* Everything below is clipped to the stepped outline: no pixels are spent where there is no LED */}
-        <div className="absolute inset-0" style={{ clipPath: ARCH_CLIP_PATH }}>
+    <ArchFrame edge={edge}>
           {/* Backdrop */}
           <div className="absolute inset-0 bg-gradient-to-b from-[#1a2a6c] via-[#13205a] to-[#0a1238]" />
           <div className="absolute -left-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-red-600/25 blur-[140px]" />
@@ -295,11 +277,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number }> = ({ winnerDelay
 
           {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
           <AutomatedVictoryDisplay match={match} overlay={false} holdUntil={revealed.holdUntil} />
-        </div>
-
-        {SHOW_ARCH_GRID && <ArchGrid />}
-      </div>
-    </div>
+    </ArchFrame>
   );
 };
 
@@ -347,28 +325,3 @@ const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number; won: boolean; s
   </div>
 );
 
-/** Setup aid (&luoi=1): cabinet grid inside the wall, the cut-away area greyed, the band the judges hide marked. */
-const ArchGrid: React.FC = () => (
-  <svg className="pointer-events-none absolute inset-0" width={ARCH_WIDTH} height={ARCH_HEIGHT}>
-    <line x1={0} x2={ARCH_WIDTH} y1={yFromBottom(HIDDEN)} y2={yFromBottom(HIDDEN)} stroke="rgba(251,191,36,0.9)" strokeWidth={4} strokeDasharray="24 16" />
-    <text x={ARCH_WIDTH / 2} y={yFromBottom(HIDDEN) + 48} fill="rgba(251,191,36,0.9)" fontSize={36} fontWeight={700} textAnchor="middle">
-      Bàn giám khảo che phần dưới vạch này (che={HIDDEN_ROWS} hàng)
-    </text>
-    {ARCH_COLUMNS.map((rows, i) =>
-      Array.from({ length: rows }, (_, r) => (
-        <rect
-          key={`${i}-${r}`}
-          x={i * MODULE_PX}
-          y={columnTop(i) + r * MODULE_PX}
-          width={MODULE_PX}
-          height={MODULE_PX}
-          fill="none"
-          stroke="rgba(255,255,255,0.18)"
-        />
-      ))
-    )}
-    {ARCH_COLUMNS.map((_, i) => (
-      <rect key={`off-${i}`} x={i * MODULE_PX} y={0} width={MODULE_PX} height={columnTop(i)} fill="rgba(255,255,255,0.06)" />
-    ))}
-  </svg>
-);

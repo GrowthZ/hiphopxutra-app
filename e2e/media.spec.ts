@@ -122,17 +122,21 @@ test('cut-out photos keep their transparent background (WebP, and PNG on Safari)
   expect((await fetch(result.safariUrl)).headers.get('content-type')).toBe('image/png');
 });
 
-test('Worker refuses non-admins, check-in staff and mislabelled files', async () => {
+test('Worker refuses non-admins, check-in staff and mislabelled files; dancer editors only into dancers/', async () => {
   const admin = await idToken('uploader@btc.hiphopxutra.vn', 'secret-1');
   const desk = await idToken('desk@btc.hiphopxutra.vn', 'secret-2');
   const stranger = await idToken('stranger@btc.hiphopxutra.vn', 'secret-3');
   await event.collection('admins').doc('uploader@btc.hiphopxutra.vn').set({ name: 'BTC', role: 'admin' });
   await event.collection('admins').doc('desk@btc.hiphopxutra.vn').set({ name: 'Desk', role: 'checkin' });
+  const editor = await idToken('photos@btc.hiphopxutra.vn', 'secret-4');
+  await event.collection('admins').doc('photos@btc.hiphopxutra.vn').set({ name: 'Ảnh', role: 'editor' });
 
   expect((await put('teams/ok-1.webp', admin, WEBP)).status).toBe(200); // BTC username account, admin role
   expect((await put('teams/ok-2.jpg', admin, JPEG, 'image/jpeg')).status).toBe(200);
   expect((await put('teams/no-1.webp', desk, WEBP)).status).toBe(403); // check-in role
   expect((await put('teams/no-2.webp', stranger, WEBP)).status).toBe(403); // not in admins
+  expect((await put('dancers/ok-4.webp', editor, WEBP)).status).toBe(200); // "Cập nhật thí sinh": dancer photos
+  expect((await put('teams/no-5.webp', editor, WEBP)).status).toBe(403); // ... and nothing else
   expect((await put('teams/no-3.webp', 'garbage', WEBP)).status).toBe(403);
   expect((await put('teams/no-4.webp', admin, JPEG)).status).toBe(415); // JPEG bytes named .webp
   expect([400, 405]).toContain((await put('../etc/x.webp', admin, WEBP)).status); // path tricks never reach R2

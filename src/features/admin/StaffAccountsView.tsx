@@ -20,9 +20,10 @@ import { InlineRename } from '../../shared/InlineRename';
 const ROLE_HINTS: Record<StaffRole, string> = {
   admin: 'Toàn quyền điều hành giải',
   checkin: 'Chỉ check-in và đăng ký thí sinh tại chỗ',
+  editor: 'Chỉ sửa thông tin và ảnh thí sinh (trên điện thoại)',
 };
 
-/** /admin/cai-dat/nguoi-dung: organizer (BTC) logins — username + password, admin or check-in role. */
+/** /admin/cai-dat/nguoi-dung: organizer (BTC) logins — username + password, admin, check-in or dancer-update role. */
 export const StaffAccountsView: React.FC = () => {
   const { authUser } = useTournament();
   const [accounts, setAccounts] = useState<StaffAccount[]>([]);
@@ -164,8 +165,8 @@ export const StaffAccountsView: React.FC = () => {
           </label>
           <fieldset className="space-y-1">
             <legend className="text-xs font-bold text-zinc-600">Quyền</legend>
-            <div className="grid grid-cols-2 gap-1.5">
-              {(['checkin', 'admin'] as const).map((r) => (
+            <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3">
+              {(['checkin', 'editor', 'admin'] as const).map((r) => (
                 <label
                   key={r}
                   className={`rounded border px-3 py-1.5 cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-amber-500 ${
@@ -239,7 +240,7 @@ export const StaffAccountsView: React.FC = () => {
                 aria-label={`Quyền của ${a.name}`}
                 className="rounded border border-zinc-300 bg-white px-2 py-1.5 text-xs font-bold text-zinc-800 cursor-pointer disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-amber-500"
               >
-                {(['admin', 'checkin'] as const).map((r) => (
+                {(['admin', 'editor', 'checkin'] as const).map((r) => (
                   <option key={r} value={r}>
                     {ROLE_LABELS[r]}
                   </option>

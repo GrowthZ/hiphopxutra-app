@@ -7,19 +7,36 @@ import { StageDisplayView } from './StageDisplayView';
 import { ArchBattleView } from './ArchBattleView';
 import { IS_ARCH_LED } from './archLayout';
 import { PrelimResultsView } from '../prelim/PrelimResultsView';
+import { BracketScreenView } from '../guest/BracketScreenView';
+import { ArchBracketView } from './ArchBracketView';
+import { ArchFrame } from './ArchFrame';
 
 const CURSOR_HIDE_MS = 3000;
 
-/** Standby / blackout screen: logo only, safe to show at any moment. */
-const StageIdleScreen: React.FC = () => (
-  <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-center px-6">
-    <p className="font-condensed font-black uppercase tracking-[0.3em] text-amber-400 text-[3vw]">Breaking U16</p>
-    <h1 className="font-condensed font-black uppercase text-white leading-none text-[11vw] tracking-wide">
-      HIPHOP XỨ TRÀ
-    </h1>
-    <p className="font-condensed font-black text-zinc-500 text-[4vw] tracking-[0.4em]">2026</p>
-  </div>
-);
+/**
+ * Standby / blackout screen, safe to show at any moment: the picture an admin uploaded (whole, on black; on the arch
+ * wall it fills the 2560×1536 picture), else the event name.
+ */
+const StageIdleScreen: React.FC<{ imageUrl?: string }> = ({ imageUrl }) =>
+  imageUrl ? (
+    IS_ARCH_LED ? (
+      <ArchFrame>
+        <img src={imageUrl} alt="" className="absolute inset-0 h-full w-full object-contain" />
+      </ArchFrame>
+    ) : (
+      <div className="fixed inset-0 bg-black">
+        <img src={imageUrl} alt="" className="h-full w-full object-contain" />
+      </div>
+    )
+  ) : (
+    <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-center px-6">
+      <p className="font-condensed font-black uppercase tracking-[0.3em] text-amber-400 text-[3vw]">Breaking U16</p>
+      <h1 className="font-condensed font-black uppercase text-white leading-none text-[11vw] tracking-wide">
+        HIPHOP XỨ TRÀ
+      </h1>
+      <p className="font-condensed font-black text-zinc-500 text-[4vw] tracking-[0.4em]">2026</p>
+    </div>
+  );
 
 /**
  * /led: what the venue screen shows, driven entirely by admins from /admin/led.
@@ -68,14 +85,20 @@ export const LedScreen: React.FC = () => {
   return (
     <div className={`relative min-h-screen bg-black ${cursorHidden ? 'cursor-none' : ''}`}>
       <div className="kiosk">
-        {scene === 'idle' && <StageIdleScreen />}
+        {scene === 'idle' && <StageIdleScreen imageUrl={state.idleImageUrl} />}
         {scene === 'battle' &&
           (IS_ARCH_LED ? (
-            <ArchBattleView winnerDelay={state.winnerDelay} />
+            <ArchBattleView winnerDelay={state.winnerDelay} edge={state.archEdge} />
           ) : (
             <StageDisplayView theme={state.theme} winnerDelay={state.winnerDelay} />
           ))}
         {scene === 'prelim_leaderboard' && <PrelimResultsView />}
+        {scene === 'bracket' &&
+          (IS_ARCH_LED ? (
+            <ArchBracketView category={state.category} theme={state.bracketTheme} />
+          ) : (
+            <BracketScreenView kiosk category={state.category} theme={state.bracketTheme ?? 'dark'} />
+          ))}
       </div>
 
       {!isOnline && (

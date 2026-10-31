@@ -1,7 +1,7 @@
 import { createUserWithEmailAndPassword, deleteUser, signInWithEmailAndPassword, signOut, updatePassword } from 'firebase/auth';
 import { deleteDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { accountsAuth } from './judgeAccounts';
-import { assertProdAuthUntouched, eventCollection, eventDoc, SHARES_PROD_AUTH, StaffRole } from './firestore';
+import { assertProdAuthUntouched, eventCollection, eventDoc, SHARES_PROD_AUTH, StaffRole, toStaffRole } from './firestore';
 
 // Organizer (BTC) accounts: email/password on a made-up domain, so staff only type a username.
 // firestore.rules accepts this domain without email verification; the role lives in admins/{email}.
@@ -17,7 +17,7 @@ export const loginEmail = (input: string) => (input.includes('@') ? input.trim()
 export const usernameOf = (email: string) =>
   email.endsWith(`@${STAFF_EMAIL_DOMAIN}`) ? email.slice(0, -STAFF_EMAIL_DOMAIN.length - 1) : null;
 
-export const ROLE_LABELS: Record<StaffRole, string> = { admin: 'Quản trị', checkin: 'Check-in' };
+export const ROLE_LABELS: Record<StaffRole, string> = { admin: 'Quản trị', checkin: 'Check-in', editor: 'Cập nhật thí sinh' };
 
 export interface StaffAccount {
   email: string;
@@ -111,7 +111,7 @@ export function subscribeStaff(onChange: (list: StaffAccount[]) => void, onError
       admins = snap.docs.map((d) => ({
         email: d.id,
         name: String(d.data().name ?? d.id),
-        role: d.data().role === 'checkin' ? 'checkin' : 'admin',
+        role: toStaffRole(d.data().role),
       }));
       emit();
     },

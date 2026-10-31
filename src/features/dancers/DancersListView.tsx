@@ -1,18 +1,7 @@
 import React, { useState } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
-import {
-  Search,
-  Download,
-  Camera,
-  Cloud,
-  Check,
-  User,
-  Image as ImageIcon,
-  Sliders,
-  Filter,
-  Pencil,
-} from 'lucide-react';
+import { Search, Download, Camera, Cloud, Pencil } from 'lucide-react';
 import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from './DancerPhotoUploadModal';
 import { DancerInfoModal } from './DancerInfoModal';
@@ -21,8 +10,13 @@ import {
   getDancerHalfBodyUrl,
 } from '../../shared/placeholderAssets';
 
+/**
+ * /admin/thi-sinh: every dancer's details and photos. Phone first (cards, big targets: photos are taken on the spot);
+ * the full table from tablet width. Also the only page of "Cập nhật thí sinh" staff (no storage settings for them).
+ */
 export const DancersListView: React.FC = () => {
   const {
+    isAdmin,
     newbieDancers,
     proDancers,
     activeCategory,
@@ -35,10 +29,12 @@ export const DancersListView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterQualified, setFilterQualified] = useState<'all' | 'top32' | 'out'>('all');
   const [filterGender, setFilterGender] = useState<'all' | 'male' | 'female'>('all');
+  const [missingPhoto, setMissingPhoto] = useState(false);
   const [selectedDancerForPhoto, setSelectedDancerForPhoto] = useState<Dancer | null>(null);
   const [editingDancer, setEditingDancer] = useState<Dancer | null>(null);
 
   const currentList = activeCategory === 'newbie_1v1' ? newbieDancers : proDancers;
+  const withoutPhoto = currentList.filter((d) => !d.avatarUrl).length;
 
   const filteredDancers = currentList.filter((d) => {
     const matchesSearch =
@@ -54,6 +50,7 @@ export const DancersListView: React.FC = () => {
 
     if (filterGender === 'male' && d.gender !== 'male') return false;
     if (filterGender === 'female' && d.gender !== 'female') return false;
+    if (missingPhoto && d.avatarUrl) return false;
 
     return true;
   });
@@ -90,142 +87,188 @@ export const DancersListView: React.FC = () => {
   };
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-3 sm:space-y-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-4">
-        <div>
-          <h1 className="font-condensed font-black text-2xl sm:text-3xl text-zinc-900 tracking-tight uppercase">
-            Danh sách thí sinh U16
-          </h1>
-          <p className="text-xs text-zinc-500 font-medium mt-0.5">
-            Quản lý hồ sơ vận động viên, giới tính (Nam / Nữ), ảnh Avatar, ảnh nửa người (R2 / Google Drive)
+      <div className="flex items-end justify-between gap-3 border-b border-zinc-200 pb-3 sm:pb-4">
+        <div className="min-w-0">
+          <h1 className="font-condensed font-black text-2xl sm:text-3xl text-zinc-900 tracking-tight uppercase">Danh sách thí sinh</h1>
+          <p className="text-xs text-zinc-500 font-medium mt-0.5 hidden sm:block">
+            Thông tin thí sinh, giới tính, ảnh avatar và ảnh nửa người (lưu trên R2)
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          {/* Quick Storage & Placeholder Config button */}
-          <button
-            onClick={() => setIsStorageModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            title="Cấu hình Cloudflare R2, Google Drive & ảnh mẫu Placeholder"
-          >
-            <Cloud className="w-3.5 h-3.5 text-zinc-500" />
-            <span className="hidden sm:inline">Cài đặt ảnh:</span>
-            <span className="font-bold text-zinc-900 uppercase">
-              R2
-            </span>
-          </button>
-
+        <div className="flex shrink-0 items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => setIsStorageModalOpen(true)}
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              title="Cấu hình Cloudflare R2, Google Drive & ảnh mẫu Placeholder"
+            >
+              <Cloud className="w-3.5 h-3.5 text-zinc-500" />
+              <span>Cài đặt ảnh</span>
+            </button>
+          )}
           <button
             onClick={handleExportRoster}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-zinc-500" />
-            <span>Tải CSV</span>
+            <span>CSV</span>
           </button>
         </div>
       </div>
 
-      {/* Segmented Controls & Search Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        {/* Category switcher */}
-        <div className="flex items-center gap-1 bg-zinc-200 p-1 rounded font-bold w-fit">
-          <button
-            onClick={() => setActiveCategory('newbie_1v1')}
-            className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
-              activeCategory === 'newbie_1v1'
-                ? 'bg-zinc-900 text-white shadow-xs'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Kid Newbie • 1vs1 ({newbieDancers.length})
-          </button>
-          <button
-            onClick={() => setActiveCategory('pro_2v2')}
-            className={`px-4 py-1.5 rounded transition-colors cursor-pointer ${
-              activeCategory === 'pro_2v2'
-                ? 'bg-zinc-900 text-white shadow-xs'
-                : 'text-zinc-600 hover:text-zinc-900'
-            }`}
-          >
-            Kid Pro • 2vs2 ({proDancers.length})
-          </button>
+      {/* Category, search and filters: stacked on a phone, one row on a laptop */}
+      <div className="sticky top-14 z-20 -mx-4 space-y-2 bg-zinc-100/95 px-4 py-2 backdrop-blur md:static md:mx-0 md:flex md:flex-wrap md:items-center md:justify-between md:gap-3 md:space-y-0 md:bg-transparent md:p-0 md:backdrop-blur-none text-xs">
+        <div className="grid grid-cols-2 gap-1 rounded-lg bg-zinc-200 p-1 font-bold md:flex md:w-fit">
+          {(
+            [
+              ['newbie_1v1', 'Newbie 1vs1', newbieDancers.length],
+              ['pro_2v2', 'Pro 2vs2', proDancers.length],
+            ] as const
+          ).map(([id, label, count]) => (
+            <button
+              key={id}
+              onClick={() => setActiveCategory(id)}
+              aria-pressed={activeCategory === id}
+              className={`rounded-md px-4 py-2 md:py-1.5 transition-colors cursor-pointer ${
+                activeCategory === id ? 'bg-zinc-900 text-white shadow-xs' : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+            >
+              {label} ({count})
+            </button>
+          ))}
         </div>
 
-        {/* Search & Gender & Status Filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Gender Filter */}
-          <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded border border-zinc-200 font-bold text-[11px]">
-            <button
-              onClick={() => setFilterGender('all')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterGender === 'all' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Tất cả giới tính
-            </button>
-            <button
-              onClick={() => setFilterGender('male')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterGender === 'male' ? 'bg-blue-600 text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Nam ♂
-            </button>
-            <button
-              onClick={() => setFilterGender('female')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterGender === 'female' ? 'bg-pink-600 text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Nữ ♀
-            </button>
-          </div>
+        <div className="relative md:order-last">
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Tìm SBD, tên, CLB…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Tìm thí sinh"
+            className="w-full rounded-lg border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base text-zinc-900 outline-none focus:border-zinc-500 md:w-52 md:py-1.5 md:text-xs shadow-2xs"
+          />
+        </div>
 
-          {/* Status Filter */}
-          <div className="flex items-center gap-1 bg-zinc-100 p-1 rounded border border-zinc-200 font-bold text-[11px]">
+        <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 font-bold text-[11px] [scrollbar-width:none] md:mx-0 md:px-0 md:pb-0">
+          {(
+            [
+              ['all', 'Tất cả'],
+              ['male', 'Nam ♂'],
+              ['female', 'Nữ ♀'],
+            ] as const
+          ).map(([g, label]) => (
             <button
-              onClick={() => setFilterQualified('all')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterQualified === 'all' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
+              key={g}
+              onClick={() => setFilterGender(g)}
+              aria-pressed={filterGender === g}
+              className={`shrink-0 rounded-full border px-3 py-1.5 cursor-pointer ${
+                filterGender === g
+                  ? g === 'female'
+                    ? 'border-pink-600 bg-pink-600 text-white'
+                    : g === 'male'
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-zinc-900 bg-zinc-900 text-white'
+                  : 'border-zinc-300 bg-white text-zinc-600'
               }`}
             >
-              Tất cả
+              {label}
             </button>
+          ))}
+          <span className="mx-0.5 w-px shrink-0 bg-zinc-300" />
+          <button
+            onClick={() => setMissingPhoto((v) => !v)}
+            aria-pressed={missingPhoto}
+            className={`shrink-0 rounded-full border px-3 py-1.5 cursor-pointer ${
+              missingPhoto ? 'border-amber-500 bg-amber-500 text-zinc-950' : 'border-zinc-300 bg-white text-zinc-600'
+            }`}
+          >
+            Chưa có ảnh ({withoutPhoto})
+          </button>
+          {(
+            [
+              ['top32', 'Top 32'],
+              ['out', 'Bị loại'],
+            ] as const
+          ).map(([q, label]) => (
             <button
-              onClick={() => setFilterQualified('top32')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterQualified === 'top32' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
+              key={q}
+              onClick={() => setFilterQualified((v) => (v === q ? 'all' : q))}
+              aria-pressed={filterQualified === q}
+              className={`shrink-0 rounded-full border px-3 py-1.5 cursor-pointer ${
+                filterQualified === q ? 'border-zinc-900 bg-zinc-900 text-white' : 'border-zinc-300 bg-white text-zinc-600'
               }`}
             >
-              Top 32
+              {label}
             </button>
-            <button
-              onClick={() => setFilterQualified('out')}
-              className={`px-2 py-0.5 rounded cursor-pointer ${
-                filterQualified === 'out' ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:text-zinc-900'
-              }`}
-            >
-              Bị loại
-            </button>
-          </div>
-
-          {/* Search Box */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Tìm SBD, tên..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-8 pr-3 py-1.5 rounded bg-white border border-zinc-300 text-zinc-900 text-xs outline-none focus:border-zinc-500 w-36 sm:w-44 shadow-2xs"
-            />
-          </div>
+          ))}
         </div>
       </div>
 
-      {/* Dancers Table */}
-      <div className="bg-white border border-zinc-200 rounded overflow-hidden shadow-2xs">
+      {/* Phone: one card per dancer, tap the photo or "Ảnh" to take / change it */}
+      <ul className="space-y-2 md:hidden" aria-label="Thí sinh">
+        {filteredDancers.length === 0 && (
+          <li className="rounded-xl border border-dashed border-zinc-300 bg-white px-4 py-8 text-center text-sm text-zinc-500">
+            Không có thí sinh nào khớp.
+          </li>
+        )}
+        {filteredDancers.map((d) => {
+          const female = d.gender === 'female';
+          return (
+            <li key={d.id} className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-2.5">
+              <button
+                onClick={() => setSelectedDancerForPhoto(d)}
+                aria-label={`Ảnh của ${d.name}`}
+                className="relative shrink-0 cursor-pointer rounded-full focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                <img
+                  loading="lazy"
+                  decoding="async"
+                  src={getDancerAvatarUrl(d, storageConfig.placeholders)}
+                  alt=""
+                  className={`h-14 w-14 rounded-full object-cover border-2 ${d.avatarUrl ? 'border-emerald-500' : 'border-dashed border-amber-500 opacity-60'}`}
+                />
+                {!d.avatarUrl && (
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-zinc-950 ring-2 ring-white">
+                    <Camera className="h-3.5 w-3.5" />
+                  </span>
+                )}
+              </button>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-condensed text-lg font-black uppercase leading-tight text-zinc-900">{d.name}</p>
+                <p className="flex items-center gap-1.5 truncate text-xs text-zinc-500">
+                  <span className="font-mono font-bold text-zinc-700">{d.sbd || '—'}</span>
+                  <span className={`rounded px-1 text-[10px] font-bold ${female ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'}`}>
+                    {female ? 'Nữ' : 'Nam'}
+                  </span>
+                  <span className="truncate">{[d.realName, d.crew].filter(Boolean).join(' · ')}</span>
+                </p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <button
+                  onClick={() => setSelectedDancerForPhoto(d)}
+                  className={`flex items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-bold cursor-pointer ${
+                    d.avatarUrl ? 'border border-zinc-300 text-zinc-700' : 'bg-amber-500 text-zinc-950'
+                  }`}
+                >
+                  <Camera className="h-3.5 w-3.5" /> Ảnh
+                </button>
+                <button
+                  onClick={() => setEditingDancer(d)}
+                  aria-label={`Sửa thông tin ${d.name}`}
+                  className="flex items-center justify-center gap-1 rounded-lg border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-700 cursor-pointer"
+                >
+                  <Pencil className="h-3.5 w-3.5" /> Sửa
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Tablet / laptop: the full table */}
+      <div className="hidden md:block bg-white border border-zinc-200 rounded overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>

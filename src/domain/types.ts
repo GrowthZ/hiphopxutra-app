@@ -25,15 +25,18 @@ export type ActiveViewType =
   | 'rehearsal';
 
 // What the LED screen shows; written by admins at /admin/led, read by /led.
-export type StageSceneType = 'idle' | 'battle' | 'prelim_leaderboard';
+export type StageSceneType = 'idle' | 'battle' | 'prelim_leaderboard' | 'bracket';
 
 export interface StageState {
   id: string; // screenId
   scene: StageSceneType;
-  category: CategoryType; // category for the prelim leaderboard scene
+  category: CategoryType; // category for the prelim leaderboard and knockout bracket scenes
   theme: 'daylight' | 'night';
   blackout: boolean; // overrides scene with the idle/logo screen
   winnerDelay?: number; // seconds between the last ballot flipping over and the result lighting up (default 0.5)
+  archEdge?: 'full' | 'dome'; // arch LED: full picture cut by the wall itself (default), or a smooth dome inside it
+  bracketTheme?: 'light' | 'dark'; // knockout bracket scene (default dark)
+  idleImageUrl?: string; // standby screen picture uploaded by an admin; empty = the built-in logo screen
   updatedAt: number;
   updatedBy: string;
 }

@@ -21,10 +21,12 @@ import {
   Mic,
   FlaskConical,
   Network,
+  X,
 } from 'lucide-react';
 import { openInNewTab, SCREEN_VIEWS } from '../../app/routes';
 
-export const AdminSidebar: React.FC = () => {
+/** The admin menu: a column on wide screens; below `lg` a drawer opened from the navbar's hamburger. */
+export const AdminSidebar: React.FC<{ mobileOpen?: boolean; onClose?: () => void }> = ({ mobileOpen = false, onClose }) => {
   const {
     activeView,
     setActiveView,
@@ -55,9 +57,23 @@ export const AdminSidebar: React.FC = () => {
     { id: 'sheets', label: 'Google Sheets DB', icon: ShieldCheck },
   ] as const;
 
-  return (
-    <aside className="w-60 bg-white border-r border-zinc-200 flex flex-col justify-between shrink-0 h-[calc(100vh-3.5rem)] sticky top-14 select-none">
-      <div className="p-3">
+  // Escape closes the drawer.
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose?.();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mobileOpen, onClose]);
+
+  const go = (id: (typeof menuItems)[number]['id']) => {
+    if ((SCREEN_VIEWS as readonly string[]).includes(id)) openInNewTab(id as (typeof SCREEN_VIEWS)[number]);
+    else setActiveView(id);
+    onClose?.();
+  };
+
+  const body = (
+    <>
+      <div className="p-3 min-h-0 flex-1 overflow-y-auto">
         {/* Navigation list */}
         <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-zinc-400 px-3 py-1.5">
           MENU ĐIỀU HÀNH
@@ -70,9 +86,9 @@ export const AdminSidebar: React.FC = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => (newTab ? openInNewTab(item.id) : setActiveView(item.id))}
+                onClick={() => go(item.id)}
                 title={newTab ? 'Mở ở tab mới' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded text-xs font-semibold transition-colors text-left cursor-pointer ${
+                className={`w-full flex items-center gap-3 px-3 py-2.5 lg:py-2 rounded text-sm lg:text-xs font-semibold transition-colors text-left cursor-pointer ${
                   isActive
                     ? 'bg-zinc-900 text-white font-bold'
                     : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
@@ -93,7 +109,10 @@ export const AdminSidebar: React.FC = () => {
         {/* Quick Button for Judge 2-Photos Config */}
         <div className="mt-3 pt-3 border-t border-zinc-100">
           <button
-            onClick={() => setIsJudgeConfigModalOpen(true)}
+            onClick={() => {
+              setIsJudgeConfigModalOpen(true);
+              onClose?.();
+            }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold transition-colors text-left cursor-pointer shadow-xs"
           >
             <Camera className="w-4 h-4 text-amber-700 shrink-0" />
@@ -118,6 +137,32 @@ export const AdminSidebar: React.FC = () => {
           </div>
         </div>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="hidden lg:flex w-60 bg-white border-r border-zinc-200 flex-col justify-between shrink-0 h-[calc(100vh-3.5rem)] sticky top-14 select-none">
+        {body}
+      </aside>
+      {mobileOpen && (
+        <div className="fixed inset-0 z-[60] lg:hidden" role="dialog" aria-modal="true" aria-label="Menu điều hành">
+          <div className="absolute inset-0 bg-zinc-900/40" onClick={onClose} />
+          <aside className="absolute inset-y-0 left-0 flex w-[min(20rem,85vw)] flex-col justify-between bg-white shadow-xl select-none pb-[env(safe-area-inset-bottom)]">
+            <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+              <span className="font-condensed text-lg font-black uppercase text-zinc-900">Menu</span>
+              <button
+                onClick={onClose}
+                aria-label="Đóng menu"
+                className="-m-1 rounded-full p-2 text-zinc-500 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            {body}
+          </aside>
+        </div>
+      )}
+    </>
   );
 };
