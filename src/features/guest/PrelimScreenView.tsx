@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Maximize, Medal, Moon, Radio, Sun } from 'lucide-react';
+import { Maximize, Moon, Radio, Sun } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { VIEW_PATHS } from '../../app/routes';
@@ -25,7 +25,7 @@ const LABEL = Object.fromEntries(CATEGORIES) as Record<CategoryType, string>;
 const START: CategoryType = new URLSearchParams(window.location.search).get('hang-muc') === 'pro' ? 'pro_2v2' : 'newbie_1v1';
 
 type Theme = 'light' | 'led';
-type Medalist = { card: string; badge: string; score: string };
+type Medalist = { card: string; score: string };
 
 /** Everything that differs between the two looks. */
 const THEMES: Record<
@@ -79,9 +79,9 @@ const THEMES: Record<
     tickerTag: 'bg-amber-400 text-zinc-900',
     flash: 'ring-8 ring-amber-400 animate-pulse',
     medal: [
-      { card: 'bg-amber-50 border border-zinc-200', badge: 'bg-amber-400 text-amber-950', score: 'text-zinc-900' },
-      { card: 'bg-zinc-100 border border-zinc-200', badge: 'bg-zinc-300 text-zinc-800', score: 'text-zinc-900' },
-      { card: 'bg-orange-50 border border-zinc-200', badge: 'bg-orange-300 text-orange-950', score: 'text-zinc-900' },
+      { card: 'bg-amber-50 border border-zinc-200', score: 'text-zinc-900' },
+      { card: 'bg-zinc-100 border border-zinc-200', score: 'text-zinc-900' },
+      { card: 'bg-orange-50 border border-zinc-200', score: 'text-zinc-900' },
     ],
   },
   led: {
@@ -119,17 +119,17 @@ const THEMES: Record<
     medal: [
       {
         card: 'bg-gradient-to-br from-amber-500/30 via-amber-400/10 to-transparent ring-2 ring-amber-400/80 shadow-[0_0_60px_rgba(251,191,36,0.35)]',
-        badge: 'bg-gradient-to-b from-amber-300 to-amber-500 text-amber-950',
+       
         score: 'bg-gradient-to-b from-amber-100 to-amber-400 bg-clip-text text-transparent',
       },
       {
         card: 'bg-gradient-to-br from-zinc-300/25 via-zinc-300/5 to-transparent ring-2 ring-zinc-300/70 shadow-[0_0_50px_rgba(212,212,216,0.25)]',
-        badge: 'bg-gradient-to-b from-zinc-100 to-zinc-400 text-zinc-900',
+       
         score: 'bg-gradient-to-b from-white to-zinc-400 bg-clip-text text-transparent',
       },
       {
         card: 'bg-gradient-to-br from-orange-500/30 via-orange-400/5 to-transparent ring-2 ring-orange-400/70 shadow-[0_0_50px_rgba(251,146,60,0.3)]',
-        badge: 'bg-gradient-to-b from-orange-300 to-orange-600 text-orange-950',
+       
         score: 'bg-gradient-to-b from-orange-100 to-orange-400 bg-clip-text text-transparent',
       },
     ],
@@ -359,6 +359,66 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
 
 const rise = (i: number): React.CSSProperties => ({ animationDelay: `${i * 70}ms` });
 
+/** Gold, silver, bronze: light edge, body, shadow, inner plate, number, outline. */
+const METALS = [
+  { hi: '#fff6c2', mid: '#fbbf24', lo: '#92400e', plate: '#b45309', text: '#fffbeb', line: '#78350f', glow: 'drop-shadow-[0_0_22px_rgba(251,191,36,0.75)]' },
+  { hi: '#ffffff', mid: '#d4d4d8', lo: '#52525b', plate: '#71717a', text: '#ffffff', line: '#3f3f46', glow: 'drop-shadow-[0_0_18px_rgba(228,228,231,0.6)]' },
+  { hi: '#ffedd5', mid: '#fb923c', lo: '#7c2d12', plate: '#9a3412', text: '#fff7ed', line: '#7c2d12', glow: 'drop-shadow-[0_0_18px_rgba(251,146,60,0.65)]' },
+];
+
+/** Top-3 emblem: a bevelled metal hexagon with the rank, crowned for first place. Height comes from className. */
+const RankEmblem: React.FC<{ rank: number; className: string; glow?: boolean }> = ({ rank, className, glow }) => {
+  const id = React.useId().replace(/:/g, '');
+  const c = METALS[rank - 1];
+  const crown = rank === 1;
+  return (
+    <svg
+      viewBox={crown ? '0 -30 120 162' : '0 0 120 132'}
+      className={`w-auto shrink-0 ${glow ? c.glow : 'drop-shadow-md'} ${className}`}
+      role="img"
+      aria-label={`Hạng ${rank}`}
+    >
+      <defs>
+        <linearGradient id={`${id}m`} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor={c.hi} />
+          <stop offset="0.45" stopColor={c.mid} />
+          <stop offset="1" stopColor={c.lo} />
+        </linearGradient>
+        <linearGradient id={`${id}p`} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor={c.plate} />
+          <stop offset="1" stopColor={c.mid} />
+        </linearGradient>
+      </defs>
+      {/* outer rim, inner plate, top-left glint */}
+      <polygon points="60,4 112,33 112,99 60,128 8,99 8,33" fill={`url(#${id}m)`} stroke={c.line} strokeWidth="3" />
+      <polygon points="60,18 99,40 99,92 60,114 21,92 21,40" fill={`url(#${id}p)`} stroke={c.hi} strokeOpacity="0.7" strokeWidth="2" />
+      <polygon points="60,18 21,40 21,62 60,40" fill="#fff" opacity="0.18" />
+      <text
+        x="60"
+        y="90"
+        textAnchor="middle"
+        fontFamily="var(--font-condensed)"
+        fontWeight="900"
+        fontSize="66"
+        fill={c.text}
+        stroke={c.line}
+        strokeWidth="3"
+        paintOrder="stroke"
+      >
+        {rank}
+      </text>
+      {crown && (
+        <g stroke={c.line} strokeWidth="3" strokeLinejoin="round">
+          <path d="M28 12 L33 -20 L48 -2 L60 -28 L72 -2 L87 -20 L92 12 Z" fill={`url(#${id}m)`} />
+          <circle cx="33" cy="-20" r="4.5" fill={c.hi} />
+          <circle cx="60" cy="-28" r="5" fill="#ef4444" />
+          <circle cx="87" cy="-20" r="4.5" fill={c.hi} />
+        </g>
+      )}
+    </svg>
+  );
+};
+
 /** While judging: big top 3 on the left, ranks 4–10 on the right. */
 const LiveBoard: React.FC<{ dancers: Dancer[]; flashing: string | null; theme: Theme }> = ({ dancers, flashing, theme }) => {
   const t = THEMES[theme];
@@ -411,10 +471,7 @@ const PodiumCard: React.FC<{ dancer: Dancer; rank: number; big?: boolean; flashi
       } ${dancer.id === flashing ? t.flash : ''}`}
     >
       {theme === 'led' && <span className="led-shine pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/25 to-transparent" />}
-      <span className={`flex items-center gap-1 rounded-full px-4 py-1.5 font-black ${m.badge} ${big ? 'text-4xl' : 'text-3xl'}`}>
-        <Medal className={big ? 'h-9 w-9' : 'h-7 w-7'} />
-        {rank}
-      </span>
+      <RankEmblem rank={rank} className={big ? 'h-[170px]' : 'h-[110px]'} glow={theme === 'led'} />
       <Avatar dancer={dancer} size={big ? 'h-44 w-44 text-7xl' : 'h-28 w-28 text-5xl'} dark={theme === 'led'} />
       <div className={`min-w-0 ${big ? 'flex-1' : 'w-full'}`}>
         <p className={`truncate font-condensed font-black uppercase leading-none ${t.name} ${big ? 'text-7xl' : 'text-5xl'}`}>
@@ -445,14 +502,13 @@ const QualifiedGrid: React.FC<{ dancers: Dancer[]; flashing: string | null; them
                 d.id === flashing ? t.flash : ''
               }`}
             >
-              <span
-                className={`flex h-11 min-w-11 items-center justify-center gap-0.5 rounded-full px-1.5 font-condensed text-2xl font-black tabular-nums ${
-                  m ? m.badge : t.rank
-                }`}
-              >
-                {m && <Medal className="h-5 w-5" />}
-                {i + 1}
-              </span>
+              {m ? (
+                <RankEmblem rank={i + 1} className={i === 0 ? 'h-[70px]' : 'h-14'} glow={theme === 'led'} />
+              ) : (
+                <span className={`flex h-11 min-w-11 items-center justify-center rounded-full px-1.5 font-condensed text-2xl font-black tabular-nums ${t.rank}`}>
+                  {i + 1}
+                </span>
+              )}
               <span className={`min-w-0 flex-1 truncate font-condensed text-3xl font-black uppercase ${t.name}`}>{stripBreakerPrefix(d.name)}</span>
               <span className={`font-condensed text-4xl font-black tabular-nums ${m ? m.score : t.score}`}>{d.prelimScoreTotal}</span>
             </li>
