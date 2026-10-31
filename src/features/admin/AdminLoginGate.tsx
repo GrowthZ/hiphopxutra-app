@@ -7,7 +7,9 @@ import { loginEmail } from '../../services/staffAccounts';
 
 /** Shown instead of /admin/* until an organizer (BTC username or whitelisted Google account) is signed in. */
 export const AdminLoginGate: React.FC = () => {
-  const { authReady, authUser, syncError, handleGoogleLogin, handleGoogleLogout } = useTournament();
+  const { authReady, authUser, syncError, handleGoogleLogin, handleGoogleLogout, activeView } = useTournament();
+  // The check-in app (and its sign-out) lands here too: name the screen after it.
+  const checkIn = activeView === 'checkin';
   const [error, setError] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -50,7 +52,7 @@ export const AdminLoginGate: React.FC = () => {
       <div className="w-full max-w-sm rounded-lg border border-zinc-200 bg-zinc-50 p-6 space-y-5">
         <div className="space-y-3">
           <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-16 w-auto" />
-          <h1 className="font-condensed text-3xl font-black uppercase">Bảng điều hành</h1>
+          <h1 className="font-condensed text-3xl font-black uppercase">{checkIn ? 'Bàn check-in' : 'Bảng điều hành'}</h1>
         </div>
 
         {!authReady ? (
@@ -67,7 +69,7 @@ export const AdminLoginGate: React.FC = () => {
             <div className="flex gap-2 rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
               <ShieldAlert className="w-5 h-5 shrink-0 text-red-600" />
               <p>
-                Tài khoản <b>{authUser.email}</b> chưa được cấp quyền vào bảng điều hành. Nhờ quản trị cấp ở trang{' '}
+                Tài khoản <b>{authUser.email}</b> chưa được cấp quyền vào {checkIn ? 'bàn check-in' : 'bảng điều hành'}. Nhờ quản trị cấp ở trang{' '}
                 <b>Người dùng BTC</b>.
               </p>
             </div>

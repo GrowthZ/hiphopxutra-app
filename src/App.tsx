@@ -8,7 +8,6 @@ import { BracketView } from './features/battle/BracketView';
 import { BattleOperatorView } from './features/battle/BattleOperatorView';
 import { LedScreen } from './features/stage/LedScreen';
 import { StageControlView } from './features/stage/StageControlView';
-import { CheckInView } from './features/dancers/CheckInView';
 import { JudgeLoginScreen } from './features/judge/JudgeLoginScreen';
 import { JudgeAccountsView } from './features/judge/JudgeAccountsView';
 import { JudgePortalView } from './features/judge/JudgePortalView';
@@ -58,8 +57,15 @@ const MainContent: React.FC = () => {
     setIsJudgeConfigModalOpen,
   } = useTournament();
 
-  // Check-in staff get only the check-in desk, whatever /admin page they open.
-  if (isAdminView(activeView) && staffRole === 'checkin') return <CheckInDesk />;
+  // Check-in staff get only the check-in desk, whatever /admin page they open: move them to its URL (and app).
+  const misplacedCheckIn = isAdminView(activeView) && staffRole === 'checkin' && activeView !== 'checkin';
+  React.useEffect(() => {
+    if (misplacedCheckIn) setActiveView('checkin');
+  }, [misplacedCheckIn, setActiveView]);
+  if (misplacedCheckIn) return null;
+
+  // Admins get the same desk (hamburger menu, no sidebar) on the check-in page.
+  if (activeView === 'checkin' && (staffRole === 'checkin' || isAdmin)) return <CheckInDesk />;
   if (isAdminView(activeView) && !isAdmin) {
     return <AdminLoginGate />;
   }
@@ -169,7 +175,6 @@ const MainContent: React.FC = () => {
           {activeView === 'sheets' && <GoogleSheetSyncModal />}
           {activeView === 'storage' && <DancersListView />}
           {activeView === 'stage_control' && <StageControlView />}
-          {activeView === 'checkin' && <CheckInView />}
           {activeView === 'judge_accounts' && <JudgeAccountsView />}
           {activeView === 'staff_accounts' && <StaffAccountsView />}
         </main>

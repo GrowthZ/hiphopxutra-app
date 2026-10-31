@@ -203,9 +203,10 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
   expect(snap.docs[0].get('panel')).toBe(Number(snap.docs[0].get('sbd').slice(1)) % 2 === 1 ? 'A' : 'B');
   await expect(desk.getByText(/Bảng [AB]/).first()).toBeVisible();
 
-  // Both categories, no number yet: the name is tidied (lower-case "s" kept), BGIRL is a girl, pinned at the top.
+  // Both categories, no number yet: the name is tidied (lower-case "s" kept), "bgirl" switches to BGirl, pinned at the top.
   await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
   await desk.getByLabel('Tên thi đấu *').fill('bgirl  sass - y');
+  await expect(desk.getByLabel('BBoy / BGirl')).toHaveValue('female');
   await desk.getByRole('radio', { name: 'Cả 2' }).click();
   await desk.getByLabel('Check-in và cấp SBD luôn').uncheck();
   await desk.getByRole('button', { name: 'Đăng ký', exact: true }).click();

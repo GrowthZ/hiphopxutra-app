@@ -30,7 +30,14 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const [walkInOpen, setWalkInOpen] = useState(false);
-  const [walkIn, setWalkIn] = useState({ name: '', realName: '', crew: '', category: 'newbie_1v1' as WalkInCategory, checkIn: true });
+  const [walkIn, setWalkIn] = useState({
+    name: '',
+    realName: '',
+    crew: '',
+    gender: 'male' as Dancer['gender'],
+    category: 'newbie_1v1' as WalkInCategory,
+    checkIn: true,
+  });
   const [walkInBusy, setWalkInBusy] = useState(false);
   const [walkInError, setWalkInError] = useState<string | null>(null);
   // Walk-ins registered at this desk, newest first: pinned to the top of the list whatever the filters.
@@ -139,7 +146,7 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
           ? { kind: 'ok', title: `Đã check-in ${name}`, sbd: sbds.join(' · ') }
           : { kind: 'ok', title: `Đã đăng ký ${name}`, sbd: 'Chưa cấp SBD' }
       );
-      setWalkIn((w) => ({ ...w, name: '', realName: '', crew: '' }));
+      setWalkIn((w) => ({ ...w, name: '', realName: '', crew: '', gender: 'male' }));
       setWalkInOpen(false);
     } catch (err) {
       setWalkInError(`Không đăng ký được: ${err instanceof Error ? err.message : String(err)}`);
@@ -277,6 +284,17 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
               </button>
             </div>
             <div className="grid gap-3">
+              <label className="block space-y-1">
+                <span className="text-xs font-bold text-zinc-600">BBoy / BGirl</span>
+                <select
+                  value={walkIn.gender}
+                  onChange={(e) => setWalkIn((w) => ({ ...w, gender: e.target.value as Dancer['gender'] }))}
+                  className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 sm:py-2 text-base sm:text-sm font-bold text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+                >
+                  <option value="male">BBoy</option>
+                  <option value="female">BGirl</option>
+                </select>
+              </label>
               {(
                 [
                   ['name', 'Tên thi đấu *', 'vd. Bboy Kenz'],
@@ -288,7 +306,12 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
                   <span className="text-xs font-bold text-zinc-600">{label}</span>
                   <input
                     value={walkIn[key]}
-                    onChange={(e) => setWalkIn((w) => ({ ...w, [key]: e.target.value }))}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // A name typed as "Bgirl ..." / "Bboy ..." picks BGirl / BBoy (still changeable after).
+                      const prefix = key === 'name' ? /^\s*b-?\s?(girl|boy)\b/i.exec(value)?.[1].toLowerCase() : undefined;
+                      setWalkIn((w) => ({ ...w, [key]: value, ...(prefix ? { gender: prefix === 'girl' ? 'female' : 'male' } : {}) }));
+                    }}
                     placeholder={placeholder}
                     required={key === 'name'}
                     maxLength={60}

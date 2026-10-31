@@ -5,7 +5,7 @@
   "description": "Bàn check-in thí sinh giải HIPHOP XỨ TRÀ 2026.",
   "lang": "vi",
   "start_url": "/admin/check-in",
-  "scope": "/",
+  "scope": "/admin/check-in",
   "display": "standalone",
   "background_color": "#fafafa",
   "theme_color": "#ffffff",

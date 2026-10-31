@@ -1,34 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { signOut } from 'firebase/auth';
-import { ExternalLink, LogOut, Menu, X } from 'lucide-react';
+import { ExternalLink, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
-import { auth } from '../../services/firebase';
 import { usernameOf } from '../../services/staffAccounts';
 import { VIEW_PATHS } from '../../app/routes';
 import { InstallAppButton } from '../judge/InstallAppButton';
 import { CheckInView } from './CheckInView';
 
-/** Installs as its own "Check-in" app: swaps the judge manifest for the desk's while this page is open. */
-const useCheckInManifest = () =>
-  useEffect(() => {
-    const link = document.querySelector<HTMLLinkElement>('link[rel="manifest"]');
-    const title = document.querySelector<HTMLMetaElement>('meta[name="apple-mobile-web-app-title"]');
-    const prev = [link?.href, title?.content] as const;
-    if (link) link.href = '/manifest-checkin.webmanifest';
-    if (title) title.content = 'Check-in';
-    return () => {
-      if (link && prev[0]) link.href = prev[0];
-      if (title && prev[1]) title.content = prev[1];
-    };
-  }, []);
-
-/** What a check-in role account sees on any /admin page: the check-in desk and nothing else. */
+/**
+ * The check-in desk on /admin/check-in, for check-in accounts and admins alike. It installs as its own
+ * "Check-in" app: index.html picks its manifest for this URL. Signing out lands on the desk's login screen.
+ */
 export const CheckInDesk: React.FC = () => {
-  const { authUser } = useTournament();
+  const { authUser, isAdmin, handleGoogleLogout } = useTournament();
   const email = authUser?.email ?? '';
   const username = usernameOf(email) ?? email;
   const [menuOpen, setMenuOpen] = useState(false);
-  useCheckInManifest();
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -83,9 +69,19 @@ export const CheckInDesk: React.FC = () => {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-bold">{username}</span>
-                <span className="text-xs text-zinc-500">Tài khoản check-in</span>
+                <span className="text-xs text-zinc-500">{isAdmin ? 'Quản trị BTC' : 'Tài khoản check-in'}</span>
               </span>
             </div>
+
+            {isAdmin && (
+              <a
+                href={VIEW_PATHS.prelim}
+                className="flex items-center gap-2 rounded-2xl border border-zinc-200 px-4 py-3 text-sm font-bold hover:bg-zinc-50 focus-visible:outline-2 focus-visible:outline-amber-500"
+              >
+                <LayoutDashboard className="h-4 w-4 text-zinc-500" />
+                Về bảng điều hành
+              </a>
+            )}
 
             <div className="overflow-hidden rounded-2xl border border-zinc-200 text-sm font-bold">
               <a
@@ -111,7 +107,10 @@ export const CheckInDesk: React.FC = () => {
             <InstallAppButton appName="Check-in" purpose="để check-in thí sinh" />
 
             <button
-              onClick={() => signOut(auth)}
+              onClick={() => {
+                setMenuOpen(false);
+                handleGoogleLogout();
+              }}
               className="mt-auto flex items-center justify-center gap-2 rounded-xl border border-zinc-200 py-3 text-sm font-bold text-red-600 hover:bg-red-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
             >
               <LogOut className="h-4 w-4" />

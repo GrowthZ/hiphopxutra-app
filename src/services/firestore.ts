@@ -146,6 +146,7 @@ export interface WalkInDancer {
   name: string;
   realName?: string;
   crew?: string;
+  gender?: 'male' | 'female';
 }
 
 /**
@@ -161,7 +162,7 @@ export async function registerWalkIn(category: CategoryType, dancer: WalkInDance
   await setDoc(eventDoc(dancersCollectionOf(category), id), {
     sbd: '',
     name,
-    gender: /^BGIRL\b/.test(name) ? 'female' : 'male',
+    gender: dancer.gender ?? (/^BGIRL\b/.test(name) ? 'female' : 'male'),
     category,
     prelimScores: {},
     ...(dancer.realName?.trim() ? { realName: dancer.realName.trim() } : {}),

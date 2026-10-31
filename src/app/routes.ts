@@ -85,6 +85,9 @@ export function viewFromLocation(): ActiveViewType {
 /** The data source is fixed per page load; moving between public and private pages reloads the page. */
 export const IS_PUBLIC_SOURCE = isPublicView(viewFromLocation());
 
+/** The check-in desk installs as its own app (manifest picked in index.html), so it is also fixed per page load. */
+export const IS_CHECKIN_APP = viewFromLocation() === 'checkin';
+
 /** `/ket-qua/tran/{slug}` -> slug */
 export const matchSlugFromPath = (pathname: string) =>
   decodeURIComponent(pathname.slice(VIEW_PATHS.match_guest.length + 1).replace(/\/+$/, ''));
