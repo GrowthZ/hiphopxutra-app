@@ -1,8 +1,9 @@
-import React, { useEffect, useId, useMemo, useState } from 'react';
-import { Check, ChevronRight, Crown, Search, X } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Check, ChevronRight, Search, X } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { Dancer } from '../../domain/types';
 import { stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { RankEmblem } from '../../shared/RankEmblem';
 import { GuestHeader } from './GuestBattleView';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 
@@ -24,29 +25,6 @@ const METALS = [
 ];
 const metalGradient = (m: (typeof METALS)[number]) => `linear-gradient(135deg, ${m.light}, ${m.mid} 45%, ${m.dark})`;
 
-/** Medal on a red ribbon (the event's colour), in the real metal tone of the rank. */
-const MedalIcon: React.FC<{ rank: number; className?: string }> = ({ rank, className }) => {
-  const m = METALS[rank - 1];
-  const id = useId().replace(/:/g, '');
-  return (
-    <svg viewBox="0 0 40 48" className={className} role="img" aria-label={`Vé ${m.name}, hạng ${rank}`}>
-      <defs>
-        <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stopColor={m.light} />
-          <stop offset="0.5" stopColor={m.mid} />
-          <stop offset="1" stopColor={m.dark} />
-        </linearGradient>
-      </defs>
-      <path d="M8 0h9l7 18h-9z" fill="#991B1B" />
-      <path d="M32 0h-9l-7 18h9z" fill="#DC2626" />
-      <circle cx="20" cy="31" r="15" fill={`url(#${id})`} stroke={m.dark} strokeWidth="1.5" />
-      <circle cx="20" cy="31" r="11" fill="none" stroke={m.light} strokeOpacity="0.8" />
-      <text x="20" y="36.5" textAnchor="middle" fontSize="16" fontWeight="900" fill={m.dark} fontFamily="'Barlow Condensed', sans-serif">
-        {rank}
-      </text>
-    </svg>
-  );
-};
 const CHEERS = [
   'Cảm ơn bạn đã cháy hết mình trên sàn hôm nay! Mỗi lần thi đấu là một bước tiến, hẹn gặp bạn ở mùa giải sau với phiên bản mạnh hơn.',
   'Dám bước lên sàn đấu đã là chiến thắng đầu tiên. Tiếp tục luyện tập nhé, sân khấu luôn chờ bạn quay lại!',
@@ -79,7 +57,7 @@ export const GenderBadge: React.FC<{ dancer: Dancer }> = ({ dancer }) =>
 const RankBadge: React.FC<{ rank: number; scored: boolean }> = ({ rank, scored }) =>
   scored && rank <= 3 ? (
     <span className="flex w-8 shrink-0 justify-center">
-      <MedalIcon rank={rank} className="h-10 w-8" />
+      <RankEmblem rank={rank} className={rank === 1 ? 'h-11' : 'h-9'} />
     </span>
   ) : (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-black tabular-nums text-zinc-500">
@@ -244,17 +222,15 @@ export const PrelimGuestView: React.FC = () => {
                   aria-label={`Hạng ${i + 1}: ${stripBreakerPrefix(d.name)}, ${d.prelimScoreTotal} điểm`}
                   className="group flex min-w-0 flex-col items-center text-center cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-500 rounded-t-2xl"
                 >
-                  {first && <Crown className="mb-0.5 h-6 w-6 text-amber-500" fill="currentColor" aria-hidden />}
                   <span className="relative transition-transform motion-safe:group-active:scale-95">
                     <span className="block rounded-full p-[3px] shadow-md" style={{ background: metalGradient(m) }}>
                       <Avatar dancer={d} size={first ? 'h-24 w-24 text-4xl' : 'h-[4.5rem] w-[4.5rem] text-2xl'} />
                     </span>
-                    <MedalIcon
-                      rank={i + 1}
-                      className={`absolute left-1/2 -translate-x-1/2 drop-shadow ${first ? '-bottom-5 h-11 w-9' : '-bottom-4 h-9 w-[30px]'}`}
-                    />
+                    <span className={`absolute left-1/2 flex -translate-x-1/2 justify-center ${first ? '-bottom-6' : '-bottom-5'}`}>
+                      <RankEmblem rank={i + 1} className={first ? 'h-[72px]' : 'h-12'} />
+                    </span>
                   </span>
-                  <span className={`${first ? 'mt-6 text-lg' : 'mt-5 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
+                  <span className={`${first ? 'mt-8 text-lg' : 'mt-7 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
                     {stripBreakerPrefix(d.name)}
                   </span>
                   <span className="w-full truncate px-0.5 text-[11px] text-zinc-500">{d.crew || d.sbd}</span>
@@ -428,11 +404,15 @@ const DancerSheet: React.FC<{
               >
                 <Avatar dancer={dancer} size="h-32 w-32 text-5xl" dark />
               </span>
-              {medal && <MedalIcon rank={rank} className="absolute -bottom-5 left-1/2 h-14 w-12 -translate-x-1/2 drop-shadow-lg" />}
+              {medal && (
+                <span className="absolute -bottom-7 left-1/2 flex -translate-x-1/2 justify-center">
+                  <RankEmblem rank={rank} className={rank === 1 ? 'h-20' : 'h-16'} glow />
+                </span>
+              )}
             </div>
 
             <p
-              className={`${medal ? 'mt-7' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
+              className={`${medal ? 'mt-9' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
               style={{ color: medal ? medal.mid : '#FBBF24' }}
             >
               {rankLabel}

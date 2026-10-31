@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer, Judge } from '../../domain/types';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
+import { RankEmblem } from '../../shared/RankEmblem';
 import {
   Trophy,
-  Medal,
   Award,
   Eye,
   Lock,
@@ -441,7 +441,7 @@ export const PrelimResultsView: React.FC = () => {
                   {/* Top Bar: Medal & SBD */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-500/20 border border-slate-400/40 text-slate-200 text-xs font-black">
-                      <Medal className="w-3.5 h-3.5 text-slate-300" />
+                      <RankEmblem rank={2} className="-my-3 h-9" glow />
                       <span>HẠNG 2 · BẠC</span>
                     </div>
                     <span className="font-mono text-xs font-bold text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700">
@@ -519,7 +519,7 @@ export const PrelimResultsView: React.FC = () => {
                   {/* Top Bar: Medal & SBD */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 px-3 py-1 rounded bg-amber-500/20 border border-amber-500/60 text-amber-300 text-xs font-black shadow-sm">
-                      <Trophy className="w-4 h-4 text-amber-400" />
+                      <RankEmblem rank={1} className="-my-4 h-11" glow />
                       <span>HẠNG 1 · QUÁN QUÂN PRELIM</span>
                     </div>
                     <span className="font-mono text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-600/50">
@@ -597,7 +597,7 @@ export const PrelimResultsView: React.FC = () => {
                   {/* Top Bar: Medal & SBD */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-amber-900/30 border border-amber-700/40 text-amber-300 text-xs font-black">
-                      <Medal className="w-3.5 h-3.5 text-amber-500" />
+                      <RankEmblem rank={3} className="-my-3 h-9" glow />
                       <span>HẠNG 3 · ĐỒNG</span>
                     </div>
                     <span className="font-mono text-xs font-bold text-zinc-400 bg-zinc-800/80 px-2 py-0.5 rounded border border-zinc-700">
@@ -750,21 +750,7 @@ export const PrelimResultsView: React.FC = () => {
                         <tr className={`${rowBg}`}>
                           {/* Rank Badge */}
                           <td className="py-3 px-3 text-center">
-                            {rank === 1 && (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-amber-500 text-zinc-950 font-mono font-black text-xs shadow-md shadow-amber-500/20">
-                                1
-                              </span>
-                            )}
-                            {rank === 2 && (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-slate-300 text-zinc-950 font-mono font-black text-xs shadow-md">
-                                2
-                              </span>
-                            )}
-                            {rank === 3 && (
-                              <span className="inline-flex items-center justify-center w-7 h-7 rounded bg-amber-700 text-white font-mono font-black text-xs shadow-md">
-                                3
-                              </span>
-                            )}
+                            {isTop3 && <RankEmblem rank={rank} className={`-my-2 inline-block ${rank === 1 ? 'h-11' : 'h-9'}`} />}
                             {rank > 3 && (
                               <span
                                 className={`inline-flex items-center justify-center w-7 h-7 rounded font-mono font-bold text-xs ${
