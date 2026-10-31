@@ -319,7 +319,44 @@ test('LED follows the scene chosen at /admin/led', async ({ browser }) => {
 
   await admin.getByRole('button', { name: 'Blackout' }).click();
   await expect(led.getByText('Breaking U16')).toBeVisible();
+  await admin.getByRole('button', { name: 'Bật lại LED' }).click();
+  await expect(led.getByText('Breaking U16')).toBeHidden();
   await context.close();
+});
+
+test('the arch LED follows every battle control at /admin/led: match, night theme, "Ra sân"', async ({ browser }) => {
+  const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
+  const context = await browser.newContext({ viewport: { width: 1280, height: 768 } });
+  const led = await context.newPage();
+  await led.goto('/led?khung=vom');
+
+  await admin.goto('/admin/led');
+  await admin.getByRole('button', { name: 'Trận Battle' }).click();
+  await admin.getByRole('button', { name: 'Ban ngày' }).click();
+
+  // The match picked on the console is the one on the wall.
+  const picker = admin.locator('section', { hasText: 'Trận trên LED' }).getByRole('combobox');
+  await expect(picker.locator('option').nth(1)).toBeAttached();
+  const options = await picker.locator('option').evaluateAll((os) => os.map((o) => (o as HTMLOptionElement).value));
+  const target = options[options.length - 1];
+  await picker.selectOption(target);
+  const m = (await event.collection('matches').doc(target).get()).data()!;
+  await expect(led.getByText(new RegExp(`${m.stageName} · Trận ${String(m.matchNumber).padStart(2, '0')}`))).toBeVisible();
+
+  // Day / night backdrop.
+  const night = led.locator('[class*="from-[#120a24]"]');
+  await expect(night).toHaveCount(0);
+  await admin.getByRole('button', { name: 'Ban đêm' }).click();
+  await expect(night).toHaveCount(1);
+  await admin.getByRole('button', { name: 'Ban ngày' }).click();
+  await expect(night).toHaveCount(0);
+
+  // "Ra sân": both corners slide in again.
+  await expect(led.locator('.animate-entrance-left')).toHaveCount(0, { timeout: 5_000 });
+  await admin.getByRole('button', { name: 'Ra sân' }).click();
+  await expect(led.locator('.animate-entrance-left').first()).toBeVisible();
+  await context.close();
+  await event.collection('meta').doc('current').update({ activeMatchId }); // back to the match the later tests expect
 });
 
 test('admin gives a BTC member a check-in account', async () => {

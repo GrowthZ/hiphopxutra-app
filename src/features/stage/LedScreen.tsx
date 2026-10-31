@@ -88,7 +88,7 @@ export const LedScreen: React.FC = () => {
         {scene === 'idle' && <StageIdleScreen imageUrl={state.idleImageUrl} />}
         {scene === 'battle' &&
           (IS_ARCH_LED ? (
-            <ArchBattleView winnerDelay={state.winnerDelay} edge={state.archEdge} />
+            <ArchBattleView winnerDelay={state.winnerDelay} edge={state.archEdge} theme={state.theme} />
           ) : (
             <StageDisplayView theme={state.theme} winnerDelay={state.winnerDelay} />
           ))}

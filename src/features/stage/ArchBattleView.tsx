@@ -7,7 +7,7 @@ import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../..
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
 import { ArchFrame } from './ArchFrame';
-import { JudgeBallotCard, useRevealedResult, useRevealStartTimes } from './StageDisplayView';
+import { JudgeBallotCard, useRevealedResult, useRevealStartTimes, useTeamEntrance } from './StageDisplayView';
 import {
   ArchEdge,
   ARCH_HEIGHT,
@@ -51,10 +51,18 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
 /**
  * `winnerDelay`: seconds between the last pill turning and the result lighting up (set on the battle console).
  * `edge` (set at /admin/led): the full picture, cut by the wall itself (default), or drawn inside a smooth dome.
+ * `theme` (set at /admin/led): daylight or night backdrop, as on the 16:9 screen.
  */
-export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge }> = ({ winnerDelay, edge = 'full' }) => {
+export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; theme?: 'daylight' | 'night' }> = ({
+  winnerDelay,
+  edge = 'full',
+  theme = 'daylight',
+}) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
+  // "Ra sân" (or a new match): both corners slide in again, as on the 16:9 screen
+  const { entranceKey, isEntranceActive } = useTeamEntrance(match);
+  const enter = (side: 'red' | 'blue') => (isEntranceActive ? (side === 'red' ? 'animate-entrance-left' : 'animate-entrance-right') : '');
   const revealStartTimes = useRevealStartTimes(match, judges.length);
   const revealed = useRevealedResult(match, revealStartTimes, judges.length, winnerDelay);
 
@@ -123,7 +131,11 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge }>
   return (
     <ArchFrame edge={edge}>
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#1a2a6c] via-[#13205a] to-[#0a1238]" />
+          <div
+            className={`absolute inset-0 bg-gradient-to-b ${
+              theme === 'daylight' ? 'from-[#1a2a6c] via-[#13205a] to-[#0a1238]' : 'from-[#120a24] via-[#0b1030] to-[#05060f]'
+            }`}
+          />
           <div className="absolute -left-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-red-600/25 blur-[140px]" />
           <div className="absolute -right-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-blue-600/25 blur-[140px]" />
           <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_56px)]" />
@@ -148,10 +160,10 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge }>
           )}
 
           {/* Corner photos, inside the steps */}
-          <div key={`r-${match.id}`} style={box(photoBox.red[0], photoBox.red[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('red')} ${won('red') ? 'scale-105 brightness-110' : ''}`}>
+          <div key={`r-${match.id}-${entranceKey}`} style={box(photoBox.red[0], photoBox.red[1], photoBox.top, photoBox.bottom)} className={`${enter('red') || 'led-rise'} ${dim('red')} ${won('red') ? 'scale-105 brightness-110' : ''}`}>
             {photo(match.sideRed, 'red')}
           </div>
-          <div key={`b-${match.id}`} style={box(photoBox.blue[0], photoBox.blue[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('blue')} ${won('blue') ? 'scale-105 brightness-110' : ''}`}>
+          <div key={`b-${match.id}-${entranceKey}`} style={box(photoBox.blue[0], photoBox.blue[1], photoBox.top, photoBox.bottom)} className={`${enter('blue') || 'led-rise'} ${dim('blue')} ${won('blue') ? 'scale-105 brightness-110' : ''}`}>
             {photo(match.sideBlue, 'blue')}
           </div>
 
@@ -196,11 +208,11 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge }>
           </div>
 
           {/* Name bars from the wall edges (the steps cut them off), score at the inner end */}
-          <div className={`absolute inset-0 ${dim('red')}`}>
+          <div key={`rn-${entranceKey}`} className={`absolute inset-0 ${dim('red')} ${enter('red')}`}>
             <NameBar color="red" name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} pad={barPad} won={won('red')} style={box(0, 0.47, BAR.top, BAR.bottom)} />
             <ScoreBox color="red" value={revealed.wins('red')} won={won('red')} style={box(0.435, 0.495, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>
-          <div className={`absolute inset-0 ${dim('blue')}`}>
+          <div key={`bn-${entranceKey}`} className={`absolute inset-0 ${dim('blue')} ${enter('blue')}`}>
             <NameBar color="blue" name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} pad={barPad} won={won('blue')} style={box(0.53, 1, BAR.top, BAR.bottom)} />
             <ScoreBox color="blue" value={revealed.wins('blue')} won={won('blue')} style={box(0.505, 0.565, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>

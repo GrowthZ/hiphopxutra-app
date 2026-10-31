@@ -204,6 +204,60 @@ export function useRevealedResult(
   return { settled, pending, holdUntil, wins };
 }
 
+/**
+ * Both corners slide in (with the swoosh) on a new match or on "Ra sân" from /admin/led or the battle console
+ * (match.entranceTriggerTimestamp, or the same-machine TEAM_ENTRANCE_DISPLAY_TRIGGER cue). Shared by both LED layouts.
+ */
+export function useTeamEntrance(match?: BattleMatch) {
+  const [entranceKey, setEntranceKey] = useState<number>(() => Date.now());
+  const [isEntranceActive, setIsEntranceActive] = useState<boolean>(true);
+  const lastMatchIdRef = useRef<string>(match?.id || '');
+  const lastEntranceTimestampRef = useRef<number | undefined>(match?.entranceTriggerTimestamp);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const trigger = () => {
+    setEntranceKey(Date.now());
+    setIsEntranceActive(true);
+    try {
+      soundFX.playTeamEntranceSwoosh();
+    } catch {
+      // ignore
+    }
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setIsEntranceActive(false), 1200);
+  };
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  useEffect(() => {
+    if (!match) return;
+    if (match.id !== lastMatchIdRef.current) {
+      lastMatchIdRef.current = match.id;
+      lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
+      trigger();
+    } else if (match.entranceTriggerTimestamp && match.entranceTriggerTimestamp !== lastEntranceTimestampRef.current) {
+      lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
+      trigger();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id, match?.entranceTriggerTimestamp]);
+
+  useEffect(() => {
+    const onCue = (e: Event) => {
+      const detail = (e as CustomEvent<{ matchId: string; timestamp: number }>).detail;
+      if (detail && detail.matchId === match?.id) {
+        lastEntranceTimestampRef.current = detail.timestamp;
+        trigger();
+      }
+    };
+    window.addEventListener('TEAM_ENTRANCE_DISPLAY_TRIGGER', onCue);
+    return () => window.removeEventListener('TEAM_ENTRANCE_DISPLAY_TRIGGER', onCue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [match?.id]);
+
+  return { entranceKey, isEntranceActive };
+}
+
 interface StageDisplayViewProps {
   /** Set by /admin/led. */
   theme?: 'daylight' | 'night';
@@ -253,52 +307,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   }, []);
 
   // 1. Both corners slide in from the sides (new match, or "Ra sân" from the operator)
-  const [entranceKey, setEntranceKey] = useState<number>(() => Date.now());
-  const [isEntranceActive, setIsEntranceActive] = useState<boolean>(true);
-  const lastMatchIdRef = useRef<string>(match?.id || '');
-  const lastEntranceTimestampRef = useRef<number | undefined>(match?.entranceTriggerTimestamp);
-
-  const triggerEntranceAnimation = (playSound = true) => {
-    setEntranceKey(Date.now());
-    setIsEntranceActive(true);
-    if (playSound) {
-      try {
-        soundFX.playTeamEntranceSwoosh();
-      } catch {
-        // ignore
-      }
-    }
-    setTimeout(() => {
-      setIsEntranceActive(false);
-    }, 1200);
-  };
-
-  useEffect(() => {
-    if (!match) return;
-    if (match.id !== lastMatchIdRef.current) {
-      lastMatchIdRef.current = match.id;
-      lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
-      triggerEntranceAnimation(true);
-    } else if (match.entranceTriggerTimestamp && match.entranceTriggerTimestamp !== lastEntranceTimestampRef.current) {
-      lastEntranceTimestampRef.current = match.entranceTriggerTimestamp;
-      triggerEntranceAnimation(true);
-    }
-  }, [match?.id, match?.entranceTriggerTimestamp]);
-
-  useEffect(() => {
-    const handleEntranceCustom = (e: Event) => {
-      const customEvent = e as CustomEvent<{ matchId: string; timestamp: number }>;
-      if (customEvent.detail && customEvent.detail.matchId === match?.id) {
-        lastEntranceTimestampRef.current = customEvent.detail.timestamp;
-        triggerEntranceAnimation(true);
-      }
-    };
-
-    window.addEventListener('TEAM_ENTRANCE_DISPLAY_TRIGGER', handleEntranceCustom);
-    return () => {
-      window.removeEventListener('TEAM_ENTRANCE_DISPLAY_TRIGGER', handleEntranceCustom);
-    };
-  }, [match?.id]);
+  const { entranceKey, isEntranceActive } = useTeamEntrance(match);
 
   // 2. Judge pills flip one by one when a round is revealed; the result lights up once they have all turned
   const revealStartTimes = useRevealStartTimes(match, judges.length);
