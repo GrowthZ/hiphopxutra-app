@@ -21,3 +21,8 @@ public/man-led.jpg
 
 # Local sample photos of real dancers (minors), used by `bun run test:db battle`: never committed
 public/image/
+
+# Judges' original photos (uploaded to R2 from the admin page) and third-party broadcast screenshots used as
+# design references: local only, never in this public repo or the deployed site
+public/giam-khao/
+public/main-battle*.png
