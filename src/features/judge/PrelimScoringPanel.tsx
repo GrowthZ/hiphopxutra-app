@@ -149,125 +149,167 @@ export const PrelimScoringPanel: React.FC = () => {
           : 'Đã chấm xong';
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 gap-2 p-2.5">
-      {/* Category + progress (tap the counter to jump to any dancer) */}
-      <div className="flex items-center justify-between gap-2 shrink-0">
-        <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Hạng mục">
-          {(
-            [
-              ['pro_2v2', 'Pro'],
-              ['newbie_1v1', 'Newbie'],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => {
-                setActiveCategory(id);
-                setDancerId(null);
-              }}
-              aria-pressed={activeCategory === id}
-              className={`rounded-md px-3 py-1.5 text-xs font-black uppercase cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
-                activeCategory === id ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        {tieOpen ? (
-          <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Chấm vòng loại hoặc tie-break">
-            <button
-              onClick={() => {
-                setMode('prelim');
-                setDancerId(null);
-              }}
-              aria-pressed={!tie}
-              className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${!tie ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'}`}
-            >
-              Bảng {myPanel}
-            </button>
-            <button
-              onClick={() => {
-                setMode('tie');
-                setDancerId(null);
-              }}
-              aria-pressed={tie}
-              className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${tie ? 'bg-red-600 text-white' : 'text-red-600'}`}
-            >
-              Tie-break ({tieDancers.length})
-            </button>
-          </div>
-        ) : (
-          myPanel && (
-            <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
-              Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
-            </span>
-          )
-        )}
-        <label className="relative flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums">
-          {scoredCount}/{dancers.length}
-          <ChevronRight className="w-3.5 h-3.5 rotate-90 text-zinc-400" />
-          <select
-            value={dancer?.id ?? ''}
-            onChange={(e) => setDancerId(e.target.value)}
-            aria-label="Chọn thí sinh"
-            className="absolute inset-0 opacity-0 cursor-pointer"
-          >
-            {dancers.map((d) => (
-              <option key={d.id} value={d.id}>
-                {typeof scoreOf(d) === 'number' ? '✓ ' : ''}
-                {d.sbd ? `${d.sbd} · ` : ''}
-                {d.name}
-              </option>
+    <div className="grid flex-1 min-h-0 grid-rows-[2fr_1fr]">
+      {/* Top two thirds: who, the score, confirm */}
+      <div className="flex min-h-0 flex-col gap-2 p-2.5">
+        {/* Category + progress (tap the counter to jump to any dancer) */}
+        <div className="flex items-center justify-between gap-2 shrink-0">
+          <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Hạng mục">
+            {(
+              [
+                ['pro_2v2', 'Pro'],
+                ['newbie_1v1', 'Newbie'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => {
+                  setActiveCategory(id);
+                  setDancerId(null);
+                }}
+                aria-pressed={activeCategory === id}
+                className={`rounded-md px-3 py-1.5 text-xs font-black uppercase cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
+                  activeCategory === id ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'
+                }`}
+              >
+                {label}
+              </button>
             ))}
-          </select>
-        </label>
+          </div>
+          {tieOpen ? (
+            <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Chấm vòng loại hoặc tie-break">
+              <button
+                onClick={() => {
+                  setMode('prelim');
+                  setDancerId(null);
+                }}
+                aria-pressed={!tie}
+                className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${!tie ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'}`}
+              >
+                Bảng {myPanel}
+              </button>
+              <button
+                onClick={() => {
+                  setMode('tie');
+                  setDancerId(null);
+                }}
+                aria-pressed={tie}
+                className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${tie ? 'bg-red-600 text-white' : 'text-red-600'}`}
+              >
+                Tie-break ({tieDancers.length})
+              </button>
+            </div>
+          ) : (
+            myPanel && (
+              <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
+                Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
+              </span>
+            )
+          )}
+          <label className="relative flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums">
+            {scoredCount}/{dancers.length}
+            <ChevronRight className="w-3.5 h-3.5 rotate-90 text-zinc-400" />
+            <select
+              value={dancer?.id ?? ''}
+              onChange={(e) => setDancerId(e.target.value)}
+              aria-label="Chọn thí sinh"
+              className="absolute inset-0 opacity-0 cursor-pointer"
+            >
+              {dancers.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {typeof scoreOf(d) === 'number' ? '✓ ' : ''}
+                  {d.sbd ? `${d.sbd} · ` : ''}
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+  
+        {/* Who is dancing + the score being entered */}
+        {dancer ? (
+          <section
+            aria-label="Thí sinh đang chấm"
+            className={`flex min-h-0 flex-1 flex-col rounded-2xl border-2 p-3 transition-colors ${
+              dirty ? 'border-amber-400 bg-amber-50' : typeof saved === 'number' ? 'border-emerald-300 bg-emerald-50/60' : 'border-zinc-200 bg-white'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {dancer.avatarUrl && (
+                <img src={dancer.avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover bg-zinc-100" />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-sm font-black text-zinc-500">
+                  {dancer.sbd || '—'} <span className="font-sans font-bold text-zinc-400">· {index + 1}/{dancers.length}</span>
+                </p>
+                <h2 className="font-condensed text-[1.75rem] font-black uppercase leading-[1.05] text-zinc-900 line-clamp-2 break-words">
+                  {dancer.name}
+                </h2>
+                {dancer.crew && <p className="truncate text-xs text-zinc-500">{dancer.crew}</p>}
+              </div>
+            </div>
+            {/* The score, as large as the space allows */}
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center" aria-live="polite">
+              <p className="font-condensed font-black leading-none tabular-nums">
+                <span className={`text-[clamp(3.5rem,14vh,7rem)] ${value === null ? 'text-zinc-300' : 'text-zinc-900'}`}>{value ?? '–'}</span>
+                <span className="text-2xl text-zinc-400"> /100</span>
+              </p>
+              <span className={`mt-1 flex items-center gap-1 text-xs font-bold ${status.tone}`}>
+                {sending[dancer.id] !== undefined ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : typeof saved === 'number' && !dirty ? (
+                  <Check className="w-3.5 h-3.5" />
+                ) : null}
+                {status.text}
+              </span>
+            </div>
+          </section>
+        ) : (
+          <p className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-200 p-6 text-center text-sm text-zinc-500">
+            {myPanel
+              ? 'Chưa có thí sinh bảng này: thí sinh hiện ra sau khi check-in và có số báo danh.'
+              : 'Giám khảo này không chấm Prelim.'}
+          </p>
+        )}
+
+        {error && (
+          <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shrink-0">
+            {error}
+          </p>
+        )}
+
+        {/* Prev · Save (and next) · Next */}
+        <div className="flex gap-1.5 shrink-0">
+          <button
+            onClick={() => goTo(index - 1)}
+            disabled={index === 0}
+            aria-label="Thí sinh trước"
+            className="w-12 rounded-xl border border-zinc-300 bg-white text-zinc-700 disabled:opacity-30 cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-amber-500"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <button
+            onClick={save}
+            disabled={locked || value === null || (!dirty && !hasNext)}
+            className="flex-1 py-3.5 rounded-xl bg-amber-500 text-zinc-950 font-black text-base uppercase tracking-wide active:bg-amber-600 disabled:bg-zinc-200 disabled:text-zinc-500 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-zinc-900"
+          >
+            {locked ? <Lock className="w-4 h-4" /> : dirty ? <Check className="w-5 h-5 stroke-[3]" /> : null}
+            {saveLabel}
+            {!locked && (dirty || value !== null) && hasNext && <ChevronRight className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={() => goTo(index + 1)}
+            disabled={!hasNext}
+            aria-label="Thí sinh sau"
+            className="w-12 rounded-xl border border-zinc-300 bg-white text-zinc-700 disabled:opacity-30 cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-amber-500"
+          >
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
-      {/* Who is dancing + the score being entered */}
-      {dancer ? (
-        <section
-          aria-label="Thí sinh đang chấm"
-          className={`flex items-stretch gap-3 rounded-2xl border-2 p-3 shrink-0 transition-colors ${
-            dirty ? 'border-amber-400 bg-amber-50' : typeof saved === 'number' ? 'border-emerald-300 bg-emerald-50/60' : 'border-zinc-200 bg-white'
-          }`}
-        >
-          {dancer.avatarUrl && (
-            <img src={dancer.avatarUrl} alt="" className="w-14 h-14 self-center rounded-full object-cover bg-zinc-100 shrink-0" />
-          )}
-          <div className="min-w-0 flex-1 flex flex-col justify-center">
-            <p className="font-mono text-sm font-black text-zinc-500">
-              {dancer.sbd || '—'} <span className="font-sans font-bold text-zinc-400">· {index + 1}/{dancers.length}</span>
-            </p>
-            <h2 className="font-condensed text-[1.75rem] font-black uppercase leading-[1.05] text-zinc-900 line-clamp-2 break-words">
-              {dancer.name}
-            </h2>
-            {dancer.crew && <p className="text-xs text-zinc-500 truncate">{dancer.crew}</p>}
-          </div>
-          <div className="w-24 shrink-0 flex flex-col items-center justify-center rounded-xl bg-white border border-zinc-200" aria-live="polite">
-            <span className={`font-condensed text-6xl font-black leading-none tabular-nums ${value === null ? 'text-zinc-300' : 'text-zinc-900'}`}>
-              {value ?? '–'}
-            </span>
-            <span className={`mt-1 flex items-center gap-1 text-[11px] font-bold ${status.tone}`}>
-              {sending[dancer.id] !== undefined ? <Loader2 className="w-3 h-3 animate-spin" /> : typeof saved === 'number' && !dirty ? <Check className="w-3 h-3" /> : null}
-              {status.text}
-            </span>
-          </div>
-        </section>
-      ) : (
-        <p className="rounded-2xl border border-zinc-200 p-6 text-center text-sm text-zinc-500 shrink-0">{myPanel
-            ? 'Chưa có thí sinh bảng này: thí sinh hiện ra sau khi check-in và có số báo danh.'
-            : 'Giám khảo này không chấm Prelim.'}</p>
-      )}
-
-      {error && (
-        <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-700 shrink-0">
-          {error}
-        </p>
-      )}
-
-      {/* Keypad fills whatever height is left */}
-      <div className="grid grid-cols-3 grid-rows-4 gap-1.5 flex-1 min-h-0">
+      {/* Keypad: fixed to the bottom third, in the thumb zone */}
+      <div className="grid min-h-0 grid-cols-3 grid-rows-4 gap-1.5 border-t border-zinc-200 bg-zinc-50 p-2">
         {KEYS.map((key) => (
           <button
             key={key}
@@ -277,41 +319,12 @@ export const PrelimScoringPanel: React.FC = () => {
             className={`min-h-11 rounded-xl border font-condensed font-black transition-colors cursor-pointer disabled:opacity-40 flex items-center justify-center focus-visible:outline-2 focus-visible:outline-amber-500 ${
               key === 'clear' || key === 'back'
                 ? 'border-zinc-200 bg-zinc-100 text-zinc-600 text-base active:bg-zinc-300'
-                : 'border-zinc-200 bg-white text-zinc-900 text-3xl active:bg-zinc-200'
+                : 'border-zinc-200 bg-white text-zinc-900 text-3xl shadow-xs active:bg-zinc-200'
             }`}
           >
             {key === 'clear' ? 'C' : key === 'back' ? <Delete className="w-6 h-6" /> : key}
           </button>
         ))}
-      </div>
-
-      {/* Prev · Save (and next) · Next */}
-      <div className="flex gap-1.5 shrink-0">
-        <button
-          onClick={() => goTo(index - 1)}
-          disabled={index === 0}
-          aria-label="Thí sinh trước"
-          className="w-12 rounded-xl border border-zinc-300 bg-white text-zinc-700 disabled:opacity-30 cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-amber-500"
-        >
-          <ChevronLeft className="w-5 h-5" />
-        </button>
-        <button
-          onClick={save}
-          disabled={locked || value === null || (!dirty && !hasNext)}
-          className="flex-1 py-3.5 rounded-xl bg-amber-500 text-zinc-950 font-black text-base uppercase tracking-wide active:bg-amber-600 disabled:bg-zinc-200 disabled:text-zinc-500 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-zinc-900"
-        >
-          {locked ? <Lock className="w-4 h-4" /> : dirty ? <Check className="w-5 h-5 stroke-[3]" /> : null}
-          {saveLabel}
-          {!locked && (dirty || value !== null) && hasNext && <ChevronRight className="w-5 h-5" />}
-        </button>
-        <button
-          onClick={() => goTo(index + 1)}
-          disabled={!hasNext}
-          aria-label="Thí sinh sau"
-          className="w-12 rounded-xl border border-zinc-300 bg-white text-zinc-700 disabled:opacity-30 cursor-pointer flex items-center justify-center focus-visible:outline-2 focus-visible:outline-amber-500"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
       </div>
     </div>
   );
