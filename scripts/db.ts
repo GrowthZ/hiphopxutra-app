@@ -278,7 +278,7 @@ const commands: Record<string, () => Promise<void>> = {
       log('Tài khoản trên emulator:');
       log('  Giám khảo   gk-1 = 111111 ... gk-9 = 999999 (chọn mã GK ở /giam-khao)');
       for (const [user, role, password] of EMULATOR_STAFF) log(`  BTC ${role.padEnd(8)} ${user} / ${password}`);
-    } else log('Chạy app: bun run dev:devdb, rồi mở /admin một lần để xuất bản bản công khai.');
+    } else log('Chạy app: bun run dev:devdb.');
   },
 
   async 'dancer:list'() {

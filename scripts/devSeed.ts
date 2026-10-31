@@ -3,7 +3,7 @@
 // dancer data in the repo). The same fixed random seed is used for every stage, so the same dancers move from
 // one stage to the next: registration → check-in → prelim → Top 32 cut-off → battle.
 
-import { matchToDoc, dancerToDoc, teamToDoc, DEFAULT_PANELS, panelOf, recalculateDancers, cutoffTie } from '../src/domain/model';
+import { matchToDoc, dancerToDoc, teamToDoc, DEFAULT_PANELS, panelOf, recalculateDancers, cutoffTie, toPublicDancer } from '../src/domain/model';
 import { seedNewbieTop32, seedProTop16 } from '../src/domain/battle';
 import { DEFAULT_JUDGES } from '../src/domain/seed';
 import type { BattleMatch, CategoryType, Dancer, Team2v2 } from '../src/domain/types';
@@ -203,6 +203,11 @@ export function buildSeed(stage: SeedStage, photos: SamplePhoto[] = []): Record<
   return {
     newbieDancers: byId(newbie.dancers, dancerToDoc),
     proDancers: byId(pro.dancers, dancerToDoc),
+    // The published copies guests and the LED read: there from the start, without waiting for an admin to open /admin.
+    publicDancers: {
+      ...byId(newbie.dancers, (d) => toPublicDancer(d, locked, DEFAULT_PANELS)),
+      ...byId(pro.dancers, (d) => toPublicDancer(d, locked, DEFAULT_PANELS)),
+    },
     teams: byId(teams, teamToDoc),
     matches: byId(matches, matchToDoc),
     judges: byId(DEFAULT_JUDGES, (j) => j),
