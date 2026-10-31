@@ -1,11 +1,33 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Delete, Loader2, Lock } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Delete, Loader2, Lock, Zap } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { soundFX } from '../../services/soundEffects';
-import { Dancer } from '../../domain/types';
+import { CategoryType, Dancer } from '../../domain/types';
 import { panelOfDancer, panelOfJudge, PrelimPanels } from '../../domain/model';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back'] as const;
+
+// Pro and Newbie each have their own colour, so a judge sees at a glance which list is being scored.
+// Red stays for the tie-break (and red / blue for the battle corners), so neither category uses them.
+const THEMES: Record<CategoryType, { short: string; page: string; pad: string; pill: string; card: string; badge: string }> = {
+  pro_2v2: {
+    short: 'Pro',
+    page: 'bg-violet-100',
+    pad: 'bg-violet-200/60',
+    pill: 'bg-violet-600 text-white',
+    card: 'border-violet-300',
+    badge: 'bg-violet-600 text-white',
+  },
+  newbie_1v1: {
+    short: 'Newbie',
+    page: 'bg-sky-100',
+    pad: 'bg-sky-200/60',
+    pill: 'bg-sky-600 text-white',
+    card: 'border-sky-300',
+    badge: 'bg-sky-600 text-white',
+  },
+};
+const TIE_THEME = { page: 'bg-red-100', pad: 'bg-red-200/50', card: 'border-red-300', badge: 'bg-red-600 text-white' };
 
 /** This judge's dancers in running order: checked in (an SBD) and of the judge's panel's parity, by SBD. */
 function scoringOrder(list: Dancer[], judgeId: string, panels: PrelimPanels) {
@@ -22,7 +44,6 @@ export const PrelimScoringPanel: React.FC = () => {
     newbieDancers,
     proDancers,
     activeCategory,
-    setActiveCategory,
     selectedJudgeId,
     updatePrelimScore,
     updateTieBreakScore,
@@ -148,45 +169,30 @@ export const PrelimScoringPanel: React.FC = () => {
           ? 'Thí sinh tiếp theo'
           : 'Đã chấm xong';
 
+  const theme = tie ? TIE_THEME : THEMES[activeCategory];
+  const tieTotal = tieDancers[0]?.prelimScoreTotal;
+
   return (
-    <div className="grid flex-1 min-h-0 grid-rows-[2fr_1fr]">
+    <div className={`grid flex-1 min-h-0 grid-rows-[minmax(0,2fr)_minmax(13.25rem,1fr)] transition-colors ${theme.page}`}>
       {/* Top two thirds: who, the score, confirm */}
       <div className="flex min-h-0 flex-col gap-2 p-2.5">
-        {/* Category + progress (tap the counter to jump to any dancer) */}
-        <div className="flex items-center justify-between gap-2 shrink-0">
-          <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Hạng mục">
-            {(
-              [
-                ['pro_2v2', 'Pro'],
-                ['newbie_1v1', 'Newbie'],
-              ] as const
-            ).map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => {
-                  setActiveCategory(id);
-                  setDancerId(null);
-                }}
-                aria-pressed={activeCategory === id}
-                className={`rounded-md px-3 py-1.5 text-xs font-black uppercase cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
-                  activeCategory === id ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+        {/* Category (coloured, so Pro and Newbie never get mixed up) + panel / tie-break + progress */}
+        <div className="flex items-center justify-between gap-1.5 shrink-0">
+          {/* Which list this is (switched from the menu: Prelim Pro / Prelim Newbie) */}
+          <span className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-black uppercase ${THEMES[activeCategory].pill}`}>
+            {THEMES[activeCategory].short}
+          </span>
           {tieOpen ? (
-            <div className="flex rounded-lg bg-zinc-100 p-0.5" role="group" aria-label="Chấm vòng loại hoặc tie-break">
+            <div className="flex rounded-lg bg-white/80 p-0.5 ring-1 ring-black/5" role="group" aria-label="Chấm vòng loại hoặc tie-break">
               <button
                 onClick={() => {
                   setMode('prelim');
                   setDancerId(null);
                 }}
                 aria-pressed={!tie}
-                className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${!tie ? 'bg-white text-zinc-900 shadow-xs' : 'text-zinc-500'}`}
+                className={`whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${!tie ? 'bg-zinc-900 text-white' : 'text-zinc-500'}`}
               >
-                Bảng {myPanel}
+                <span className="max-[360px]:hidden">Bảng </span>{myPanel}
               </button>
               <button
                 onClick={() => {
@@ -194,19 +200,19 @@ export const PrelimScoringPanel: React.FC = () => {
                   setDancerId(null);
                 }}
                 aria-pressed={tie}
-                className={`rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${tie ? 'bg-red-600 text-white' : 'text-red-600'}`}
+                className={`flex items-center gap-0.5 whitespace-nowrap rounded-md px-2.5 py-1.5 text-xs font-black uppercase cursor-pointer ${tie ? 'bg-red-600 text-white' : 'text-red-600'}`}
               >
-                Tie-break ({tieDancers.length})
+                <Zap className="h-3 w-3" /> Tie ({tieDancers.length})
               </button>
             </div>
           ) : (
             myPanel && (
-              <span className="rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
-                Bảng {myPanel} · SBD {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}
+              <span className="whitespace-nowrap rounded-lg bg-zinc-900 px-2.5 py-1.5 text-xs font-black uppercase text-white">
+                Bảng {myPanel}<span className="max-[380px]:hidden"> · {(myPanel === 'A') === prelimPanels.aIsOdd ? 'lẻ' : 'chẵn'}</span>
               </span>
             )
           )}
-          <label className="relative flex items-center gap-1 rounded-lg border border-zinc-200 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums">
+          <label className="relative flex items-center gap-1 rounded-lg bg-white/80 px-2.5 py-1.5 text-xs font-bold text-zinc-600 tabular-nums ring-1 ring-black/5">
             {scoredCount}/{dancers.length}
             <ChevronRight className="w-3.5 h-3.5 rotate-90 text-zinc-400" />
             <select
@@ -225,33 +231,85 @@ export const PrelimScoringPanel: React.FC = () => {
             </select>
           </label>
         </div>
-  
+
+        {tie ? (
+          /* Tie-break: why these dancers are back, and each of them at a tap */
+          <section aria-label="Tie-break đồng điểm" className="shrink-0 rounded-xl bg-red-600 px-3 py-2 text-white shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wide">
+              <Zap className="h-3.5 w-3.5" /> Tie-break ngưỡng Top 32{typeof tieTotal === 'number' && ` · đồng ${tieTotal} điểm`}
+            </p>
+            <p className="text-[11px] leading-snug text-white/85 [@media(max-height:600px)]:hidden">
+              Cả 8 giám khảo chấm thêm 1 lượt · điểm này chỉ để tách hạng
+            </p>
+            <div className="mt-1 flex flex-wrap gap-1">
+              {tieDancers.map((d) => {
+                const done = typeof scoreOf(d) === 'number';
+                return (
+                  <button
+                    key={d.id}
+                    onClick={() => setDancerId(d.id)}
+                    aria-pressed={d.id === dancer?.id}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 font-mono text-[11px] font-black cursor-pointer ${
+                      d.id === dancer?.id ? 'bg-white text-red-700' : 'bg-white/15 text-white'
+                    }`}
+                  >
+                    {done && <Check className="h-3 w-3" />}
+                    {d.sbd || '—'}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        ) : (
+          tieOpen && (
+            <button
+              onClick={() => {
+                setMode('tie');
+                setDancerId(null);
+              }}
+              className="flex shrink-0 items-center justify-center gap-1.5 rounded-xl border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-black text-red-700 cursor-pointer"
+            >
+              <Zap className="h-3.5 w-3.5" /> Có tie-break: {tieDancers.length} thí sinh cần chấm lại
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          )
+        )}
+
         {/* Who is dancing + the score being entered */}
         {dancer ? (
           <section
             aria-label="Thí sinh đang chấm"
-            className={`flex min-h-0 flex-1 flex-col rounded-2xl border-2 p-3 transition-colors ${
-              dirty ? 'border-amber-400 bg-amber-50' : typeof saved === 'number' ? 'border-emerald-300 bg-emerald-50/60' : 'border-zinc-200 bg-white'
+            className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border-2 p-3 shadow-sm transition-colors [@media(max-height:600px)]:p-2 ${
+              dirty ? 'border-amber-400 bg-amber-50' : typeof saved === 'number' ? 'border-emerald-300 bg-emerald-50' : `${theme.card} bg-white`
             }`}
           >
             <div className="flex items-center gap-3">
               {dancer.avatarUrl && (
-                <img src={dancer.avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover bg-zinc-100" />
+                <img src={dancer.avatarUrl} alt="" className={`${tie ? 'h-16 w-16' : 'h-20 w-20'} [@media(max-height:600px)]:h-12 [@media(max-height:600px)]:w-12 shrink-0 rounded-full object-cover bg-zinc-100`} />
               )}
               <div className="min-w-0 flex-1">
-                <p className="font-mono text-sm font-black text-zinc-500">
-                  {dancer.sbd || '—'} <span className="font-sans font-bold text-zinc-400">· {index + 1}/{dancers.length}</span>
+                <p className="flex items-center gap-1.5 text-sm font-bold">
+                  <span className={`rounded px-1.5 py-0.5 font-mono text-base font-black ${theme.badge}`}>{dancer.sbd || '—'}</span>
+                  <span className="text-zinc-400">
+                    {index + 1}/{dancers.length}
+                  </span>
                 </p>
-                <h2 className="font-condensed text-[1.75rem] font-black uppercase leading-[1.05] text-zinc-900 line-clamp-2 break-words">
+                <h2 className={`mt-0.5 font-condensed ${tie ? 'text-[1.85rem]' : 'text-[2.1rem]'} font-black uppercase leading-none text-zinc-900 line-clamp-2 break-words [@media(max-height:600px)]:text-2xl [@media(max-height:600px)]:line-clamp-1`}>
                   {dancer.name}
                 </h2>
-                {dancer.crew && <p className="truncate text-xs text-zinc-500">{dancer.crew}</p>}
+                {dancer.crew && <p className="mt-0.5 truncate text-sm text-zinc-500 [@media(max-height:600px)]:hidden">{dancer.crew}</p>}
               </div>
             </div>
-            {/* The score, as large as the space allows */}
-            <div className="flex min-h-0 flex-1 flex-col items-center justify-center" aria-live="polite">
+            {/* The score */}
+            <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden" aria-live="polite">
               <p className="font-condensed font-black leading-none tabular-nums">
-                <span className={`text-[clamp(3.5rem,14vh,7rem)] ${value === null ? 'text-zinc-300' : 'text-zinc-900'}`}>{value ?? '–'}</span>
+                <span
+                  className={`${tie ? 'text-[clamp(2.75rem,8vh,5rem)]' : 'text-[clamp(3.25rem,12vh,6.5rem)]'} ${
+                    value === null ? 'text-zinc-300' : 'text-zinc-900'
+                  }`}
+                >
+                  {value ?? '–'}
+                </span>
                 <span className="text-2xl text-zinc-400"> /100</span>
               </p>
               <span className={`mt-1 flex items-center gap-1 text-xs font-bold ${status.tone}`}>
@@ -265,7 +323,7 @@ export const PrelimScoringPanel: React.FC = () => {
             </div>
           </section>
         ) : (
-          <p className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-200 p-6 text-center text-sm text-zinc-500">
+          <p className="flex flex-1 items-center justify-center rounded-2xl border border-zinc-200 bg-white p-6 text-center text-sm text-zinc-500">
             {myPanel
               ? 'Chưa có thí sinh bảng này: thí sinh hiện ra sau khi check-in và có số báo danh.'
               : 'Giám khảo này không chấm Prelim.'}
@@ -291,7 +349,7 @@ export const PrelimScoringPanel: React.FC = () => {
           <button
             onClick={save}
             disabled={locked || value === null || (!dirty && !hasNext)}
-            className="flex-1 py-3.5 rounded-xl bg-amber-500 text-zinc-950 font-black text-base uppercase tracking-wide active:bg-amber-600 disabled:bg-zinc-200 disabled:text-zinc-500 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-zinc-900"
+            className="flex-1 py-3.5 rounded-xl bg-amber-500 text-zinc-950 font-black text-base max-[380px]:text-sm uppercase tracking-wide whitespace-nowrap active:bg-amber-600 disabled:bg-zinc-200 disabled:text-zinc-500 cursor-pointer flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-zinc-900"
           >
             {locked ? <Lock className="w-4 h-4" /> : dirty ? <Check className="w-5 h-5 stroke-[3]" /> : null}
             {saveLabel}
@@ -309,7 +367,7 @@ export const PrelimScoringPanel: React.FC = () => {
       </div>
 
       {/* Keypad: fixed to the bottom third, in the thumb zone */}
-      <div className="grid min-h-0 grid-cols-3 grid-rows-4 gap-1.5 border-t border-zinc-200 bg-zinc-50 p-2">
+      <div className={`grid min-h-0 grid-cols-3 grid-rows-4 gap-1.5 border-t border-black/5 p-2 ${theme.pad}`}>
         {KEYS.map((key) => (
           <button
             key={key}

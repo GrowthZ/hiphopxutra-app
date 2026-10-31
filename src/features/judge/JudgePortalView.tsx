@@ -10,12 +10,31 @@ import { PrelimScoringPanel } from './PrelimScoringPanel';
 import { BattleScoringPanel } from './BattleScoringPanel';
 import { InstallAppButton } from './InstallAppButton';
 import { useJudgeHeartbeat } from '../../state/useJudgePresence';
+import { CategoryType } from '../../domain/types';
 
-type Mode = 'prelim' | 'battle';
-const MODES: Record<Mode, { label: string; sub: string; Icon: typeof ListChecks }> = {
-  prelim: { label: 'Prelim', sub: 'Vòng loại · 8 GK, 2 bảng', Icon: ListChecks },
-  battle: { label: 'Main Battle', sub: 'Đối kháng · 9 GK', Icon: Swords },
+// Pro and Newbie prelims are separate menu entries (in their own colours, as on the scoring screen), so a judge
+// always knows which list they are scoring.
+type Mode = 'prelim_pro' | 'prelim_newbie' | 'battle';
+const MODES: Record<Mode, { label: string; sub: string; Icon: typeof ListChecks; icon: string; row: string; text: string }> = {
+  prelim_pro: {
+    label: 'Prelim Pro',
+    sub: 'Vòng loại Pro 2vs2',
+    Icon: ListChecks,
+    icon: 'bg-violet-600 text-white',
+    row: 'bg-violet-50',
+    text: 'text-violet-600',
+  },
+  prelim_newbie: {
+    label: 'Prelim Newbie',
+    sub: 'Vòng loại Newbie 1vs1',
+    Icon: ListChecks,
+    icon: 'bg-sky-600 text-white',
+    row: 'bg-sky-50',
+    text: 'text-sky-600',
+  },
+  battle: { label: 'Main Battle', sub: 'Đối kháng · 9 GK', Icon: Swords, icon: 'bg-amber-500 text-zinc-950', row: 'bg-amber-50', text: 'text-amber-600' },
 };
+const CATEGORY_OF: Partial<Record<Mode, CategoryType>> = { prelim_pro: 'pro_2v2', prelim_newbie: 'newbie_1v1' };
 
 export const JudgePortalView: React.FC = () => {
   const {
@@ -29,6 +48,8 @@ export const JudgePortalView: React.FC = () => {
     judgeAccountId,
     judgeSignOut,
     setActiveView,
+    activeCategory,
+    setActiveCategory,
   } = useTournament();
 
   useJudgeHeartbeat(judgeAccountId);
@@ -42,12 +63,19 @@ export const JudgePortalView: React.FC = () => {
   // is known before selectedJudgeId catches up with it.
   const isPrelimJudge = prelimJudges.some((j) => j.id === (judgeAccountId ?? selectedJudgeId));
   const canScorePrelim = !judgeAccountId || isPrelimJudge;
-  const [pickedMode, setPickedMode] = useState<Mode | null>(null);
-  const scoringMode: Mode = !canScorePrelim ? 'battle' : (pickedMode ?? (isPrelimJudge ? 'prelim' : 'battle'));
-  const modes: Mode[] = canScorePrelim ? ['prelim', 'battle'] : ['battle'];
+  const [pickedBattle, setPickedBattle] = useState<boolean | null>(null);
+  const battle = !canScorePrelim || (pickedBattle ?? !isPrelimJudge);
+  // The prelim category is the app's active category, so the scoring screen and this menu always agree.
+  const scoringMode: Mode = battle ? 'battle' : activeCategory === 'newbie_1v1' ? 'prelim_newbie' : 'prelim_pro';
+  const modes: Mode[] = canScorePrelim ? ['prelim_pro', 'prelim_newbie', 'battle'] : ['battle'];
+  const pickMode = (mode: Mode) => {
+    const category = CATEGORY_OF[mode];
+    if (category) setActiveCategory(category);
+    setPickedBattle(mode === 'battle');
+  };
 
   // For battle mode, show all 9 judges; for prelim mode, show 4 prelim judges
-  const activeJudgesList = scoringMode === 'battle' ? judges : prelimJudges;
+  const activeJudgesList = battle ? judges : prelimJudges;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -67,13 +95,13 @@ export const JudgePortalView: React.FC = () => {
   if (showWelcome) {
     return (
       <>
-        <JudgeWelcomeScreen onEnterPortal={() => setShowWelcome(false)} onOpenConfig={() => setIsJudgeConfigModalOpen(true)} />
+        <JudgeWelcomeScreen onEnterPortal={() => setShowWelcome(false)} />
         {configModal}
       </>
     );
   }
 
-  const { label: modeLabel, Icon: ModeIcon } = MODES[scoringMode];
+  const { label: modeLabel, Icon: ModeIcon, text: modeText } = MODES[scoringMode];
   const menuRow =
     'flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold hover:bg-zinc-50 cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-amber-500';
 
@@ -90,7 +118,7 @@ export const JudgePortalView: React.FC = () => {
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-label="Online" />
               </p>
               <p className="flex items-center gap-1 font-condensed text-lg font-black uppercase text-zinc-900">
-                <ModeIcon className="h-4 w-4 text-amber-600" />
+                <ModeIcon className={`h-4 w-4 ${modeText}`} />
                 {modeLabel}
               </p>
             </div>
@@ -105,7 +133,7 @@ export const JudgePortalView: React.FC = () => {
           </button>
         </header>
 
-        {scoringMode === 'battle' ? <BattleScoringPanel /> : <PrelimScoringPanel />}
+        {battle ? <BattleScoringPanel /> : <PrelimScoringPanel />}
         <div className="pb-[env(safe-area-inset-bottom)] shrink-0" />
       </div>
 
@@ -151,24 +179,24 @@ export const JudgePortalView: React.FC = () => {
               </span>
             </div>
 
-            {/* The two scoring screens */}
+            {/* The scoring screens: Prelim Pro, Prelim Newbie, Main Battle */}
             <div>
               <p className="mb-1.5 px-1 text-[11px] font-bold uppercase tracking-wider text-zinc-400">Chấm điểm</p>
               <div className="overflow-hidden rounded-2xl border border-zinc-200">
                 {modes.map((mode, i) => {
-                  const { label, sub, Icon } = MODES[mode];
+                  const { label, sub, Icon, icon, row } = MODES[mode];
                   const active = scoringMode === mode;
                   return (
                     <button
                       key={mode}
                       onClick={() => {
-                        setPickedMode(mode);
+                        pickMode(mode);
                         setMenuOpen(false);
                       }}
                       aria-current={active ? 'page' : undefined}
-                      className={`${menuRow} ${i > 0 ? 'border-t border-zinc-100' : ''} ${active ? 'bg-amber-50' : ''}`}
+                      className={`${menuRow} ${i > 0 ? 'border-t border-zinc-100' : ''} ${active ? row : ''}`}
                     >
-                      <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? 'bg-amber-500 text-zinc-950' : 'bg-zinc-100 text-zinc-500'}`}>
+                      <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${active ? icon : 'bg-zinc-100 text-zinc-500'}`}>
                         <Icon className="h-5 w-5" />
                       </span>
                       <span className="min-w-0 flex-1">

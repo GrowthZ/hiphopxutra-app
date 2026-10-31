@@ -10,7 +10,7 @@ test.describe.configure({ mode: 'serial' });
 const JUDGES = Array.from({ length: 9 }, (_, i) => `gk-${i + 1}`);
 
 /** The judge app switches between its two scoring screens from the hamburger menu. */
-async function openScoring(judge: Page, screen: 'Prelim' | 'Main Battle') {
+async function openScoring(judge: Page, screen: 'Prelim Pro' | 'Prelim Newbie' | 'Main Battle') {
   await judge.getByRole('button', { name: 'Mở menu' }).click();
   await judge.getByRole('navigation', { name: 'Menu' }).getByRole('button', { name: new RegExp(`^${screen}`) }).click();
 }
@@ -45,8 +45,8 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
   await judge.getByRole('button', { name: /GK 01/ }).click();
   for (const digit of '123456') await judge.getByRole('button', { name: digit, exact: true }).click();
 
-  await judge.getByRole('button', { name: /VÀO BÀN CHẤM ĐIỂM NGAY/ }).click();
-  await openScoring(judge, 'Prelim');
+  await judge.getByRole('button', { name: /Vào bàn chấm điểm/ }).click();
+  await openScoring(judge, 'Prelim Pro');
   for (const key of '70') await judge.getByRole('button', { name: key, exact: true }).click();
   await judge.getByRole('button', { name: /Lưu 70 điểm/ }).click();
 
@@ -72,9 +72,9 @@ test('prelim panels: a panel B judge scores even SBDs only; panel A cannot touch
   await judge.goto('/giam-khao');
   await judge.getByRole('button', { name: /GK 05/ }).click();
   for (const digit of '555555') await judge.getByRole('button', { name: digit, exact: true }).click();
-  await judge.getByRole('button', { name: /VÀO BÀN CHẤM ĐIỂM NGAY/ }).click();
-  await openScoring(judge, 'Prelim');
-  await expect(judge.getByText('Bảng B · SBD chẵn')).toBeVisible();
+  await judge.getByRole('button', { name: /Vào bàn chấm điểm/ }).click();
+  await openScoring(judge, 'Prelim Pro');
+  await expect(judge.getByText('Bảng B · chẵn')).toBeVisible();
   for (const key of '75') await judge.getByRole('button', { name: key, exact: true }).click();
   await judge.getByRole('button', { name: /Lưu 75 điểm/ }).click();
 
