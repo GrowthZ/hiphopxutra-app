@@ -12,10 +12,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Giám khảo" />
     <script>
-      // The check-in desk installs as its own app: pick its manifest before the browser reads the judge one.
-      if (/^\/(admin\/check-in|checkin)\/?$/i.test(location.pathname)) {
-        document.querySelector('link[rel="manifest"]').href = '/manifest-checkin.webmanifest';
-        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = 'Check-in';
+      // Dev server only matters here: production serves check-in.html / mc.html (built by vite.config.ts) for these apps.
+      var app = /^\/(admin\/check-in|checkin)\/?$/i.test(location.pathname)
+        ? ['/manifest-checkin.webmanifest', 'Check-in']
+        : /^\/mc\/?$/i.test(location.pathname)
+          ? ['/manifest-mc.webmanifest', 'MC']
+          : null;
+      if (app) {
+        document.querySelector('link[rel="manifest"]').href = app[0];
+        document.querySelector('meta[name="apple-mobile-web-app-title"]').content = app[1];
       }
     </script>
     <title>HIPHOP XỨ TRÀ 2026 - Giải Đấu Breaking U16</title>

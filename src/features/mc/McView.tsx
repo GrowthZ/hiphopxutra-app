@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, LogOut, Mic } from 'lucide-react';
+import { InstallAppButton } from '../judge/InstallAppButton';
 import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer } from '../../domain/types';
 import { PANEL_SIZE, PanelId, panelOfDancer } from '../../domain/model';
@@ -98,14 +99,17 @@ export const McView: React.FC = () => {
               <p className="truncate font-condensed text-lg font-black uppercase">{mc?.name ?? 'Ban tổ chức'}</p>
             </div>
           </div>
-          <button
-            onClick={judgeSignOut}
-            aria-label="Đăng xuất"
-            title="Đăng xuất"
-            className="-mr-2 rounded-full p-2.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
-          >
-            <LogOut className="h-5 w-5" />
-          </button>
+          <div className="flex shrink-0 items-center gap-1">
+            <InstallAppButton appName="MC" purpose="để dẫn chương trình" />
+            <button
+              onClick={judgeSignOut}
+              aria-label="Đăng xuất"
+              title="Đăng xuất"
+              className="-mr-2 rounded-full p-2.5 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            >
+              <LogOut className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         <div className="mx-auto max-w-2xl space-y-2 px-4 pb-2">

@@ -4,5 +4,10 @@
   "installCommand": "bun install",
   "buildCommand": "bun run build",
   "outputDirectory": "dist",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/admin/check-in", "destination": "/check-in.html" },
+    { "source": "/checkin", "destination": "/check-in.html" },
+    { "source": "/mc", "destination": "/mc.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }

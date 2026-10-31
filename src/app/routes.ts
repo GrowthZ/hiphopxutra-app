@@ -92,8 +92,10 @@ export function viewFromLocation(): ActiveViewType {
 /** The data source is fixed per page load; moving between public and private pages reloads the page. */
 export const IS_PUBLIC_SOURCE = isPublicView(viewFromLocation());
 
-/** The check-in desk installs as its own app (manifest picked in index.html), so it is also fixed per page load. */
-export const IS_CHECKIN_APP = viewFromLocation() === 'checkin';
+/** Views that install as their own app (own page + manifest, see vite.config.ts); judge app otherwise. */
+export const appOf = (view: ActiveViewType) => (view === 'checkin' || view === 'mc' ? view : 'judge');
+/** The installable app is fixed per page load: its manifest comes with the served page. */
+export const PAGE_APP = appOf(viewFromLocation());
 
 /** `/ket-qua/tran/{slug}` -> slug */
 export const matchSlugFromPath = (pathname: string) =>
