@@ -6,6 +6,12 @@
     --font-condensed: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   }
 
+  /* Pages that scroll the whole document (guest results, MC) only lose the browser's pull-to-refresh when the
+     root element says so: overscroll-behavior on body is not applied to the viewport. */
+  html {
+    overscroll-behavior-y: none;
+  }
+
   body {
     font-family: var(--font-inter);
     color: #09090b;
