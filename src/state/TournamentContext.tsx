@@ -40,11 +40,15 @@ import {
   isCutoffUndecided,
   isPrelimComplete,
   prelimJudgeIdsFor,
+  fillPhotosFromTwins,
+  otherCategory,
+  photosOf,
+  twinOf,
 } from '../domain/model';
 import * as battle from '../domain/battle';
 import { IS_PUBLIC_SOURCE } from '../app/routes';
 import { getSavedStorageConfig, saveStorageConfig } from '../services/storageService';
-import { clearVotes, eventDoc, StaffRole, writeBattleVote, writeDancerFields, writePrelimScore, writeTieBreakScore } from '../services/firestore';
+import { clearVotes, eventDoc, registerWalkIn, StaffRole, writeBattleVote, writeDancerFields, writePrelimScore, writeTieBreakScore } from '../services/firestore';
 import { soundFX } from '../services/soundEffects';
 import * as cues from '../services/stageCues';
 import { useSyncedCollection } from './useSyncedCollection';
@@ -141,6 +145,8 @@ interface TournamentContextType {
   updateDancerMedia: (category: CategoryType, dancerId: string, photos: DancerMediaUpdate) => void;
   updateDancerGender: (category: CategoryType, dancerId: string, gender: 'male' | 'female') => void;
   updateDancerInfo: (category: CategoryType, dancerId: string, info: DancerInfoUpdate) => void;
+  /** Registers the dancer in the other category too (same details and photo); returns the new id. */
+  addOtherCategory: (category: CategoryType, dancerId: string) => Promise<string>;
   updateTeamPhoto: (teamId: string, teamPhotoUrl: string) => void;
   isStorageModalOpen: boolean;
   setIsStorageModalOpen: (open: boolean) => void;
@@ -374,6 +380,14 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     useSyncedCollection('judgeBallots', judgeBallots, () => {}, { canWrite: canPublish, enabled: canWrite }),
   ];
   usePublisherHeartbeat(canPublish);
+
+  // One photo per dancer: a record added in the other category (at the desk, by import) takes the photo already
+  // taken. The admin client does it, so it also covers records the check-in desk creates (it can't write photos).
+  useEffect(() => {
+    if (!canWrite) return;
+    setNewbieDancers((prev) => fillPhotosFromTwins(prev, proBase));
+    setProDancers((prev) => fillPhotosFromTwins(prev, newbieBase));
+  }, [canWrite, newbieBase, proBase]);
   const syncError = actionError ?? [...syncStates, ...publicSync].find((s) => s.error)?.error ?? null;
 
   function applyRemotePublicDancers(list: Dancer[]) {
@@ -545,7 +559,20 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   };
 
   // Teams and matches store dancer ids and are hydrated from the dancer lists, so photos only change here.
+  // A dancer in both categories has one photo: it goes on both records (see twinOf).
+  const listOf = (category: CategoryType) => (category === 'newbie_1v1' ? newbieBase : proBase);
+  const twinIdOf = (category: CategoryType, dancerId: string) => {
+    const dancer = listOf(category).find((d) => d.id === dancerId);
+    return dancer && twinOf(dancer, listOf(otherCategory(category)))?.id;
+  };
+
   const updateDancerMedia = (category: CategoryType, dancerId: string, photos: DancerMediaUpdate) => {
+    const twinId = twinIdOf(category, dancerId);
+    applyDancerMedia(category, dancerId, photos);
+    if (twinId) applyDancerMedia(otherCategory(category), twinId, photos);
+  };
+
+  const applyDancerMedia = (category: CategoryType, dancerId: string, photos: DancerMediaUpdate) => {
     const update = (prev: Dancer[]) =>
       prev.map((d) =>
         d.id !== dancerId
@@ -575,6 +602,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   /** Admin edits a dancer's details; an empty real name or club removes it. SBD, panel, photos and scores stay. */
   const updateDancerInfo = (category: CategoryType, dancerId: string, info: DancerInfoUpdate) => {
+    const twinId = twinIdOf(category, dancerId);
+    applyDancerInfo(category, dancerId, info);
+    if (twinId) applyDancerInfo(otherCategory(category), twinId, info);
+  };
+
+  const applyDancerInfo = (category: CategoryType, dancerId: string, info: DancerInfoUpdate) => {
     const update = (prev: Dancer[]) =>
       prev.map((d) => {
         if (d.id !== dancerId) return d;
@@ -609,6 +642,24 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return red === m.sideRed && blue === m.sideBlue ? m : { ...m, sideRed: red, sideBlue: blue };
       })
     );
+  };
+
+  const addOtherCategory = async (category: CategoryType, dancerId: string) => {
+    const dancer = listOf(category).find((d) => d.id === dancerId);
+    if (!dancer) throw new Error('Không tìm thấy thí sinh');
+    const other = otherCategory(category);
+    const existing = twinOf(dancer, listOf(other));
+    if (existing) return existing.id;
+    const id = await registerWalkIn(other, {
+      name: dancer.name,
+      realName: dancer.realName,
+      crew: dancer.crew,
+      gender: dancer.gender,
+    });
+    // The photo follows: written here by a dancer editor, or by the admin client (fillPhotosFromTwins below).
+    const photos = photosOf(dancer);
+    if (editorMode && photos.avatarUrl) await writeDancerFields(other, id, photos);
+    return id;
   };
 
   // Match sides pick the team photo up through hydrateMatch.
@@ -777,6 +828,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateDancerMedia,
         updateDancerGender,
         updateDancerInfo,
+        addOtherCategory,
         updateTeamPhoto,
         isStorageModalOpen,
         setIsStorageModalOpen,

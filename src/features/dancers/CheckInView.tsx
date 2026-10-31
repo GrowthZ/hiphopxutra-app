@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, UserCheck, Undo2, Loader2, X, CheckCircle2, UserPlus, AlertCircle } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
 import { checkInDancer, undoCheckIn, isIssuedSbd, registerWalkIn, walkInName } from '../../services/firestore';
+import { otherCategory, twinOf } from '../../domain/model';
+
+const CATEGORY_SHORT: Record<CategoryType, string> = { newbie_1v1: 'Newbie', pro_2v2: 'Pro' };
 import { getDancerAvatarUrl } from '../../shared/placeholderAssets';
 import { CategoryType, Dancer } from '../../domain/types';
 
@@ -23,7 +26,7 @@ type Toast = { key: number; kind: 'ok' | 'error'; title: string; sbd?: string };
 
 /** desk: the check-in staff app. The title lives in its app bar and the filters stick under it on phones. */
 export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
-  const { newbieDancers, proDancers, storageConfig, prelimPanels } = useTournament();
+  const { newbieDancers, proDancers, storageConfig, prelimPanels, addOtherCategory } = useTournament();
   const [category, setCategory] = useState<CategoryType>('newbie_1v1');
   const [status, setStatus] = useState<StatusFilter>('pending');
   const [query, setQuery] = useState('');
@@ -113,9 +116,12 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
   // Walk-in: a dancer who didn't pre-register signs up at the desk (and usually gets a number right away).
   const handleWalkIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cats: CategoryType[] = walkIn.category === 'both' ? ['newbie_1v1', 'pro_2v2'] : [walkIn.category];
+    const chosen: CategoryType[] = walkIn.category === 'both' ? ['newbie_1v1', 'pro_2v2'] : [walkIn.category];
     const key = normalize(walkIn.name).replace(/\s+/g, ' ');
-    const duplicate = cats.find((cat) => listOf(cat).some((d) => normalize(d.name) === key));
+    const listed = (cat: CategoryType) => listOf(cat).some((d) => normalize(d.name) === key);
+    // "Cả 2" for someone already in one list: only the missing category is added (photo shared, see twinOf).
+    const cats = chosen.length > 1 ? chosen.filter((cat) => !listed(cat)) : chosen;
+    const duplicate = cats.length === 0 ? chosen[0] : cats.find(listed);
     if (duplicate) {
       // Already on the list: close the form and show the existing entry instead.
       setError(`${walkInName(walkIn.name)} đã có trong danh sách ${duplicate === 'newbie_1v1' ? 'Newbie' : 'Pro'}: tìm tên để check-in.`);
@@ -164,6 +170,22 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
       setQuery('');
     } catch (e) {
       setError(`Không check-in được ${dancer.name}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  // Signed up for one category, now wants the other too: same details and photo; checked in there too if they are here.
+  const handleAddOther = async (dancer: Dancer) => {
+    const other = otherCategory(category);
+    setBusyId(dancer.id);
+    try {
+      const id = await addOtherCategory(category, dancer.id);
+      const sbd = dancer.checkedInAt ? await issueSbd(other, id) : 'Chưa cấp SBD';
+      setRecent((list) => [{ id, at: Date.now() }, ...list]);
+      notify({ kind: 'ok', title: `Đã đăng ký thêm ${dancer.name} vào ${CATEGORY_SHORT[other]}`, sbd });
+    } catch (e) {
+      setError(`Không đăng ký thêm được ${dancer.name}: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusyId(null);
     }
@@ -499,6 +521,17 @@ export const CheckInView: React.FC<{ desk?: boolean }> = ({ desk = false }) => {
                     {at > 0 && <span className="font-bold text-amber-700">Đăng ký {formatTime(at)} · </span>}
                     {[d.realName, d.crew, d.gender === 'female' ? 'Nữ' : 'Nam'].filter(Boolean).join(' · ')}
                   </p>
+                  {twinOf(d, listOf(otherCategory(category))) ? (
+                    <p className="text-[11px] font-bold text-sky-700">Cũng thi {CATEGORY_SHORT[otherCategory(category)]}</p>
+                  ) : (
+                    <button
+                      onClick={() => handleAddOther(d)}
+                      disabled={busy}
+                      className="-ml-1 mt-0.5 rounded px-1 py-0.5 text-[11px] font-bold text-sky-700 hover:bg-sky-50 disabled:opacity-40 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+                    >
+                      + Đăng ký thêm {CATEGORY_SHORT[otherCategory(category)]}
+                    </button>
+                  )}
                 </div>
   
                 <div className="w-16 sm:w-20 text-center shrink-0">

@@ -1,9 +1,42 @@
 import type { DocumentData } from 'firebase/firestore';
-import { BattleMatch, BattleRound, BattleSide, Dancer, Judge, RoundStage, Team2v2 } from './types';
+import { BattleMatch, BattleRound, BattleSide, CategoryType, Dancer, Judge, RoundStage, Team2v2 } from './types';
 
 // Pure domain helpers + the mapping between React state and Firestore documents.
 // Teams and matches store dancer ids only (photos live once, on the dancer doc, keeping docs under 1MB);
 // battle votes live in their own `votes` collection so judges never write match documents.
+
+// ---------- One dancer in both categories ----------
+// A dancer who competes in Newbie and Pro has one record in each list, linked by the stage name (as dancer:import
+// and the walk-in form already treat it). They share their details and photos: one upload serves both.
+
+export const otherCategory = (c: CategoryType): CategoryType => (c === 'newbie_1v1' ? 'pro_2v2' : 'newbie_1v1');
+
+/** Stage name as stored and compared: "bboy  kenz - x" -> "BBOY KENZ-X". */
+export const stageNameKey = (name: string) => name.replace(/\s*-\s*/g, '-').replace(/\s+/g, ' ').trim().toUpperCase();
+
+/** The same dancer's record in the other category's list, if they are registered there too. */
+export const twinOf = (dancer: Pick<Dancer, 'name'>, otherList: Dancer[]) =>
+  otherList.find((d) => stageNameKey(d.name) === stageNameKey(dancer.name));
+
+const PHOTO_KEYS = ['avatarUrl', 'halfBodyUrl', 'avatarCrop'] as const;
+export const photosOf = (d: Dancer): Pick<Dancer, (typeof PHOTO_KEYS)[number]> =>
+  Object.fromEntries(PHOTO_KEYS.filter((k) => d[k] !== undefined).map((k) => [k, d[k]]));
+
+/**
+ * A record without a photo takes its twin's (e.g. the Pro entry added at the desk after the Newbie photo was taken).
+ * Returns the same list when nothing changes, so it can run on every update.
+ */
+export function fillPhotosFromTwins(list: Dancer[], otherList: Dancer[]): Dancer[] {
+  let changed = false;
+  const next = list.map((d) => {
+    if (d.avatarUrl) return d;
+    const twin = twinOf(d, otherList);
+    if (!twin?.avatarUrl) return d;
+    changed = true;
+    return { ...d, ...photosOf(twin) };
+  });
+  return changed ? next : list;
+}
 
 // ---------- Prelim panels ----------
 // 8 judges score a category in two panels of 4. A dancer gets their panel (dancer.panel) at check-in, from the

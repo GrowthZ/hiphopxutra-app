@@ -498,6 +498,52 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
   await context.close();
 });
 
+test('a Newbie dancer signs up for Pro too: one photo serves both, at the desk and in the walk-in form', async ({ browser }) => {
+  // The walk-in from the test above already has a photo (taken for Newbie).
+  const newbie = (await event.collection('newbieDancers').where('name', '==', 'BBOY WALK IN').get()).docs[0];
+  await newbie.ref.update({ avatarUrl: 'https://media.test/walk-in-avatar.webp', halfBodyUrl: 'https://media.test/walk-in-half.webp' });
+  await admin.goto('/admin/thi-sinh'); // the admin client is the one that copies photos across
+
+  const context = await browser.newContext();
+  const desk = await context.newPage();
+  await desk.goto('/checkin');
+  await desk.getByLabel('Tên đăng nhập').fill('checkin1');
+  await desk.getByPlaceholder('Mật khẩu').fill('desk-pass-1');
+  await desk.getByRole('button', { name: 'Đăng nhập', exact: true }).click();
+  await expect(desk.getByText('Bàn check-in', { exact: true })).toBeVisible();
+
+  // From the Newbie list: "+ Đăng ký thêm Pro". Already checked in, so the Pro number comes at once.
+  await desk.getByRole('button', { name: 'Tất cả', exact: true }).click();
+  const row = desk.getByRole('listitem').filter({ hasText: 'BBOY WALK IN' });
+  await row.getByRole('button', { name: '+ Đăng ký thêm Pro' }).click();
+  await expect(desk.getByText('Đã đăng ký thêm BBOY WALK IN vào Pro')).toBeVisible();
+  await expect(row.getByText('Cũng thi Pro')).toBeVisible();
+
+  const proDoc = async () => (await event.collection('proDancers').where('name', '==', 'BBOY WALK IN').get()).docs[0]?.data();
+  await expect.poll(async () => (await proDoc())?.avatarUrl).toBeTruthy();
+  const pro = (await proDoc())!;
+  expect(pro.sbd).toMatch(/^P\d{3}$/);
+  expect(pro.avatarUrl).toBe('https://media.test/walk-in-avatar.webp');
+  expect(pro.halfBodyUrl).toBe('https://media.test/walk-in-half.webp');
+
+  // The walk-in form: "Cả 2" for someone already on the Newbie list adds only the Pro entry, no duplicate.
+  await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
+  await desk.getByLabel('Tên thi đấu *').fill('Bboy Solo');
+  await desk.getByLabel('Check-in và cấp SBD luôn').uncheck();
+  await desk.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+  await expect(desk.getByText('Đã đăng ký BBOY SOLO')).toBeVisible();
+  await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
+  await desk.getByLabel('Tên thi đấu *').fill('Bboy Solo');
+  await desk.getByRole('radio', { name: 'Cả 2' }).click();
+  await desk.getByLabel('Check-in và cấp SBD luôn').uncheck();
+  await desk.getByRole('button', { name: 'Đăng ký', exact: true }).click();
+  await expect(desk.getByRole('dialog')).toBeHidden();
+  for (const col of ['newbieDancers', 'proDancers']) {
+    expect((await event.collection(col).where('name', '==', 'BBOY SOLO').get()).size).toBe(1);
+  }
+  await context.close();
+});
+
 // Last: switching to the rehearsal data reloads every open page, including the shared admin one.
 test('the live draw is entered by hand, a side withdraws, and the public bracket follows', async ({ browser }) => {
   test.setTimeout(120_000); // three pages: the draw, the bracket console, the public bracket
