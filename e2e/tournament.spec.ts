@@ -1,4 +1,5 @@
-import { BrowserContext, expect, Page, test } from '@playwright/test';
+import { BrowserContext, Dialog, expect, Page, test } from '@playwright/test';
+import { getFirestore } from 'firebase-admin/firestore';
 import { adminAuth, createJudge, event, signInAdmin, waitForDoc } from './emulator';
 
 // The three flows that must work on competition day, in order, sharing one emulator database:
@@ -271,4 +272,42 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
     expect(girl.docs[0].get('gender')).toBe('female');
   }
   await context.close();
+});
+
+// Last: switching to the rehearsal data reloads every open page, including the shared admin one.
+test('rehearsal: sample data in its own tree, switched on for every device, then deleted', async ({ browser }) => {
+  const rehearsal = getFirestore().collection('events').doc('hiphopxutra-2026-dev');
+  const realNewbies = (await event.collection('newbieDancers').count().get()).data().count;
+  const accept = (d: Dialog) => d.accept();
+  admin.on('dialog', accept);
+
+  // The real event's admin fills the rehearsal tree, which has no accounts of its own (firestore.rules borrows them).
+  await admin.goto('/admin/cai-dat/tong-duyet');
+  await admin.getByLabel('Chỉ thi Newbie').fill('20');
+  await admin.getByLabel('Chỉ thi Pro').fill('20');
+  await admin.getByLabel('Thi cả 2 hạng mục').fill('14');
+  await admin.getByRole('button', { name: 'Tạo dữ liệu mẫu' }).click();
+  await expect(admin.getByRole('status')).toContainText('Đã tạo');
+  expect((await rehearsal.collection('newbieDancers').count().get()).data().count).toBe(34);
+  expect((await rehearsal.collection('proDancers').count().get()).data().count).toBe(34);
+  expect((await event.collection('newbieDancers').count().get()).data().count).toBe(realNewbies); // real data untouched
+
+  // Switched on: every device reloads onto the sample data.
+  const guest = await (await browser.newContext()).newPage();
+  await guest.goto('/ket-qua/prelim');
+  await expect(guest.getByText('Dữ liệu tổng duyệt')).toBeHidden();
+  await admin.getByRole('button', { name: 'Bật chế độ tổng duyệt' }).click();
+  await expect(admin.getByRole('button', { name: /Đang tổng duyệt/ })).toBeVisible();
+  await expect(guest.getByText('Dữ liệu tổng duyệt')).toBeVisible();
+
+  // Switched off, then the sample data deleted (accounts kept).
+  await admin.getByRole('button', { name: 'Tắt, về giải thật' }).click();
+  await expect(admin.getByText('Đang chạy giải thật')).toBeVisible();
+  await expect(guest.getByText('Dữ liệu tổng duyệt')).toBeHidden();
+  await admin.getByRole('button', { name: 'Xoá dữ liệu mẫu' }).click();
+  await expect(admin.getByRole('status')).toContainText('Đã xoá');
+  expect((await rehearsal.collection('newbieDancers').count().get()).data().count).toBe(0);
+  expect((await event.collection('newbieDancers').count().get()).data().count).toBe(realNewbies);
+  admin.off('dialog', accept);
+  await guest.context().close();
 });

@@ -12,20 +12,33 @@ import {
   runTransaction,
   deleteField,
   FieldPath,
+  onSnapshot,
 } from 'firebase/firestore';
 import { app, USE_EMULATORS } from './firebase';
 import { CategoryType } from '../domain/types';
 
 // One Firestore tree per tournament: events/{EVENT_ID}/...
-// VITE_EVENT_ID points the app at another tree: the rehearsal data (`bun run dev:devdb`, see docs/dev-database.md).
 export const PROD_EVENT_ID = 'hiphopxutra-2026';
-export const EVENT_ID = import.meta.env.VITE_EVENT_ID || PROD_EVENT_ID;
+/** Sample data for rehearsals; keep in sync with scripts/db.ts DEV_EVENT_ID, vite.config.ts and firestore.rules. */
+export const REHEARSAL_EVENT_ID = 'hiphopxutra-2026-dev';
+/** The tree this build is for: the real event, or the rehearsal one (`bun run dev:devdb`, TEST=true). */
+export const BUILD_EVENT_ID = import.meta.env.VITE_EVENT_ID || PROD_EVENT_ID;
+/**
+ * The tree in use. A real-event build switches to the rehearsal tree while an admin has turned rehearsal mode on
+ * (config/app, read by chooseEventTree() before the app renders); every device follows.
+ */
+export let EVENT_ID = BUILD_EVENT_ID;
+export const CAN_SWITCH_TO_REHEARSAL = BUILD_EVENT_ID === PROD_EVENT_ID;
+
+// Logins and their secrets belong to the build's event, whichever tree the data comes from.
+const ACCOUNT_COLLECTIONS: readonly SyncedCollection[] = ['admins', 'judgeSecrets', 'mcSecrets', 'staffSecrets'];
+const treeOf = (name: SyncedCollection) => (ACCOUNT_COLLECTIONS.includes(name) ? BUILD_EVENT_ID : EVENT_ID);
 
 /**
- * Rehearsal tree in the real project: Firebase Auth is shared with production, so judge PINs and BTC passwords
+ * Rehearsal build in the real project: Firebase Auth is shared with production, so judge PINs and BTC passwords
  * must not be created or changed from here (that would change the real logins too).
  */
-export const SHARES_PROD_AUTH = EVENT_ID !== PROD_EVENT_ID && !USE_EMULATORS;
+export const SHARES_PROD_AUTH = BUILD_EVENT_ID !== PROD_EVENT_ID && !USE_EMULATORS;
 export function assertProdAuthUntouched() {
   if (SHARES_PROD_AUTH) {
     throw new Error(
@@ -61,8 +74,54 @@ export type SyncedCollection =
   | 'admins'
   | 'staffSecrets';
 
-export const eventCollection = (name: SyncedCollection) => collection(db, 'events', EVENT_ID, name);
-export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', EVENT_ID, name, id);
+export const eventCollection = (name: SyncedCollection) => collection(db, 'events', treeOf(name), name);
+export const eventDoc = (name: SyncedCollection, id: string) => doc(db, 'events', treeOf(name), name, id);
+
+// ---------- Rehearsal mode (config/app.rehearsal) ----------
+
+const configDoc = () => doc(db, 'config', 'app');
+const MODE_KEY = 'hiphop_xu_tra_rehearsal';
+const treeFor = (rehearsal: boolean) => (rehearsal ? REHEARSAL_EVENT_ID : PROD_EVENT_ID);
+
+/**
+ * Picks the tree before the app renders. Offline (or slow), the last mode seen on this device is used, so a judge
+ * phone that lost Wi-Fi keeps working on the same data.
+ */
+export async function chooseEventTree() {
+  if (!CAN_SWITCH_TO_REHEARSAL) return;
+  let rehearsal = false;
+  try {
+    rehearsal = localStorage.getItem(MODE_KEY) === '1';
+  } catch {
+    // no storage: start on the real event
+  }
+  try {
+    const snap = await Promise.race([
+      getDoc(configDoc()),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error('timeout')), 4000)),
+    ]);
+    rehearsal = snap.data()?.rehearsal === true;
+    try {
+      localStorage.setItem(MODE_KEY, rehearsal ? '1' : '0');
+    } catch {
+      // not remembered
+    }
+  } catch {
+    // keep the remembered mode
+  }
+  EVENT_ID = treeFor(rehearsal);
+}
+
+/** Calls `onSwitch` when an admin turns rehearsal mode on or off (the page then reloads onto the other tree). */
+export const watchEventTree = (onSwitch: () => void) =>
+  CAN_SWITCH_TO_REHEARSAL
+    ? onSnapshot(configDoc(), (snap) => {
+        if (snap.metadata.fromCache) return;
+        if (treeFor(snap.data()?.rehearsal === true) !== EVENT_ID) onSwitch();
+      })
+    : () => {};
+
+export const setRehearsalMode = (on: boolean) => setDoc(configDoc(), { rehearsal: on, updatedAt: Date.now() }, { merge: true });
 
 export const dancersCollectionOf = (category: CategoryType): SyncedCollection =>
   category === 'newbie_1v1' ? 'newbieDancers' : 'proDancers';
@@ -85,7 +144,7 @@ export type StaffRole = 'admin' | 'checkin';
 
 /** Organizer role from admins/{email}; entries without a role are full admins (older entries, Google admins). */
 export async function getStaffRole(email: string): Promise<StaffRole | null> {
-  const snap = await getDoc(doc(db, 'events', EVENT_ID, 'admins', email.toLowerCase()));
+  const snap = await getDoc(doc(db, 'events', BUILD_EVENT_ID, 'admins', email.toLowerCase()));
   if (!snap.exists()) return null;
   return snap.data().role === 'checkin' ? 'checkin' : 'admin';
 }

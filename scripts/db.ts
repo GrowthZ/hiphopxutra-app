@@ -23,7 +23,7 @@ import { createInterface } from 'node:readline/promises';
 import { applicationDefault, cert, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { DocumentReference, FieldValue, getFirestore, Timestamp, WriteBatch } from 'firebase-admin/firestore';
-import { buildSeed, SamplePhoto, SEED_STAGES, SeedStage } from './devSeed';
+import { buildSeed, SamplePhoto, SEED_STAGES, SeedStage } from '../src/domain/sampleData';
 
 const ROOT = path.resolve(import.meta.dir, '..');
 const PROD_EVENT_ID = 'hiphopxutra-2026'; // keep in sync with src/services/firestore.ts

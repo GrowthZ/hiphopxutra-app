@@ -21,6 +21,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   checkin: '/admin/check-in',
   judge_accounts: '/admin/cai-dat/giam-khao',
   staff_accounts: '/admin/cai-dat/nguoi-dung',
+  rehearsal: '/admin/cai-dat/tong-duyet',
 };
 
 /** Audience screens and the MC screen open in a new tab from the admin pages. */

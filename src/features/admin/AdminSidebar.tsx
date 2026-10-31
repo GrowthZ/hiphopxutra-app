@@ -19,6 +19,7 @@ import {
   MonitorPlay,
   ExternalLink,
   Mic,
+  FlaskConical,
 } from 'lucide-react';
 import { openInNewTab, SCREEN_VIEWS } from '../../app/routes';
 
@@ -46,6 +47,7 @@ export const AdminSidebar: React.FC = () => {
     { id: 'mc', label: 'Màn MC', icon: Mic },
     { id: 'judge_accounts', label: 'Tài khoản GK & MC', icon: KeyRound },
     { id: 'staff_accounts', label: 'Người dùng BTC', icon: UserCog },
+    { id: 'rehearsal', label: 'Tổng duyệt (dữ liệu mẫu)', icon: FlaskConical },
     { id: 'dancers', label: 'Danh sách Thí sinh', icon: Users },
     { id: 'storage', label: 'Lưu trữ & Ảnh mẫu', icon: Cloud },
     { id: 'sheets', label: 'Google Sheets DB', icon: ShieldCheck },

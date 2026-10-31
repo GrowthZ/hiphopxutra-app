@@ -23,9 +23,10 @@ import { StorageConfigModal } from './features/settings/StorageConfigModal';
 import { JudgeConfigModal } from './features/judge/JudgeConfigModal';
 import { AdminLoginGate } from './features/admin/AdminLoginGate';
 import { StaffAccountsView } from './features/admin/StaffAccountsView';
+import { RehearsalView } from './features/admin/RehearsalView';
 import { CheckInDesk } from './features/dancers/CheckInDesk';
 import { isAdminView } from './app/routes';
-import { EVENT_ID, PROD_EVENT_ID } from './services/firestore';
+import { CAN_SWITCH_TO_REHEARSAL, EVENT_ID, PROD_EVENT_ID, REHEARSAL_EVENT_ID, watchEventTree } from './services/firestore';
 import { ArrowLeft, Tv, CloudOff } from 'lucide-react';
 
 const SyncErrorBanner: React.FC = () => {
@@ -134,6 +135,14 @@ const MainContent: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-100 flex flex-col">
       <Navbar />
+      {CAN_SWITCH_TO_REHEARSAL && EVENT_ID === REHEARSAL_EVENT_ID && (
+        <button
+          onClick={() => setActiveView('rehearsal')}
+          className="flex items-center justify-center gap-2 bg-fuchsia-600 px-4 py-2 text-xs font-black uppercase tracking-wide text-white hover:bg-fuchsia-700 cursor-pointer"
+        >
+          Đang tổng duyệt: mọi máy dùng dữ liệu mẫu, không phải giải thật · Bấm để tắt
+        </button>
+      )}
       <div className="flex-1 flex max-w-full">
         {/* Left Sidebar */}
         <AdminSidebar />
@@ -150,6 +159,7 @@ const MainContent: React.FC = () => {
           {activeView === 'stage_control' && <StageControlView />}
           {activeView === 'judge_accounts' && <JudgeAccountsView />}
           {activeView === 'staff_accounts' && <StaffAccountsView />}
+          {activeView === 'rehearsal' && <RehearsalView />}
         </main>
       </div>
 
@@ -175,11 +185,13 @@ const MainContent: React.FC = () => {
 const DevDataBadge: React.FC = () =>
   EVENT_ID === PROD_EVENT_ID ? null : (
     <div className="pointer-events-none fixed top-0 left-1/2 -translate-x-1/2 z-[100] rounded-b bg-fuchsia-600 px-2 py-0.5 font-mono text-[10px] font-black uppercase tracking-wider text-white shadow">
-      Dữ liệu DEV · {EVENT_ID}
+      {EVENT_ID === REHEARSAL_EVENT_ID ? 'Dữ liệu tổng duyệt' : `Dữ liệu DEV · ${EVENT_ID}`}
     </div>
   );
 
 export default function App() {
+  // An admin turning rehearsal mode on or off moves every open screen (judges, MC, LED, desks) to the other data.
+  React.useEffect(() => watchEventTree(() => window.location.reload()), []);
   return (
     <TournamentProvider>
       <MainContent />

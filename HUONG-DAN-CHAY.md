@@ -160,6 +160,20 @@ Firebase Console → **Authentication → Settings → Authorized domains** → 
 báo lỗi `auth/unauthorized-domain`. `localhost` đã được cho phép sẵn. Bản preview của pull request có domain khác,
 nên đăng nhập admin trên preview sẽ bị chặn trừ khi thêm domain đó.
 
+### Tổng duyệt trên production (dữ liệu mẫu)
+
+Admin vào **Tổng duyệt (dữ liệu mẫu)** (`/admin/cai-dat/tong-duyet`):
+
+1. Chọn giai đoạn (Đăng ký, Check-in, Prelim đang chấm, Prelim chấm xong có đồng điểm, Battle vòng đầu, hoặc đã đấu
+   xong tới Tứ kết / Bán kết / Chung kết) và số thí sinh
+   chỉ Newbie / chỉ Pro / thi cả 2 (mỗi hạng mục ít nhất 32 em, vì nhánh đấu theo thể thức Top 32). Bấm **Tạo dữ liệu mẫu**.
+2. Bấm **Bật chế độ tổng duyệt**: mọi máy (giám khảo, MC, check-in, LED, trang khách) tự tải lại và dùng dữ liệu mẫu;
+   góc trên màn hình hiện "Dữ liệu tổng duyệt", trang admin có dải tím nhắc tắt.
+3. Xong thì **Tắt, về giải thật**, rồi **Xoá dữ liệu mẫu**.
+
+Dữ liệu mẫu nằm ở `events/hiphopxutra-2026-dev`, tách khỏi giải thật; tài khoản BTC, giám khảo, MC dùng chung.
+Chỉ tạo lại / xoá được khi đã tắt chế độ tổng duyệt. **Tắt chế độ tổng duyệt trước ngày thi.**
+
 ---
 
 ## Biến môi trường

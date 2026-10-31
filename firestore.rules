@@ -7,9 +7,27 @@ rules_version = '2';
 // LED PC: anonymous session, heartbeat only.
 service cloud.firestore {
   match /databases/{database}/documents {
+    function realStaffEntry() {
+      return /databases/$(database)/documents/events/hiphopxutra-2026/admins/$(request.auth.token.email.lower());
+    }
+
+    // App-wide switch (config/app.rehearsal): every device reads it before choosing the real event or the rehearsal
+    // tree; only an admin of the real event flips it.
+    match /config/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.email is string
+        && (request.auth.token.email_verified == true
+          || request.auth.token.email.matches('^[a-z0-9._-]+@btc[.]hiphopxutra[.]vn$'))
+        && exists(realStaffEntry())
+        && get(realStaffEntry()).data.get('role', 'admin') == 'admin';
+    }
+
     match /events/{eventId} {
+      // The rehearsal tree borrows the real event's organizer accounts when it has no list of its own.
       function staffEntry() {
-        return /databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower());
+        let own = /databases/$(database)/documents/events/$(eventId)/admins/$(request.auth.token.email.lower());
+        return eventId == 'hiphopxutra-2026-dev' && !exists(own) ? realStaffEntry() : own;
       }
 
       // BTC accounts (email/password on the made-up btc.hiphopxutra.vn domain) can't verify their email;

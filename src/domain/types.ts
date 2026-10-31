@@ -20,7 +20,8 @@ export type ActiveViewType =
   | 'stage_control'
   | 'checkin'
   | 'judge_accounts'
-  | 'staff_accounts';
+  | 'staff_accounts'
+  | 'rehearsal';
 
 // What the LED screen shows; written by admins at /admin/led, read by /led.
 export type StageSceneType = 'idle' | 'battle' | 'prelim_leaderboard';
