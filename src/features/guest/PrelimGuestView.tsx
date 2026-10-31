@@ -17,6 +17,8 @@ type Scope = 'top10' | 'top32' | 'all';
 export const QUALIFY = 32;
 const RANKED_UNTIL = 40;
 export const LIVE_LIMIT = 10;
+/** Provisional results stay hidden until this many dancers of the category are fully scored (official results always show). */
+export const MIN_SCORED_TO_SHOW = 10;
 // Gold, silver, bronze: metal tones for medals and rings, plus the row tint.
 const METALS = [
   { name: 'Vàng', light: '#FFF3C4', mid: '#E3B23C', dark: '#8C6510', row: 'bg-amber-50' },
@@ -84,6 +86,22 @@ export const Avatar: React.FC<{ dancer: Dancer; size: string; dark?: boolean }> 
     </span>
   );
 
+/** Before MIN_SCORED_TO_SHOW dancers are fully scored: nothing ranked yet, just how far judging has got. */
+export const WaitingForScores: React.FC<{ scored: number; dark?: boolean; className?: string }> = ({ scored, dark, className = '' }) => (
+  <section
+    aria-live="polite"
+    className={`rounded-2xl px-5 py-8 text-center ${dark ? 'bg-white/5 ring-1 ring-white/10' : 'border border-zinc-200 bg-white'} ${className}`}
+  >
+    <p className={`font-condensed text-2xl font-black uppercase ${dark ? 'text-white' : 'text-zinc-900'}`}>Giám khảo đang chấm</p>
+    <p className={`mt-1 text-sm ${dark ? 'text-white/60' : 'text-zinc-500'}`}>
+      Bảng xếp hạng tạm thời hiện khi đủ {MIN_SCORED_TO_SHOW} thí sinh được chấm xong.
+    </p>
+    <p className="mt-4 font-condensed text-5xl font-black tabular-nums text-amber-500">
+      {Math.min(scored, MIN_SCORED_TO_SHOW)}/{MIN_SCORED_TO_SHOW}
+    </p>
+  </section>
+);
+
 export const PrelimGuestView: React.FC = () => {
   const { activeCategory, setActiveCategory, newbieDancers, proDancers, judges, prelimPanels, isNewbieTop32Locked, isProTop32Locked } =
     useTournament();
@@ -102,12 +120,14 @@ export const PrelimGuestView: React.FC = () => {
     [activeCategory, newbieDancers, proDancers, judgeCount]
   );
   const scoredCount = ranked.filter((d) => isScored(d, judgeCount)).length;
+  const waiting = !locked && scoredCount < MIN_SCORED_TO_SHOW;
 
   // While judging is on, only the provisional top 10 is public (search included).
   const effectiveScope: Scope = locked ? scope : 'top10';
   const limit = { top10: LIVE_LIMIT, top32: QUALIFY, all: Infinity }[effectiveScope];
 
   const visible = useMemo(() => {
+    if (waiting) return [];
     const withRank = ranked.map((d, i) => ({ dancer: d, rank: i + 1 }));
     // Below rank 40: one group, shuffled, so the order gives nothing away.
     const shown = [
@@ -118,12 +138,12 @@ export const PrelimGuestView: React.FC = () => {
     const q = query.trim().toLowerCase();
     if (q) return pool.filter(({ dancer }) => [dancer.name, dancer.sbd].some((f) => f.toLowerCase().includes(q)));
     return pool.slice(0, limit);
-  }, [ranked, query, limit, locked]);
+  }, [ranked, query, limit, locked, waiting]);
 
   // Shared card link (?sbd=): open it once the data is in, switching category if needed; hidden ranks stay hidden.
   const [linkedSbd, setLinkedSbd] = useState(() => new URLSearchParams(window.location.search).get('sbd'));
   useEffect(() => {
-    if (!linkedSbd) return;
+    if (!linkedSbd || waiting) return; // opened once results are public
     const index = ranked.findIndex((d) => d.sbd === linkedSbd);
     if (index < 0) {
       const other = activeCategory === 'newbie_1v1' ? 'pro_2v2' : 'newbie_1v1';
@@ -132,9 +152,9 @@ export const PrelimGuestView: React.FC = () => {
     }
     setLinkedSbd(null);
     if (locked || index < LIVE_LIMIT) setSelected(ranked[index]);
-  }, [linkedSbd, ranked, locked, activeCategory, newbieDancers, proDancers, setActiveCategory]);
+  }, [linkedSbd, ranked, locked, waiting, activeCategory, newbieDancers, proDancers, setActiveCategory]);
 
-  const podium = ranked.slice(0, 3).filter((d) => isScored(d, judgeCount));
+  const podium = waiting ? [] : ranked.slice(0, 3).filter((d) => isScored(d, judgeCount));
   const scopes: [Scope, string][] = locked
     ? [['top10', 'Top 10'], ['top32', 'Top 32'], ['all', `Tất cả (${ranked.length})`]]
     : [];
@@ -198,7 +218,7 @@ export const PrelimGuestView: React.FC = () => {
             ))}
           </div>
         </div>
-        {!locked && (
+        {!locked && !waiting && (
           <p className="-mt-2 text-xs text-zinc-500">
             Top {LIVE_LIMIT} tạm thời. Danh sách đầy đủ và Top {QUALIFY} vào vòng Battle công bố khi chấm xong.
           </p>
@@ -250,8 +270,10 @@ export const PrelimGuestView: React.FC = () => {
           </section>
         )}
 
+        {waiting && <WaitingForScores scored={scoredCount} />}
+
         {/* Search */}
-        <label className="relative block">
+        <label className={waiting ? 'hidden' : 'relative block'}>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-400" />
           <input
             type="search"
@@ -264,7 +286,7 @@ export const PrelimGuestView: React.FC = () => {
         </label>
 
         {/* Ranking: rank · photo · name · total */}
-        <ol className="overflow-hidden rounded-2xl border border-zinc-200 bg-white" aria-label="Bảng xếp hạng">
+        <ol className={`overflow-hidden rounded-2xl border border-zinc-200 bg-white ${waiting ? 'hidden' : ''}`} aria-label="Bảng xếp hạng">
           {visible.length === 0 && <li className="px-4 py-8 text-center text-sm text-zinc-500">Không tìm thấy thí sinh.</li>}
           {visible.map(({ dancer: d, rank }, i) => {
             const scored = isScored(d, judgeCount);

@@ -7,7 +7,7 @@ import { stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { PANEL_SIZE } from '../../domain/model';
 import { QrImage } from '../../shared/QrImage';
 import { RankEmblem } from '../../shared/RankEmblem';
-import { Avatar, GenderBadge, isScored, LIVE_LIMIT, QUALIFY, rankForDisplay } from './PrelimGuestView';
+import { Avatar, GenderBadge, isScored, LIVE_LIMIT, MIN_SCORED_TO_SHOW, QUALIFY, rankForDisplay } from './PrelimGuestView';
 
 // Landscape prelim leaderboard for the audience: /ket-qua/trinh-chieu (light, TV / projector) and
 // /ket-qua/trinh-chieu-led (dark, LED wall). Laid out on a fixed 1920x1080 stage scaled to the window, so it
@@ -237,13 +237,17 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
   const locked = category === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
   const ranked = lists[category];
   const scored = ranked.filter((d) => isScored(d, judgeCount));
-  const shown = scored.slice(0, locked ? QUALIFY : LIVE_LIMIT);
+  // Provisional ranks stay off screen until enough dancers are scored; the official top 32 always shows.
+  const waiting = !locked && scored.length < MIN_SCORED_TO_SHOW;
+  const shown = waiting ? [] : scored.slice(0, locked ? QUALIFY : LIVE_LIMIT);
 
   const freshDancer = fresh ? lists[fresh.category].find((d) => d.id === fresh.id) : undefined;
   const freshRank = freshDancer ? lists[fresh!.category].indexOf(freshDancer) + 1 : 0;
   const freshLocked = fresh?.category === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
   // While judging, a score is only public inside the top 10.
-  const freshPublic = freshRank > 0 && (freshLocked ? freshRank <= QUALIFY : freshRank <= LIVE_LIMIT);
+  const freshCategoryScored = fresh ? lists[fresh.category].filter((d) => isScored(d, judgeCount)).length : 0;
+  const freshPublic =
+    freshRank > 0 && (freshLocked ? freshRank <= QUALIFY : freshRank <= LIVE_LIMIT && freshCategoryScored >= MIN_SCORED_TO_SHOW);
 
   const guestUrl = `${window.location.origin}${VIEW_PATHS.prelim_guest}`;
 
@@ -299,8 +303,22 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
         <main key={category} className="relative min-h-0 flex-1 px-14 py-10">
           {shown.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center text-center">
-              <p className={`font-condensed text-8xl font-black uppercase ${t.empty}`}>Vòng loại sắp bắt đầu</p>
-              <p className={`mt-4 text-3xl ${t.emptySub}`}>Điểm hiện lên ngay khi 4 giám khảo chấm xong mỗi thí sinh.</p>
+              {scored.length === 0 ? (
+                <>
+                  <p className={`font-condensed text-8xl font-black uppercase ${t.empty}`}>Vòng loại sắp bắt đầu</p>
+                  <p className={`mt-4 text-3xl ${t.emptySub}`}>
+                    Bảng xếp hạng tạm thời hiện khi đủ {MIN_SCORED_TO_SHOW} thí sinh được 4 giám khảo chấm xong.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <p className={`font-condensed text-8xl font-black uppercase ${t.empty}`}>Giám khảo đang chấm</p>
+                  <p className={`mt-4 text-3xl ${t.emptySub}`}>Bảng xếp hạng tạm thời hiện khi đủ {MIN_SCORED_TO_SHOW} thí sinh chấm xong.</p>
+                  <p className="mt-8 font-condensed text-[160px] font-black leading-none tabular-nums text-amber-500">
+                    {scored.length}/{MIN_SCORED_TO_SHOW}
+                  </p>
+                </>
+              )}
             </div>
           ) : locked ? (
             <QualifiedGrid dancers={shown} flashing={flashing} theme={theme} />

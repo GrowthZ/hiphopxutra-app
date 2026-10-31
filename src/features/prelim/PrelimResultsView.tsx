@@ -3,6 +3,7 @@ import { useTournament } from '../../state/TournamentContext';
 import { CategoryType, Dancer, Judge } from '../../domain/types';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 import { RankEmblem } from '../../shared/RankEmblem';
+import { isScored, MIN_SCORED_TO_SHOW, WaitingForScores } from '../guest/PrelimGuestView';
 import {
   Trophy,
   Award,
@@ -164,6 +165,20 @@ export const PrelimResultsView: React.FC = () => {
           : 'Chưa thể chốt Top 32: tie-break đang được chấm, hoặc vẫn đồng điểm và chờ chọn thí sinh đi tiếp theo quyết định của BGK ở Bàn chấm Prelim.'
     );
   };
+
+  // Provisional ranks stay off screen until enough dancers of this category are fully scored.
+  const scoredCount = currentDancers.filter((d) => isScored(d, PANEL_SIZE)).length;
+  if (!isLocked && scoredCount < MIN_SCORED_TO_SHOW) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col items-center justify-center gap-6 px-6 text-center">
+        <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-28 w-auto" />
+        <p className="font-condensed text-3xl font-black uppercase tracking-wider text-white">
+          Kết quả vòng sơ loại Prelim · {activeCategory === 'newbie_1v1' ? 'Newbie 1vs1' : 'Pro 2vs2'}
+        </p>
+        <WaitingForScores scored={scoredCount} dark className="w-full max-w-xl" />
+      </div>
+    );
+  }
 
   return (
     <div
