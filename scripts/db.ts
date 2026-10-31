@@ -33,7 +33,7 @@ const KEY_FILE = path.join(ROOT, 'secrets', 'service-account.json');
 const SAMPLE_PHOTOS = path.join(ROOT, 'public', 'image', 'seed', 'manifest.json'); // written by scripts/sample-photos.ts
 const STAFF_EMAIL_DOMAIN = 'btc.hiphopxutra.vn'; // keep in sync with src/services/staffAccounts.ts
 const PASSWORD_ALPHABET = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'staffSecrets'];
+const KEEP_ON_RESET = ['admins', 'judgeSecrets', 'mcSecrets', 'staffSecrets'];
 // Emulator-only BTC logins (TEST=true): fixed, so testers can share them. Never created on the real project.
 const EMULATOR_STAFF = [
   ['admin', 'admin', 'admin123'],
@@ -233,7 +233,8 @@ const commands: Record<string, () => Promise<void>> = {
     await inBatches(stale, (batch, ref) => batch.delete(ref));
 
     // Logins: Firebase Auth is shared by every event of a project, so the dev event borrows the real admins,
-    // judge PINs and BTC passwords. The emulator has no real event: judges gk-N get PIN NNNNNN there.
+    // judge / MC PINs and BTC passwords. The emulator has no real event: judges gk-N get PIN NNNNNN there,
+    // MCs mc-1 (Caramel) 121212 and mc-2 (Fury) 343434.
     if (emulator) {
       for (let n = 1; n <= 9; n++) {
         const email = `gk-${n}@giamkhao.hiphopxutra.vn`;
@@ -244,6 +245,15 @@ const commands: Record<string, () => Promise<void>> = {
           () => auth.createUser({ email, password: pin })
         );
         await event.collection('judgeSecrets').doc(`gk-${n}`).set({ pin, updatedAt: Date.now() });
+      }
+      for (const [mcId, pin] of [['mc-1', '121212'], ['mc-2', '343434']]) {
+        const email = `${mcId}@mc.hiphopxutra.vn`;
+        const auth = getAuth();
+        await auth.getUserByEmail(email).then(
+          (u) => auth.updateUser(u.uid, { password: pin }),
+          () => auth.createUser({ email, password: pin })
+        );
+        await event.collection('mcSecrets').doc(mcId).set({ pin, updatedAt: Date.now() });
       }
       for (const [user, role, password] of EMULATOR_STAFF) {
         const email = `${user}@${STAFF_EMAIL_DOMAIN}`;
@@ -277,6 +287,7 @@ const commands: Record<string, () => Promise<void>> = {
     if (emulator) {
       log('Tài khoản trên emulator:');
       log('  Giám khảo   gk-1 = 111111 ... gk-9 = 999999 (chọn mã GK ở /giam-khao)');
+      log('  MC          Caramel = 121212, Fury = 343434 (ở /mc)');
       for (const [user, role, password] of EMULATOR_STAFF) log(`  BTC ${role.padEnd(8)} ${user} / ${password}`);
     } else log('Chạy app: bun run dev:devdb.');
   },

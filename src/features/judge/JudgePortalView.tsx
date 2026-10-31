@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { Camera, LayoutDashboard, ListChecks, LogOut, Menu, Swords, Tv, UserRound, X } from 'lucide-react';
 import { isStandalone } from '../../services/pwa';
+import { markWelcomed, wasWelcomed } from '../../services/judgeAccounts';
 import { useWakeLock } from '../../state/useWakeLock';
 import { getJudgeAvatarUrl } from '../../shared/placeholderAssets';
 import { JudgeWelcomeScreen } from './JudgeWelcomeScreen';
@@ -55,8 +56,9 @@ export const JudgePortalView: React.FC = () => {
   useJudgeHeartbeat(judgeAccountId);
   useWakeLock(); // scoring screen stays on between dancers
 
-  // The installed app opens straight into scoring; the welcome screen stays one tap away (menu).
-  const [showWelcome, setShowWelcome] = useState<boolean>(() => !isStandalone());
+  // The welcome screen shows once after signing in (and stays one tap away in the menu), not every time the app
+  // is opened; the installed app opens straight into scoring.
+  const [showWelcome, setShowWelcome] = useState<boolean>(() => !isStandalone() && !wasWelcomed(judgeAccountId));
   const [menuOpen, setMenuOpen] = useState(false);
   // Prelim comes first in the day: prelim judges start there. A battle-only judge account (GK 05–09)
   // can't score prelims at all, so it gets the Battle screen only. Keyed on the signed-in account, which
@@ -95,7 +97,12 @@ export const JudgePortalView: React.FC = () => {
   if (showWelcome) {
     return (
       <>
-        <JudgeWelcomeScreen onEnterPortal={() => setShowWelcome(false)} />
+        <JudgeWelcomeScreen
+          onEnterPortal={() => {
+            setShowWelcome(false);
+            markWelcomed(judgeAccountId);
+          }}
+        />
         {configModal}
       </>
     );

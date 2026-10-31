@@ -154,6 +154,8 @@ interface TournamentContextType {
   syncError: string | null;
   /** Judge id when this device is signed in with a judge account, else null. */
   judgeAccountId: string | null;
+  /** MC id ('mc-1' / 'mc-2') when this device is signed in with an MC account, else null. */
+  mcAccountId: string | null;
   judgeNotice: string | null;
   judgeSignOut: () => Promise<void>;
 

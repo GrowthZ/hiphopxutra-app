@@ -5,7 +5,8 @@ import { ActiveViewType } from '../domain/types';
 import { IS_LED_PREVIEW } from '../app/routes';
 import { auth } from '../services/firebase';
 import { eventDoc, getStaffRole, StaffRole } from '../services/firestore';
-import { currentSessionId, judgeIdFromEmail } from '../services/judgeAccounts';
+import { currentSessionId, forgetWelcomed, judgeIdFromEmail } from '../services/judgeAccounts';
+import { mcIdFromEmail } from '../services/mcAccounts';
 
 /**
  * Who is on this device: organizers (Google or BTC username accounts, whitelisted with a role in Firestore),
@@ -41,8 +42,9 @@ export function useAuthSession(activeView: ActiveViewType, reportError: (message
     }
   }, [authReady, authUser, activeView, reportError]);
 
-  // Signed in as a judge account: that judge is fixed on this device.
+  // Signed in as a judge account: that judge is fixed on this device. Same for an MC account.
   const judgeAccountId = judgeIdFromEmail(authUser?.email);
+  const mcAccountId = mcIdFromEmail(authUser?.email);
 
   // One device per judge: a newer login elsewhere signs this one out.
   useEffect(() => {
@@ -58,9 +60,10 @@ export function useAuthSession(activeView: ActiveViewType, reportError: (message
 
   const judgeSignOut = useCallback(() => {
     setJudgeNotice(null);
+    forgetWelcomed();
     return signOut(auth);
   }, []);
 
   const isAdmin = staffRole === 'admin';
-  return { authUser, authReady, isAdmin, staffRole, judgeAccountId, judgeNotice, judgeSignOut };
+  return { authUser, authReady, isAdmin, staffRole, judgeAccountId, mcAccountId, judgeNotice, judgeSignOut };
 }

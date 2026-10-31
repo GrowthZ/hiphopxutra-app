@@ -13,6 +13,7 @@ export type ActiveViewType =
   | 'battle'
   | 'stage'
   | 'judge'
+  | 'mc'
   | 'dancers'
   | 'sheets'
   | 'storage'

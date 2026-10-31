@@ -18,6 +18,7 @@ import {
   UserCog,
   MonitorPlay,
   ExternalLink,
+  Mic,
 } from 'lucide-react';
 import { openInNewTab, SCREEN_VIEWS } from '../../app/routes';
 
@@ -42,7 +43,8 @@ export const AdminSidebar: React.FC = () => {
     { id: 'battle', label: 'Điều hành Battle (9 GK)', icon: Swords },
     { id: 'stage_control', label: 'Điều khiển màn LED', icon: Tv },
     { id: 'judge', label: 'Cổng Giám khảo', icon: Smartphone },
-    { id: 'judge_accounts', label: 'Tài khoản Giám khảo', icon: KeyRound },
+    { id: 'mc', label: 'Màn MC', icon: Mic },
+    { id: 'judge_accounts', label: 'Tài khoản GK & MC', icon: KeyRound },
     { id: 'staff_accounts', label: 'Người dùng BTC', icon: UserCog },
     { id: 'dancers', label: 'Danh sách Thí sinh', icon: Users },
     { id: 'storage', label: 'Lưu trữ & Ảnh mẫu', icon: Cloud },

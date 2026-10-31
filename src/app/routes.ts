@@ -8,6 +8,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   bracket_guest: '/ket-qua/nhanh-dau',
   match_guest: '/ket-qua/tran', // + '/{matchSlug}'
   judge: '/giam-khao',
+  mc: '/mc',
   stage: '/led',
   prelim: '/admin/prelim',
   dancers: '/admin/thi-sinh',
@@ -22,8 +23,8 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   staff_accounts: '/admin/cai-dat/nguoi-dung',
 };
 
-/** Audience screens open in a new tab from the admin pages. */
-export const SCREEN_VIEWS = ['prelim_screen', 'prelim_screen_led'] as const;
+/** Audience screens and the MC screen open in a new tab from the admin pages. */
+export const SCREEN_VIEWS = ['prelim_screen', 'prelim_screen_led', 'mc'] as const;
 export const openInNewTab = (view: ActiveViewType) => window.open(VIEW_PATHS[view], '_blank', 'noopener');
 
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */
@@ -39,7 +40,6 @@ const PATH_ALIASES: Record<string, ActiveViewType> = {
 const SHORT_LINKS: Record<string, ActiveViewType> = {
   '/gk': 'judge',
   '/checkin': 'checkin',
-  '/mc': 'prelim_guest',
   '/xem': 'prelim_guest',
   '/bxh': 'prelim_results',
   '/nhanh': 'bracket_guest',
@@ -58,8 +58,9 @@ const LEGACY_VIEWS: Record<string, ActiveViewType> = {
 
 export const isAdminView = (view: ActiveViewType) => VIEW_PATHS[view].startsWith('/admin');
 
-/** Guest pages and the LED read only the published copies (publicDancers / publicVotes). */
-export const isPublicView = (view: ActiveViewType) => view === 'stage' || VIEW_PATHS[view].startsWith('/ket-qua');
+/** Guest pages, the MC screen and the LED read only the published copies (publicDancers / publicVotes). */
+export const isPublicView = (view: ActiveViewType) =>
+  view === 'stage' || view === 'mc' || VIEW_PATHS[view].startsWith('/ket-qua');
 
 /** Reads the view from the URL, rewriting legacy hash/query links to their path. */
 export function viewFromLocation(): ActiveViewType {

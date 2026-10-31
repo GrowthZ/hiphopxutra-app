@@ -55,6 +55,7 @@ export type SyncedCollection =
   | 'presence'
   | 'counters'
   | 'judgeSecrets'
+  | 'mcSecrets'
   | 'judgeSessions'
   | 'judgePresence'
   | 'admins'

@@ -5,13 +5,22 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../../services/firebase';
 import { loginEmail } from '../../services/staffAccounts';
 
+const LAST_USERNAME_KEY = 'hiphop_xu_tra_last_username';
+
 /** Shown instead of /admin/* until an organizer (BTC username or whitelisted Google account) is signed in. */
 export const AdminLoginGate: React.FC = () => {
   const { authReady, authUser, syncError, handleGoogleLogin, handleGoogleLogout, activeView } = useTournament();
   // The check-in app (and its sign-out) lands here too: name the screen after it.
   const checkIn = activeView === 'checkin';
   const [error, setError] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
+  // The username typed last time on this device is filled in again (the session itself is kept by Firebase).
+  const [username, setUsername] = useState(() => {
+    try {
+      return localStorage.getItem(LAST_USERNAME_KEY) ?? '';
+    } catch {
+      return '';
+    }
+  });
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -31,6 +40,11 @@ export const AdminLoginGate: React.FC = () => {
     setBusy(true);
     try {
       await signInWithEmailAndPassword(auth, loginEmail(username), password);
+      try {
+        localStorage.setItem(LAST_USERNAME_KEY, username.trim());
+      } catch {
+        // private mode: nothing remembered
+      }
     } catch (err) {
       const code = (err as { code?: string }).code ?? '';
       setError(

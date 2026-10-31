@@ -1,5 +1,5 @@
 import { BrowserContext, expect, Page, test } from '@playwright/test';
-import { createJudge, event, signInAdmin, waitForDoc } from './emulator';
+import { adminAuth, createJudge, event, signInAdmin, waitForDoc } from './emulator';
 
 // The three flows that must work on competition day, in order, sharing one emulator database:
 // an admin opens the dashboard (seeds Firestore), a judge scores a prelim, the admin announces a battle round,
@@ -62,6 +62,11 @@ test('judge logs in with GK code + PIN and scores a prelim', async ({ browser })
   await judge.getByRole('button', { name: /Gửi phiếu: Đỏ/ }).click();
   await waitForDoc<{ r1?: Record<string, string> }>(`votes/${activeMatchId}`, (v) => v?.r1?.['gk-1'] === 'red');
   await expect(judge.getByRole('alert')).toBeHidden(); // no sync error banner
+
+  // Reopening the app keeps the judge signed in and goes straight to scoring (the welcome screen showed once).
+  await judge.reload();
+  await expect(judge.getByRole('button', { name: 'Mở menu' })).toBeVisible();
+  await expect(judge.getByRole('button', { name: /Vào bàn chấm điểm/ })).toBeHidden();
   await context.close();
 });
 
@@ -106,6 +111,42 @@ test('prelim panels: a panel B judge scores even SBDs only; panel A cannot touch
     }
   );
   expect(res.status).toBe(403);
+});
+
+test('MC logs in with a PIN, sees their panel’s running order, and cannot read the raw scores', async ({ browser }) => {
+  await adminAuth.createUser({ email: 'mc-2@mc.hiphopxutra.vn', password: '343434' });
+  const context = await browser.newContext();
+  const mc = await context.newPage();
+  await mc.goto('/mc');
+  await mc.getByRole('button', { name: /Fury/ }).click();
+  for (const digit of '343434') await mc.getByRole('button', { name: digit, exact: true }).click();
+
+  // The MC picks the panel they call: panel B is the even SBDs.
+  await mc.getByRole('tab', { name: /Bảng B/ }).click();
+  const order = mc.getByRole('list', { name: 'Thứ tự Bảng B' });
+  await expect(order.getByRole('listitem').first().locator('.font-mono')).toHaveText(/[02468]$/);
+  await mc.getByRole('tab', { name: /Bảng A/ }).click();
+  const orderA = mc.getByRole('list', { name: 'Thứ tự Bảng A' });
+  await expect(orderA.getByRole('listitem').first().locator('.font-mono')).toHaveText(/[13579]$/);
+
+  // Reloading keeps the MC signed in, on the tab they chose.
+  await mc.reload();
+  await expect(mc.getByRole('tab', { name: /Bảng A/ })).toHaveAttribute('aria-selected', 'true');
+  await context.close();
+
+  // An MC only reads the published copy, like guests: the raw dancer docs stay admin-only.
+  const { idToken } = await (
+    await fetch('http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'mc-2@mc.hiphopxutra.vn', password: '343434', returnSecureToken: true }),
+    })
+  ).json();
+  const raw = await fetch(
+    `http://127.0.0.1:8080/v1/projects/demo-hiphopxutra/databases/(default)/documents/${event.collection('proDancers').path}`,
+    { headers: { Authorization: `Bearer ${idToken}` }, signal: AbortSignal.timeout(10_000) }
+  );
+  expect(raw.status).toBe(403);
 });
 
 test('tie-break: any of the 8 judges scores a flagged dancer, never an unflagged one', async () => {
@@ -196,6 +237,11 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
   // Whatever /admin page they open, check-in staff only get the desk.
   await expect(desk.getByText('Bàn check-in', { exact: true })).toBeVisible();
   await expect(desk.getByRole('button', { name: /Công Bố & Xác Nhận/ })).toBeHidden();
+
+  // Reopening the desk keeps the check-in account signed in.
+  await desk.reload();
+  await expect(desk.getByText('Bàn check-in', { exact: true })).toBeVisible();
+  await expect(desk.getByLabel('Tên đăng nhập')).toBeHidden();
 
   await desk.getByRole('button', { name: 'Đăng ký tại chỗ' }).click();
   await desk.getByLabel('Tên thi đấu *').fill('Bboy Walk In');

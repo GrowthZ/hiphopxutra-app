@@ -11,6 +11,8 @@ import { StageControlView } from './features/stage/StageControlView';
 import { JudgeLoginScreen } from './features/judge/JudgeLoginScreen';
 import { JudgeAccountsView } from './features/judge/JudgeAccountsView';
 import { JudgePortalView } from './features/judge/JudgePortalView';
+import { McLoginScreen } from './features/mc/McLoginScreen';
+import { McView } from './features/mc/McView';
 import { PrelimResultsView } from './features/prelim/PrelimResultsView';
 import { PrelimGuestView } from './features/guest/PrelimGuestView';
 import { PrelimScreenView } from './features/guest/PrelimScreenView';
@@ -48,6 +50,7 @@ const MainContent: React.FC = () => {
     staffRole,
     authReady,
     judgeAccountId,
+    mcAccountId,
     isStorageModalOpen,
     setIsStorageModalOpen,
     isJudgeConfigModalOpen,
@@ -107,6 +110,12 @@ const MainContent: React.FC = () => {
   // LED screen: kiosk, controlled from /admin/led
   if (activeView === 'stage') {
     return <LedScreen />;
+  }
+
+  // MC screen: MC accounts (PIN, like the judges), or admins looking over their shoulder
+  if (activeView === 'mc') {
+    if (!authReady) return <div className="min-h-[100dvh] bg-white" />;
+    return mcAccountId || isAdmin ? <McView /> : <McLoginScreen />;
   }
 
   // Judge Portal View (Mobile-first judging view): judge accounts, or admins operating on a judge's behalf
