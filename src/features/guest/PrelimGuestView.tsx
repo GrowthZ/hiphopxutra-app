@@ -226,11 +226,10 @@ export const PrelimGuestView: React.FC = () => {
                     <span className="block rounded-full p-[3px] shadow-md" style={{ background: metalGradient(m) }}>
                       <Avatar dancer={d} size={first ? 'h-24 w-24 text-4xl' : 'h-[4.5rem] w-[4.5rem] text-2xl'} />
                     </span>
-                    <span className={`absolute left-1/2 flex -translate-x-1/2 justify-center ${first ? '-bottom-6' : '-bottom-5'}`}>
-                      <RankEmblem rank={i + 1} className={first ? 'h-[72px]' : 'h-12'} />
-                    </span>
                   </span>
-                  <span className={`${first ? 'mt-8 text-lg' : 'mt-7 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
+                  {/* Under the photo, only its top edge touching the ring, so the face stays clear */}
+                  <RankEmblem rank={i + 1} className={`${first ? '-mt-2.5 h-[68px]' : '-mt-2 h-12'} relative`} />
+                  <span className={`${first ? 'mt-0.5 text-lg' : 'mt-0.5 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
                     {stripBreakerPrefix(d.name)}
                   </span>
                   <span className="w-full truncate px-0.5 text-[11px] text-zinc-500">{d.crew || d.sbd}</span>
@@ -404,15 +403,12 @@ const DancerSheet: React.FC<{
               >
                 <Avatar dancer={dancer} size="h-32 w-32 text-5xl" dark />
               </span>
-              {medal && (
-                <span className="absolute -bottom-7 left-1/2 flex -translate-x-1/2 justify-center">
-                  <RankEmblem rank={rank} className={rank === 1 ? 'h-20' : 'h-16'} glow />
-                </span>
-              )}
             </div>
+            {/* Under the photo, only its top edge touching the ring, so the face stays clear */}
+            {medal && <RankEmblem rank={rank} className={`relative -mt-3 ${rank === 1 ? 'h-20' : 'h-16'}`} glow />}
 
             <p
-              className={`${medal ? 'mt-9' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
+              className={`${medal ? 'mt-2' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
               style={{ color: medal ? medal.mid : '#FBBF24' }}
             >
               {rankLabel}
