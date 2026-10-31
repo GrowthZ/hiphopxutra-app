@@ -242,15 +242,16 @@ export const BattleScoringPanel: React.FC = () => {
       <div className="flex shrink-0 items-center justify-between gap-2 px-1">
         <span className="text-xs font-bold text-zinc-500">{roundStatus}</span>
         <span className="font-condensed text-2xl font-black tabular-nums leading-none" aria-label="Tỉ số round">
-          <span className="text-red-600">{match.roundWinsRed}</span>
-          <span className="text-zinc-300"> – </span>
           <span className="text-blue-600">{match.roundWinsBlue}</span>
+          <span className="text-zinc-300"> – </span>
+          <span className="text-red-600">{match.roundWinsRed}</span>
         </span>
       </div>
 
-      {/* Two corners side by side, as on stage and the LED: red left, blue right. Tap one to pick it. */}
+      {/* Two corners side by side, mirrored from the LED: the judges sit in front of the LED facing the audience,
+          so blue is on their left and red on their right. Tap one to pick it. */}
       <div className="grid grid-cols-2 gap-2 flex-1 min-h-0">
-        {(['red', 'blue'] as const).map((s) => {
+        {(['blue', 'red'] as const).map((s) => {
           const data: BattleSide = s === 'red' ? match.sideRed : match.sideBlue;
           const style = SIDE_STYLE[s];
           const selected = side === s;
