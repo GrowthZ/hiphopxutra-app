@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTournament } from '../../state/TournamentContext';
-import { SIZES, uploadPhoto } from '../../services/media';
+import Cropper, { Area, Point } from 'react-easy-crop';
+import { CropArea, loadImage, renderWebp, SIZES, uploadImage, uploadPhoto } from '../../services/media';
 import { Judge } from '../../domain/types';
 import {
   X,
@@ -14,6 +15,8 @@ import {
   HelpCircle,
   Eye,
   Sliders,
+  ZoomIn,
+  Loader2,
 } from 'lucide-react';
 import {
   getJudgeAvatarUrl,
@@ -40,6 +43,13 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
   const [fullPhotoUrl, setFullPhotoUrl] = useState<string>('');
   const [customName, setCustomName] = useState<string>('');
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false);
+
+  // Avatar picked but not cropped / uploaded yet.
+  const [avatarFile, setAvatarFile] = useState<{ file: File; url: string } | null>(null);
+  const [crop, setCrop] = useState<Point>({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [cropArea, setCropArea] = useState<CropArea | null>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
 
   const avatarFileInputRef = useRef<HTMLInputElement>(null);
   const fullPhotoFileInputRef = useRef<HTMLInputElement>(null);
@@ -77,21 +87,40 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
       return;
     }
 
+    // The avatar is shown as a circle everywhere: crop it 1:1 first (see uploadAvatarCrop).
+    if (type === 'avatar') {
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setCropArea(null);
+      setAvatarFile({ file, url: URL.createObjectURL(file) });
+      return;
+    }
+
     try {
-      const url = await uploadPhoto(
-        file,
-        'judges',
-        `${currentJudge.id}-${type}`,
-        type === 'avatar' ? SIZES.avatar : SIZES.photo
-      );
-      if (type === 'avatar') {
-        setAvatarUrl(url);
-      } else {
-        setFullPhotoUrl(url);
-      }
+      setFullPhotoUrl(await uploadPhoto(file, 'judges', `${currentJudge.id}-full`, SIZES.photo));
       playAudioEffect('tick');
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const cancelAvatarCrop = () => {
+    if (avatarFile) URL.revokeObjectURL(avatarFile.url);
+    setAvatarFile(null);
+  };
+
+  const uploadAvatarCrop = async () => {
+    if (!avatarFile || !cropArea || !currentJudge) return;
+    setAvatarBusy(true);
+    try {
+      const blob = await renderWebp(await loadImage(avatarFile.file), SIZES.avatar, cropArea, 0.85);
+      setAvatarUrl(await uploadImage(blob, 'judges', `${currentJudge.id}-avatar`));
+      playAudioEffect('tick');
+      cancelAvatarCrop();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAvatarBusy(false);
     }
   };
 
@@ -223,12 +252,61 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
                   <span className="text-[10px] font-mono text-zinc-500 font-bold">TỶ LỆ 1:1</span>
                 </div>
                 <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-                  Hiển thị trên thẻ chấm điểm mobile, danh sách ban giám khảo và bảng điều hành.
+                  Hiển thị ở trang chào mừng và màn chấm điểm của giám khảo. Chọn ảnh rồi kéo, phóng để cắt khung tròn 1:1.
                 </p>
 
-                {/* Avatar Preview Box */}
+                {/* A picked file is cropped to a 1:1 circle here before upload (drag / zoom) */}
+                {avatarFile ? (
+                  <div className="space-y-2">
+                    <div className="relative h-56 overflow-hidden rounded-lg border border-zinc-200 bg-zinc-100">
+                      <Cropper
+                        image={avatarFile.url}
+                        crop={crop}
+                        zoom={zoom}
+                        aspect={1}
+                        cropShape="round"
+                        showGrid={false}
+                        onCropChange={setCrop}
+                        onZoomChange={setZoom}
+                        onCropComplete={(percent: Area) => setCropArea(percent)}
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-zinc-500">
+                      <ZoomIn className="h-4 w-4 shrink-0" />
+                      <input
+                        type="range"
+                        min={1}
+                        max={4}
+                        step={0.05}
+                        value={zoom}
+                        onChange={(e) => setZoom(Number(e.target.value))}
+                        aria-label="Phóng to"
+                        className="flex-1 accent-amber-500"
+                      />
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={cancelAvatarCrop}
+                        disabled={avatarBusy}
+                        className="flex-1 rounded-lg border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer"
+                      >
+                        Huỷ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={uploadAvatarCrop}
+                        disabled={avatarBusy || !cropArea}
+                        className="flex flex-[2] items-center justify-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-xs font-black uppercase text-zinc-950 hover:bg-amber-400 disabled:opacity-50 cursor-pointer"
+                      >
+                        {avatarBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        Cắt 1:1 & tải lên
+                      </button>
+                    </div>
+                  </div>
+                ) : (
                 <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-white border border-zinc-200">
-                  <div className="relative w-32 h-32 rounded-xl overflow-hidden border-2 border-amber-500/60 shadow-xl bg-zinc-50">
+                  <div className="relative w-32 h-32 rounded-full overflow-hidden border-2 border-amber-500/60 shadow-xl bg-zinc-50">
                     <img
                       src={avatarUrl.trim() || DEFAULT_JUDGE_AVATAR}
                       alt="Judge Avatar Preview"
@@ -247,6 +325,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
                     {avatarUrl ? 'Xem trước ảnh cận mặt' : 'Ảnh avatar mặc định SVG'}
                   </span>
                 </div>
+                )}
               </div>
 
               {/* Action Controls for Avatar */}
@@ -307,7 +386,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
                   <span className="text-[10px] font-mono text-zinc-500 font-bold">TỶ LỆ 3:4</span>
                 </div>
                 <p className="text-xs text-zinc-500 mb-3 leading-relaxed">
-                  Hiển thị trên màn hình chào mừng đăng nhập và giới thiệu ban giám khảo sân khấu.
+                  Lưu sẵn, hiện chưa hiển thị ở màn nào (trang chào mừng giám khảo chỉ dùng ảnh avatar).
                 </p>
 
                 {/* Full Photo Preview Box */}
