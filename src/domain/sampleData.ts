@@ -86,6 +86,9 @@ const STAGE_INDEX = (s: SeedStage) => SEED_STAGES.indexOf(s);
 
 type Person = Pick<Dancer, 'name' | 'realName' | 'crew' | 'gender'>;
 
+/** A dancer of the real event, copied into the rehearsal with their photo ("Dùng danh sách thí sinh thật"). */
+export type RealDancer = Person & Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop'>;
+
 function person(nick: string, rnd: () => number): Person {
   const female = rnd() < 0.3;
   const pick = <T,>(l: T[]) => l[Math.floor(rnd() * l.length)];
@@ -222,7 +225,7 @@ export function sampleCountsProblem(stage: SeedStage, { newbie, pro, both }: Sam
   if ([newbie, pro, both].some((n) => !Number.isInteger(n) || n < 0)) return 'Số thí sinh phải là số nguyên không âm.';
   if (newbie + pro + both > NICKNAMES.length) return `Tối đa ${NICKNAMES.length} thí sinh mẫu (tổng 3 ô).`;
   // The bracket placeholder is a Top 32 (Newbie 32 dancers, Pro 16 teams); the cut-off tie needs ranks 32-34.
-  const needed = STAGE_INDEX(stage) >= STAGE_INDEX('chot-top32') ? 34 : 32;
+  const needed = presentNeeded(stage);
   for (const [label, count, cat] of [
     ['Newbie', newbie + both, 'newbie_1v1'],
     ['Pro', pro + both, 'pro_2v2'],
@@ -234,8 +237,13 @@ export function sampleCountsProblem(stage: SeedStage, { newbie, pro, both }: Sam
 }
 
 /** The event's own judges (names, photos) and prelim panels, so the rehearsal looks like the real day. */
+/** Present dancers a stage needs: the Top 32 bracket placeholder, and ranks 32-34 for the cut-off tie. */
+const presentNeeded = (stage: SeedStage) => (STAGE_INDEX(stage) >= STAGE_INDEX('chot-top32') ? 34 : 32);
+
 export interface SampleSetup {
   counts?: SampleCounts;
+  /** The real event's dancers instead of sample ones, topped up with sample dancers when a stage needs more. */
+  real?: { newbie: RealDancer[]; pro: RealDancer[] };
   judges?: Judge[];
   panels?: PrelimPanels;
 }
@@ -243,16 +251,38 @@ export interface SampleSetup {
 export function buildSeed(
   stage: SeedStage,
   photos: SamplePhoto[] = [],
-  { counts = DEFAULT_COUNTS, judges = DEFAULT_JUDGES, panels = DEFAULT_PANELS }: SampleSetup = {}
+  { counts = DEFAULT_COUNTS, judges = DEFAULT_JUDGES, panels = DEFAULT_PANELS, real }: SampleSetup = {}
 ): Record<string, Docs> {
-  const problem = sampleCountsProblem(stage, counts);
+  const problem = real ? null : sampleCountsProblem(stage, counts);
   if (problem) throw new Error(problem);
   const rnd = prng(2026);
   const nicks = shuffle(NICKNAMES, rnd);
-  const newbiePeople = nicks.slice(0, counts.newbie + counts.both).map((n) => person(n, rnd));
-  const proOnly = nicks.slice(counts.newbie + counts.both, counts.newbie + counts.both + counts.pro);
-  // Those who entered both, mixed in among the Pro-only dancers.
-  const proPeople = shuffle([...shuffle(newbiePeople, rnd).slice(0, counts.both), ...proOnly.map((n) => person(n, rnd))], rnd);
+  let newbiePeople: Person[];
+  let proPeople: Person[];
+  const samples = new Set<string>(); // names of made-up dancers (they get drawn portraits)
+  if (real) {
+    // The real lists as they are (a dancer in both keeps one name and photo), topped up with sample dancers
+    // when there are too few for the stage's bracket.
+    const taken = new Set([...real.newbie, ...real.pro].map((p) => p.name));
+    const spare = nicks.filter((n) => !taken.has(`BBOY ${n}`) && !taken.has(`BGIRL ${n}`));
+    const topUp = (list: Person[], cat: CategoryType) => {
+      const out = [...list];
+      while (out.length - noShowsOf(cat, out.length) < presentNeeded(stage)) {
+        const p = person(spare.shift()!, rnd);
+        samples.add(p.name);
+        out.push(p);
+      }
+      return out;
+    };
+    newbiePeople = topUp(real.newbie, 'newbie_1v1');
+    proPeople = topUp(real.pro, 'pro_2v2');
+  } else {
+    newbiePeople = nicks.slice(0, counts.newbie + counts.both).map((n) => person(n, rnd));
+    const proOnly = nicks.slice(counts.newbie + counts.both, counts.newbie + counts.both + counts.pro);
+    // Those who entered both, mixed in among the Pro-only dancers.
+    proPeople = shuffle([...shuffle(newbiePeople, rnd).slice(0, counts.both), ...proOnly.map((n) => person(n, rnd))], rnd);
+    newbiePeople.concat(proPeople).forEach((p) => samples.add(p.name));
+  }
   const newbie = category('newbie_1v1', stage, rnd, newbiePeople, panels);
   const pro = category('pro_2v2', stage, rnd, proPeople, panels);
   const locked = STAGE_INDEX(stage) >= STAGE_INDEX('battle');
@@ -289,7 +319,8 @@ export function buildSeed(
     givePhotos([...new Set([...inBattle, ...newbie.dancers, ...pro.dancers])], photos, new Map(), {});
   } else {
     // No local photos (the admin page on production): drawn avatars, one per name, so nobody real is shown.
-    for (const d of [...newbie.dancers, ...pro.dancers]) Object.assign(d, drawnPortrait(d.name));
+    // Real dancers keep their own photo (or none, as on the real day).
+    for (const d of [...newbie.dancers, ...pro.dancers]) if (samples.has(d.name)) Object.assign(d, drawnPortrait(d.name));
   }
 
   const byId = <T extends { id: string }>(list: T[], toDoc: (x: T) => object) =>

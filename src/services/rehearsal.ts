@@ -1,6 +1,6 @@
 import { collection, doc, DocumentReference, getDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { BUILD_EVENT_ID, db, REHEARSAL_EVENT_ID, setRehearsalMode, SyncedCollection } from './firestore';
-import { buildSeed, SampleCounts, SeedStage } from '../domain/sampleData';
+import { buildSeed, RealDancer, SampleCounts, SeedStage } from '../domain/sampleData';
 import { DEFAULT_PANELS, PrelimPanels } from '../domain/model';
 import { Judge } from '../domain/types';
 
@@ -45,16 +45,37 @@ async function clearRehearsalTree(): Promise<number> {
   return refs.length;
 }
 
+/** The real event's dancers: details and photos only (no number, scores or check-in), for a rehearsal on them. */
+async function realDancers(name: 'newbieDancers' | 'proDancers'): Promise<RealDancer[]> {
+  const docs = (await getDocs(collection(db, 'events', BUILD_EVENT_ID, name))).docs;
+  return docs
+    .map((d) => d.data())
+    .filter((d) => typeof d.name === 'string' && d.name)
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'vi'))
+    .map((d) => ({
+      name: d.name,
+      gender: d.gender === 'female' ? 'female' : 'male',
+      ...(d.realName && { realName: d.realName }),
+      ...(d.crew && { crew: d.crew }),
+      ...(d.avatarUrl && { avatarUrl: d.avatarUrl }),
+      ...(d.halfBodyUrl && { halfBodyUrl: d.halfBodyUrl }),
+      ...(d.avatarCrop && { avatarCrop: d.avatarCrop }),
+    }));
+}
+
 /**
- * Replaces the rehearsal data with sample dancers at `stage`. The real event's judges (names, photos) and prelim
- * panels are copied in, so judges see themselves and score the right panel. Returns the documents written.
+ * Replaces the rehearsal data at `stage`: sample dancers, or (`useReal`) the real event's dancers with their photos,
+ * to check how they look on every screen. The real event's judges (names, photos) and prelim panels are copied in,
+ * so judges see themselves and score the right panel. The real event itself is only read. Returns the documents written.
  */
-export async function generateRehearsalData(stage: SeedStage, counts: SampleCounts): Promise<number> {
+export async function generateRehearsalData(stage: SeedStage, counts: SampleCounts, useReal = false): Promise<number> {
   const realJudges = (await getDocs(collection(db, 'events', BUILD_EVENT_ID, 'judges'))).docs.map((d) => ({ ...d.data(), id: d.id }) as Judge);
   const meta = (await getDoc(doc(db, 'events', BUILD_EVENT_ID, 'meta', 'current'))).data();
   const panels = (meta?.prelimPanels as PrelimPanels | undefined) ?? DEFAULT_PANELS;
+  const real = useReal ? { newbie: await realDancers('newbieDancers'), pro: await realDancers('proDancers') } : undefined;
   const data = buildSeed(stage, [], {
     counts,
+    real,
     judges: realJudges.length ? realJudges.sort((a, b) => a.id.localeCompare(b.id, 'en', { numeric: true })) : undefined,
     panels,
   });

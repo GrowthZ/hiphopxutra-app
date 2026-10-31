@@ -13,6 +13,8 @@ export const RehearsalView: React.FC = () => {
   const [summary, setSummary] = useState<{ newbie: number; pro: number } | null>(null);
   const [stage, setStage] = useState<SeedStage>('check-in');
   const [counts, setCounts] = useState<SampleCounts>(DEFAULT_COUNTS);
+  // The real dancers (names, clubs, photos) instead of made-up ones: to check how they look on every screen.
+  const [useReal, setUseReal] = useState(false);
   const [busy, setBusy] = useState<'generate' | 'delete' | 'switch' | null>(null);
   const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
@@ -22,7 +24,7 @@ export const RehearsalView: React.FC = () => {
     refresh();
   }, []);
 
-  const problem = sampleCountsProblem(stage, counts);
+  const problem = useReal ? null : sampleCountsProblem(stage, counts);
   const hasData = Boolean(summary && summary.newbie + summary.pro > 0);
 
   const run = async (kind: 'generate' | 'delete' | 'switch', action: () => Promise<string>) => {
@@ -41,9 +43,12 @@ export const RehearsalView: React.FC = () => {
   const generate = () => {
     if (problem) return;
     const replace = hasData ? ' Toàn bộ dữ liệu tổng duyệt hiện có sẽ bị thay.' : '';
-    if (!window.confirm(`Tạo dữ liệu mẫu: ${SEED_STAGE_LABELS[stage]}, ${counts.newbie + counts.both} Newbie và ${counts.pro + counts.both} Pro.${replace} Giải thật không bị ảnh hưởng.`)) return;
+    const who = useReal
+      ? 'danh sách thí sinh thật (tên, CLB, ảnh; bù thêm thí sinh mẫu nếu không đủ cho nhánh đấu)'
+      : `${counts.newbie + counts.both} Newbie và ${counts.pro + counts.both} Pro mẫu`;
+    if (!window.confirm(`Tạo dữ liệu tổng duyệt: ${SEED_STAGE_LABELS[stage]}, ${who}.${replace} Giải thật chỉ được đọc, không bị thay đổi.`)) return;
     run('generate', async () => {
-      const written = await generateRehearsalData(stage, counts);
+      const written = await generateRehearsalData(stage, counts, useReal);
       return `Đã tạo ${written} bản ghi dữ liệu mẫu. Bật "Chế độ tổng duyệt" để mọi máy chuyển sang dữ liệu này.`;
     });
   };
@@ -176,15 +181,46 @@ export const RehearsalView: React.FC = () => {
           ))}
         </fieldset>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          {field('newbie', 'Chỉ thi Newbie', 'Số thí sinh chỉ đăng ký Newbie')}
-          {field('pro', 'Chỉ thi Pro', 'Số thí sinh chỉ đăng ký Pro')}
-          {field('both', 'Thi cả 2 hạng mục', 'Có mặt ở cả Newbie và Pro')}
-        </div>
-        <p className="text-xs text-zinc-600">
-          Tổng: <b>{counts.newbie + counts.both} Newbie</b> · <b>{counts.pro + counts.both} Pro</b>. Giám khảo và cách chia bảng lấy theo giải
-          thật. Từ 40 em trở lên, vài em mẫu sẽ vắng mặt lúc check-in.
-        </p>
+        <fieldset className="space-y-1.5" disabled={onRehearsal || busy !== null}>
+          <legend className="mb-1 text-xs font-bold text-zinc-700">Thí sinh</legend>
+          {(
+            [
+              [false, 'Thí sinh mẫu', 'Tên và ảnh vẽ, chọn số lượng bên dưới.'],
+              [
+                true,
+                'Dùng danh sách thí sinh thật',
+                'Chép tên, CLB và ảnh của thí sinh đã đăng ký để xem hiển thị thật (màn LED, trang khách…). Điểm, SBD và kết quả battle vẫn là giả lập; giải thật chỉ được đọc. Nếu chưa đủ người cho nhánh Top 32, bù thêm vài thí sinh mẫu.',
+              ],
+            ] as const
+          ).map(([real, label, hint]) => (
+            <label
+              key={label}
+              className={`flex items-start gap-2 rounded border px-3 py-2 text-sm ${
+                useReal === real ? 'border-zinc-900 bg-zinc-50' : 'border-zinc-200'
+              } ${onRehearsal ? 'opacity-60' : 'cursor-pointer'}`}
+            >
+              <input type="radio" name="dancers" checked={useReal === real} onChange={() => setUseReal(real)} className="mt-1 accent-zinc-900" />
+              <span>
+                <span className={useReal === real ? 'font-bold' : ''}>{label}</span>
+                <span className="block text-[11px] text-zinc-500">{hint}</span>
+              </span>
+            </label>
+          ))}
+        </fieldset>
+
+        {!useReal && (
+          <>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {field('newbie', 'Chỉ thi Newbie', 'Số thí sinh chỉ đăng ký Newbie')}
+              {field('pro', 'Chỉ thi Pro', 'Số thí sinh chỉ đăng ký Pro')}
+              {field('both', 'Thi cả 2 hạng mục', 'Có mặt ở cả Newbie và Pro')}
+            </div>
+            <p className="text-xs text-zinc-600">
+              Tổng: <b>{counts.newbie + counts.both} Newbie</b> · <b>{counts.pro + counts.both} Pro</b>. Giám khảo và cách chia bảng lấy theo
+              giải thật. Từ 40 em trở lên, vài em mẫu sẽ vắng mặt lúc check-in.
+            </p>
+          </>
+        )}
         {problem && (
           <p role="alert" className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
             {problem}
