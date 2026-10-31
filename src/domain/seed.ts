@@ -1,4 +1,4 @@
-import { Dancer, Judge, BattleMatch, Team2v2 } from './types';
+import { Dancer, Judge, BattleMatch, Team2v2, CategoryType, RoundStage } from './types';
 import { DEFAULT_PANELS, PANEL_SIZE, panelOf, prelimJudgeIdsFor } from './model';
 
 // 9 Judges for Main Battle (Updated Official List)
@@ -120,15 +120,21 @@ export function generateRandomTeams(top32Dancers: Dancer[]): Team2v2[] {
 
 export const INITIAL_PRO_TEAMS = generateRandomTeams(INITIAL_PRO_DANCERS);
 
+/** Regulation rounds per battle by stage (docs/main-battle.md 2.3). Pro has no Top 32. */
+export const ROUNDS_BY_STAGE: Record<CategoryType, Record<RoundStage, number>> = {
+  newbie_1v1: { top32: 1, top16: 1, top8: 1, top4: 2, final: 2 },
+  pro_2v2: { top32: 2, top16: 2, top8: 2, top4: 4, final: 4 },
+};
+
 export function createInitialMatch(
   category: 'newbie_1v1' | 'pro_2v2',
-  stage: 'top32' | 'top16' | 'top8' | 'top4' | 'final',
+  stage: RoundStage,
   matchNumber: number,
   sideRed: { id: string; name: string; dancers: Dancer[]; sbdText: string },
   sideBlue: { id: string; name: string; dancers: Dancer[]; sbdText: string }
 ): BattleMatch {
-  // Thể thức 2 round chính thức. Nếu hòa 1 - 1 sẽ thêm 1 round Tie-Break
-  const totalRounds = 2;
+  // Số round chính thức theo vòng (docs/main-battle.md 2.3); hòa sau các round đó thì thêm 1 round Tie-break.
+  const totalRounds = ROUNDS_BY_STAGE[category][stage];
 
   const stageTitles: Record<string, string> = {
     top32: 'Top 32',

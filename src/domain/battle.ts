@@ -22,9 +22,12 @@ const blankRound = (roundNumber: number, isTieBreak = false): BattleRound => ({
   ...(isTieBreak && { isTieBreak: true }),
 });
 
-/** 1 - 1 after the two regulation rounds: add round 3 as the tie-break (once). */
+/** The regulation rounds of a match (1, 2 or 4 by stage), without the tie-break. */
+export const regulationRounds = (m: Pick<BattleMatch, 'rounds'>) => m.rounds.filter((r) => !r.isTieBreak);
+
+/** Level after the regulation rounds: add one tie-break round after them (once). */
 const withTieBreak = (rounds: BattleRound[]) =>
-  rounds.some((r) => r.isTieBreak) ? rounds : [...rounds, blankRound(3, true)];
+  rounds.some((r) => r.isTieBreak) ? rounds : [...rounds, blankRound(rounds.length + 1, true)];
 
 export interface RoundOutcome {
   match: BattleMatch;
@@ -32,7 +35,10 @@ export interface RoundOutcome {
   matchWinner: Side | null;
 }
 
-/** Confirm one round from its counted votes; decides the match after round 2 or the tie-break. */
+/**
+ * Confirm one round from its counted votes. The match goes on through every regulation round (no early finish);
+ * after the last one, more round wins decide it, a level score adds the tie-break, which decides it.
+ */
 export function confirmRound(m: BattleMatch, roundNumber: number, now: number): RoundOutcome | null {
   const target = m.rounds.find((r) => r.roundNumber === roundNumber);
   if (!target) return null;
@@ -49,23 +55,21 @@ export function confirmRound(m: BattleMatch, roundNumber: number, now: number): 
   let totalRoundsRequired = m.totalRoundsRequired;
   let currentRound = roundNumber;
 
+  const nextRegulation = rounds.find((r) => !r.isTieBreak && !r.isConfirmed);
   if (target.isTieBreak) {
     matchWinner = winner;
     status = 'finished';
-  } else if (roundNumber === 1 && m.totalRoundsRequired >= 2) {
+  } else if (nextRegulation) {
     status = 'ongoing';
-    currentRound = 2;
-  } else if (roundNumber >= 2) {
-    if (winsRed === 1 && winsBlue === 1) {
-      status = 'ongoing';
-      totalRoundsRequired = 3;
-      currentRound = 3;
-      rounds = withTieBreak(rounds);
-    } else {
-      // 2 round wins decide it (red first, as before); otherwise whoever leads
-      matchWinner = winsRed >= 2 ? 'red' : winsBlue >= 2 ? 'blue' : winsRed > winsBlue ? 'red' : 'blue';
-      status = 'finished';
-    }
+    currentRound = nextRegulation.roundNumber;
+  } else if (winsRed === winsBlue) {
+    rounds = withTieBreak(rounds);
+    status = 'ongoing';
+    totalRoundsRequired = rounds.length;
+    currentRound = rounds.length;
+  } else {
+    matchWinner = winsRed > winsBlue ? 'red' : 'blue';
+    status = 'finished';
   }
 
   return {
@@ -107,16 +111,17 @@ export function revealAllRounds(m: BattleMatch, now: number): RevealOutcome {
 
   const tieBreak = winsRed === winsBlue;
   const matchWinner: Side | null = tieBreak ? null : winsRed > winsBlue ? 'red' : 'blue';
+  const rounds = tieBreak ? withTieBreak(counted) : counted;
   return {
     tieBreak,
     matchWinner,
     match: {
       ...m,
-      rounds: tieBreak ? withTieBreak(counted) : counted,
+      rounds,
       roundWinsRed: winsRed,
       roundWinsBlue: winsBlue,
-      totalRoundsRequired: tieBreak ? 3 : m.totalRoundsRequired,
-      currentRound: tieBreak ? 3 : m.currentRound,
+      totalRoundsRequired: tieBreak ? rounds.length : m.totalRoundsRequired,
+      currentRound: tieBreak ? rounds.length : m.currentRound,
       winnerSide: matchWinner,
       status: tieBreak ? 'ongoing' : 'finished',
       victoryTriggerTimestamp: matchWinner ? now : m.victoryTriggerTimestamp,

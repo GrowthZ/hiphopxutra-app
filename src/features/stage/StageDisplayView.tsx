@@ -6,6 +6,7 @@ import { soundFX } from '../../services/soundEffects';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { BattleMatch, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
+import { regulationRounds } from '../../domain/battle';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
 
 // Main battle on the 16:9 LED (/led). Drawn on a fixed 1920×1080 canvas and scaled to the window, so the HDMI
@@ -276,9 +277,12 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   const lost = (side: 'red' | 'blue') => announcedWinner !== null && announcedWinner !== side;
   const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35' : '');
 
-  const regularRounds = match.category === 'newbie_1v1' ? 2 : 4;
-  const isTieBreakRound = (r: BattleMatch['rounds'][number]) => r.isTieBreak || r.roundNumber > regularRounds;
+  // One row per regulation round of this stage (1, 2 or 4), then the tie-break row: dim until a level score opens
+  // it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
+  const regularRounds = regulationRounds(match).length;
+  const isTieBreakRound = (r: BattleMatch['rounds'][number]) => Boolean(r.isTieBreak);
   const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak);
+  const roundRows: (BattleMatch['rounds'][number] | null)[] = [...regulationRounds(match), match.rounds.find(isTieBreakRound) ?? null];
   const isMatchTied =
     match.roundWinsRed === match.roundWinsBlue &&
     match.rounds.length > 0 &&
@@ -286,8 +290,8 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   const currentRound = match.rounds.find((r) => r.roundNumber === match.currentRound);
   const roundLabel = (r?: BattleMatch['rounds'][number]) => (!r ? '' : isTieBreakRound(r) ? 'Tie-break' : `Round ${r.roundNumber}`);
 
-  // Rows fill the space under the names, and shrink when a 2vs2 battle needs more than three of them.
-  const rowH = match.rounds.length > 3 ? 58 : match.rounds.length > 2 ? 84 : 96;
+  // Ballot rows at half their former height; a little lower still for the 5 rows of a 4-round battle.
+  const rowH = roundRows.length > 3 ? 40 : 48;
   const cols = `220px repeat(${Math.max(judges.length, 1)}, minmax(0, 1fr))`;
 
   const photoBox = match.category === 'pro_2v2' ? 'bottom-[360px] w-[860px]' : 'bottom-0 w-[720px]';
@@ -320,7 +324,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
       ? `Chung cuộc ${match.roundWinsRed} - ${match.roundWinsBlue}${hasTieBreakRound ? ' · thắng tie-break' : ''}`
       : hasTieBreakRound || isMatchTied
         ? `Hòa ${match.roundWinsRed} - ${match.roundWinsBlue} · tie-break phân định thắng thua`
-        : `${regularRounds} rounds · hòa đấu tie-break`;
+        : `${regularRounds} round · hòa thì đấu tie-break`;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black">
@@ -431,7 +435,19 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           </div>
 
           <div className="mt-3 space-y-3">
-            {match.rounds.map((round) => {
+            {roundRows.map((round) => {
+              if (!round) {
+                return (
+                  <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
+                    <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
+                      <span className="whitespace-nowrap font-condensed text-[28px] font-black uppercase leading-none text-amber-300">Tie-break</span>
+                    </div>
+                    {judges.map((j) => (
+                      <span key={j.id} className="rounded-xl bg-white/10" />
+                    ))}
+                  </div>
+                );
+              }
               const isTieBreak = isTieBreakRound(round);
               const isCurrent = round.roundNumber === match.currentRound && match.status !== 'finished';
               const isRevealed = isRoundOpen(round);
@@ -439,17 +455,21 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
               const flipping = isRevealed && revealAt && Date.now() - revealAt < judges.length * 150 + 200;
               const votes = Object.values(round.votes).filter(Boolean).length;
               return (
-                <div key={round.roundNumber} className="grid gap-x-3" style={{ gridTemplateColumns: cols, height: rowH }}>
+                <div
+                  key={round.roundNumber}
+                  className={`grid gap-x-3 transition-opacity duration-700 ${hasTieBreakRound && !isTieBreak ? 'opacity-40' : ''}`}
+                  style={{ gridTemplateColumns: cols, height: rowH }}
+                >
                   <div
-                    className={`flex flex-col justify-center rounded-xl px-4 ${
+                    className={`flex items-center justify-between gap-2 rounded-xl px-3 ${
                       isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
                     }`}
                   >
-                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? 'text-[28px] text-amber-300' : 'text-[32px] text-white'}`}>
+                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? 'text-[24px] text-amber-300' : 'text-[28px] text-white'}`}>
                       {roundLabel(round)}
                     </span>
                     <span
-                      className={`mt-1 text-[15px] font-black uppercase leading-none tracking-wider ${
+                      className={`whitespace-nowrap text-[13px] font-black uppercase leading-none ${
                         isRevealed && !flipping ? (round.winner === 'red' ? 'text-red-400' : 'text-blue-400') : 'text-emerald-300'
                       }`}
                     >

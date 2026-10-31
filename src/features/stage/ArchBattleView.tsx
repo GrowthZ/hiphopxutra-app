@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { BattleMatch, BattleRound, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
+import { regulationRounds } from '../../domain/battle';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
@@ -96,9 +97,12 @@ export const ArchBattleView: React.FC = () => {
       ? { red: [0.16, 0.42], blue: [0.58, 0.84], top: 0.82, bottom: BAR.bottom - 0.03 } // mid-flank, under the 10-row steps
       : { red: [0.24, 0.45], blue: [0.55, 0.76], top: 0.85, bottom: BAR.bottom - 0.02 }; // under the match label: raised arms stay clear
 
-  const regularRounds = match.category === 'newbie_1v1' ? 2 : 4;
-  const isTieBreak = (r: BattleRound) => Boolean(r.isTieBreak) || r.roundNumber > regularRounds;
+  // One row per regulation round of this stage (1, 2 or 4), then the tie-break row: shown dim until a level score
+  // opens it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
+  const isTieBreak = (r: BattleRound) => Boolean(r.isTieBreak);
   const roundLabel = (r?: BattleRound) => (!r ? '' : isTieBreak(r) ? 'Tie-break' : `Round ${r.roundNumber}`);
+  const tieRound = match.rounds.find(isTieBreak);
+  const roundRows: (BattleRound | null)[] = [...regulationRounds(match), tieRound ?? null];
 
   // Announced result: the match winner once it's over, else the last revealed round until the next votes come in.
   const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
@@ -108,10 +112,10 @@ export const ArchBattleView: React.FC = () => {
   const lost = (side: 'red' | 'blue') => winner !== null && winner !== side;
   const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35 transition-all duration-700' : 'transition-all duration-700');
 
-  // Judge rows share the strip's height (header row + gaps taken out).
+  // Judge rows: half the height two rows would get from the strip, smaller only when 5 rows (4 + tie-break) need it.
   const gridPx = yFromBottom(GRID.bottom) - yFromBottom(GRID.top);
-  const rows = Math.max(match.rounds.length, 1);
-  const rowH = Math.floor((gridPx - 52 - rows * 10) / rows);
+  const rows = roundRows.length;
+  const rowH = Math.min(Math.floor((gridPx - 52 - 2 * 10) / 4), Math.floor((gridPx - 52 - rows * 10) / rows));
   const cols = `260px repeat(${Math.max(judges.length, 1)}, minmax(0, 1fr))`;
   // Name text starts past the outermost column, which is too short to show the bar.
   const barPad = MODULE_PX + 40;
@@ -202,12 +206,29 @@ export const ArchBattleView: React.FC = () => {
               ))}
             </div>
             <div className="mt-2.5 space-y-2.5">
-              {match.rounds.map((round) => {
+              {roundRows.map((round) => {
+                if (!round) {
+                  // Tie-break not needed (yet): a dim placeholder row
+                  return (
+                    <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
+                      <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
+                        <span className="whitespace-nowrap font-condensed text-[32px] font-black uppercase leading-none text-amber-300">Tie-break</span>
+                      </div>
+                      {judges.map((j) => (
+                        <span key={j.id} className="rounded-xl bg-white/10" />
+                      ))}
+                    </div>
+                  );
+                }
                 const open = isRoundOpen(round);
                 const tie = isTieBreak(round);
                 const live = round.roundNumber === match.currentRound && match.status !== 'finished';
                 return (
-                  <div key={round.roundNumber} className="grid gap-x-3" style={{ gridTemplateColumns: cols, height: rowH }}>
+                  <div
+                    key={round.roundNumber}
+                    className={`grid gap-x-3 transition-opacity duration-700 ${tieRound && !tie ? 'opacity-40' : ''}`}
+                    style={{ gridTemplateColumns: cols, height: rowH }}
+                  >
                     <div
                       className={`flex items-center justify-between gap-2 rounded-xl px-4 ${
                         tie ? 'bg-amber-500/25 ring-2 ring-amber-400' : live ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'

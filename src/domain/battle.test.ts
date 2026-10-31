@@ -11,7 +11,8 @@ const JUDGES = Array.from({ length: 9 }, (_, i) => `gk-${i + 1}`);
 const dancer = (n: number) =>
   ({ id: `d${n}`, sbd: `N${String(n).padStart(3, '0')}`, name: `Dancer ${n}` }) as Dancer;
 const side = (d: Dancer) => ({ id: d.id, name: d.name, dancers: [d], sbdText: `SBD ${d.sbd}` });
-const newMatch = () => createInitialMatch('newbie_1v1', 'top32', 1, side(dancer(1)), side(dancer(2)));
+// A 2-round battle (Newbie semi-final); the 1- and 4-round formats have their own tests below.
+const newMatch = () => createInitialMatch('newbie_1v1', 'top4', 1, side(dancer(1)), side(dancer(2)));
 
 /** `red` of the 9 judges vote red in that round, the rest blue. */
 function vote(m: BattleMatch, roundNumber: number, red: number): BattleMatch {
@@ -108,4 +109,40 @@ test('seedNewbieTop32 pairs seed 1 with 32', () => {
   expect(matches).toHaveLength(16);
   expect([matches[0].sideRed.id, matches[0].sideBlue.id]).toEqual(['d1', 'd32']);
   expect([matches[15].sideRed.id, matches[15].sideBlue.id]).toEqual(['d16', 'd17']);
+});
+
+describe('rounds per stage (docs/main-battle.md 2.3)', () => {
+  const match = (category: 'newbie_1v1' | 'pro_2v2', stage: 'top32' | 'top16' | 'top8' | 'top4' | 'final') =>
+    createInitialMatch(category, stage, 1, side(dancer(1)), side(dancer(2)));
+
+  test('each stage gets its regulation rounds', () => {
+    expect(['top32', 'top16', 'top8', 'top4', 'final'].map((s) => match('newbie_1v1', s as never).rounds.length)).toEqual([1, 1, 1, 2, 2]);
+    expect(['top16', 'top8', 'top4', 'final'].map((s) => match('pro_2v2', s as never).rounds.length)).toEqual([2, 2, 4, 4]);
+    expect(match('pro_2v2', 'final').totalRoundsRequired).toBe(4);
+  });
+
+  test('a 1-round battle is decided by that round', () => {
+    const { match: m, matchWinner } = confirm(match('newbie_1v1', 'top32'), 1, 4);
+    expect(matchWinner).toBe('blue');
+    expect(m.status).toBe('finished');
+    expect(m.rounds).toHaveLength(1);
+  });
+
+  test('a 4-round battle plays all 4 rounds: 3 - 1 wins, 2 - 2 goes to a 5th tie-break round', () => {
+    let m = match('pro_2v2', 'final');
+    for (const [round, red] of [[1, 9], [2, 9], [3, 9]] as const) {
+      const out = confirm(m, round, red);
+      expect(out.matchWinner).toBeNull(); // 3 - 0 after round 3: still not over
+      m = out.match;
+    }
+    expect(confirm(m, 4, 0)).toMatchObject({ matchWinner: 'red', match: { status: 'finished', roundWinsRed: 3 } });
+
+    let level = match('pro_2v2', 'top4');
+    for (const [round, red] of [[1, 9], [2, 0], [3, 9]] as const) level = confirm(level, round, red).match;
+    const tied = confirm(level, 4, 0);
+    expect(tied.matchWinner).toBeNull();
+    expect(tied.match).toMatchObject({ status: 'ongoing', currentRound: 5, totalRoundsRequired: 5 });
+    expect(tied.match.rounds.at(-1)).toMatchObject({ roundNumber: 5, isTieBreak: true });
+    expect(confirm(tied.match, 5, 6)).toMatchObject({ matchWinner: 'red', match: { status: 'finished' } });
+  });
 });
