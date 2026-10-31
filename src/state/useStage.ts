@@ -88,5 +88,6 @@ export function useStageController(screenId = DEFAULT_SCREEN_ID, adminEmail = ''
     setCategory: (category: StageState['category']) => update({ category }),
     setTheme: (theme: StageState['theme']) => update({ theme }),
     setBlackout: (blackout: boolean) => update({ blackout }),
+    setWinnerDelay: (winnerDelay: number) => update({ winnerDelay }),
   };
 }

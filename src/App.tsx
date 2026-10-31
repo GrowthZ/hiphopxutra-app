@@ -16,6 +16,7 @@ import { McView } from './features/mc/McView';
 import { PrelimResultsView } from './features/prelim/PrelimResultsView';
 import { PrelimGuestView } from './features/guest/PrelimGuestView';
 import { PrelimScreenView } from './features/guest/PrelimScreenView';
+import { BracketScreenView } from './features/guest/BracketScreenView';
 import { GuestBracketView, GuestMatchView } from './features/guest/GuestBattleView';
 import { DancersListView } from './features/dancers/DancersListView';
 import { GoogleSheetSyncModal } from './features/settings/GoogleSheetSyncModal';
@@ -78,6 +79,7 @@ const MainContent: React.FC = () => {
   }
   if (activeView === 'prelim_screen') return <PrelimScreenView />;
   if (activeView === 'prelim_screen_led') return <PrelimScreenView theme="led" />;
+  if (activeView === 'bracket_screen') return <BracketScreenView />;
   if (activeView === 'bracket_guest') return <GuestBracketView />;
   if (activeView === 'match_guest') return <GuestMatchView />;
 

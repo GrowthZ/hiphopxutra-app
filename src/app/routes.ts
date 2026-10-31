@@ -6,6 +6,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
   prelim_screen: '/ket-qua/trinh-chieu',
   prelim_screen_led: '/ket-qua/trinh-chieu-led',
   bracket_guest: '/ket-qua/nhanh-dau',
+  bracket_screen: '/ket-qua/so-do', // knockout tree for everyone (phones, TV, LED)
   match_guest: '/ket-qua/tran', // + '/{matchSlug}'
   judge: '/giam-khao',
   mc: '/mc',
@@ -25,7 +26,7 @@ export const VIEW_PATHS: Record<ActiveViewType, string> = {
 };
 
 /** Audience screens and the MC screen open in a new tab from the admin pages. */
-export const SCREEN_VIEWS = ['prelim_screen', 'prelim_screen_led', 'mc'] as const;
+export const SCREEN_VIEWS = ['prelim_screen', 'prelim_screen_led', 'bracket_screen', 'mc'] as const;
 export const openInNewTab = (view: ActiveViewType) => window.open(VIEW_PATHS[view], '_blank', 'noopener');
 
 /** `/led?preview=1` is the live preview embedded in /admin/led: no heartbeat, no sound, no writes. */

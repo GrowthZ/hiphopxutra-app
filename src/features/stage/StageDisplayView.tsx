@@ -8,6 +8,7 @@ import { BattleMatch, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
 import { regulationRounds } from '../../domain/battle';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
+import { DEFAULT_WINNER_DELAY, FLIP_MS, FLIP_STEP_MS, roundOffset, rowFlipMs } from '../../domain/reveal';
 
 // Main battle on the 16:9 LED (/led). Drawn on a fixed 1920×1080 canvas and scaled to the window, so the HDMI
 // output is pixel-exact and the /admin/led preview is the same picture, smaller.
@@ -32,7 +33,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
   const [hasFlipped, setHasFlipped] = useState<boolean>(() => {
     if (!isRevealed) return false;
     if (!revealStartTime) return true;
-    return Date.now() - revealStartTime > judgeIndex * 150 + 300;
+    return Date.now() - revealStartTime > judgeIndex * FLIP_STEP_MS + FLIP_MS;
   });
   const [isFlipping, setIsFlipping] = useState<boolean>(false);
   const flipTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -46,7 +47,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
 
     if (revealStartTime) {
       const elapsed = Date.now() - revealStartTime;
-      const targetDelay = judgeIndex * 150; // 150ms per judge sequential flip
+      const targetDelay = judgeIndex * FLIP_STEP_MS; // one judge after the other
 
       if (elapsed < targetDelay) {
         setHasFlipped(false);
@@ -59,7 +60,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
           } catch {
             // ignore
           }
-          setTimeout(() => setIsFlipping(false), 450);
+          setTimeout(() => setIsFlipping(false), FLIP_MS);
         }, targetDelay - elapsed);
       } else {
         setHasFlipped(true);
@@ -82,6 +83,8 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
   if (isRevealed && hasFlipped) {
     return (
       <div
+        role="img"
+        aria-label={`${judgeCode}: ${vote === 'red' ? 'Đỏ' : vote === 'blue' ? 'Xanh' : 'không có phiếu'}`}
         className={`${base} text-[30px] tracking-wider text-white ${
           vote === 'red'
             ? 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_24px_rgba(239,68,68,0.85)] ring-2 ring-red-300/70'
@@ -97,24 +100,25 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
 
   if (vote != null) {
     return (
-      <div className={`${base} bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_0_20px_rgba(16,185,129,0.8)] ring-2 ring-emerald-300/70`}>
+      <div role="img" aria-label={`${judgeCode}: đã chấm`} className={`${base} bg-gradient-to-b from-emerald-500 to-emerald-700 shadow-[0_0_20px_rgba(16,185,129,0.8)] ring-2 ring-emerald-300/70`}>
         <Check className="h-9 w-9 text-white" strokeWidth={4} />
       </div>
     );
   }
 
   return (
-    <div className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]`}>
+    <div role="img" aria-label={`${judgeCode}: chờ phiếu`} className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]`}>
       {judgeCode.replace('GK ', '')}
     </div>
   );
 };
 
 /**
- * When each round of the match was revealed (round number -> ms), so its JudgeBallotCards flip one by one.
- * Rounds already open when the match first shows up stay still (a reload or a new screen mid-battle).
+ * When each round's pills start flipping (round number -> ms), so its JudgeBallotCards turn one by one. Rounds revealed
+ * together flip one after the other, in round order. Rounds already open when the match first shows up stay still
+ * (a reload or a new screen mid-battle).
  */
-export function useRevealStartTimes(match?: BattleMatch): Record<number, number> {
+export function useRevealStartTimes(match?: BattleMatch, judges = 9): Record<number, number> {
   const [revealStartTimes, setRevealStartTimes] = useState<Record<number, number>>({});
   const seen = useRef<{ matchId?: string; open: Set<number> }>({ open: new Set() });
 
@@ -126,8 +130,8 @@ export function useRevealStartTimes(match?: BattleMatch): Record<number, number>
         const now = customEvent.detail.timestamp || Date.now();
         setRevealStartTimes((prev) => {
           const updated = { ...prev };
-          customEvent.detail.roundNumbers.forEach((rNum) => {
-            updated[rNum] = now;
+          [...customEvent.detail.roundNumbers].sort((a, b) => a - b).forEach((rNum, i) => {
+            updated[rNum] = now + roundOffset(i, judges);
           });
           return updated;
         });
@@ -138,7 +142,7 @@ export function useRevealStartTimes(match?: BattleMatch): Record<number, number>
     return () => {
       window.removeEventListener('ROUND_REVEAL_DISPLAY_TRIGGER', handleRoundRevealCustom);
     };
-  }, [match?.id]);
+  }, [match?.id, judges]);
 
   useEffect(() => {
     if (!match) return;
@@ -153,21 +157,58 @@ export function useRevealStartTimes(match?: BattleMatch): Record<number, number>
       const now = Date.now();
       setRevealStartTimes((prev) => {
         const updated = { ...prev };
-        opened.forEach((rNum) => {
+        opened.sort((a, b) => a - b).forEach((rNum, i) => {
           // Keep the operator's click time if it just came in; otherwise (also a re-reveal after an undo) start now.
-          if (!updated[rNum] || now - updated[rNum] > 3000) updated[rNum] = now;
+          if (!updated[rNum] || now - updated[rNum] > 3000) updated[rNum] = now + roundOffset(i, judges);
         });
         return updated;
       });
     }
-  }, [match?.id, match?.rounds]);
+  }, [match?.id, match?.rounds, judges]);
 
   return revealStartTimes;
+}
+
+/**
+ * What the LED may show of the result yet. A revealed row keeps its outcome back until its last pill has turned plus
+ * the operator's winner delay; the winner, the scores and the tie-break row wait for every row (`pending`).
+ */
+export function useRevealedResult(
+  match: BattleMatch | undefined,
+  revealStartTimes: Record<number, number>,
+  judges: number,
+  winnerDelay = DEFAULT_WINNER_DELAY
+) {
+  const [now, setNow] = useState(() => Date.now());
+  const settleAt = (roundNumber: number) => {
+    const start = revealStartTimes[roundNumber];
+    return start ? start + rowFlipMs(judges) + winnerDelay * 1000 : 0;
+  };
+  const openRounds = match ? match.rounds.filter(isRoundOpen) : [];
+  const ends = openRounds.map((r) => settleAt(r.roundNumber));
+  const holdUntil = Math.max(0, ...ends);
+  const nextEnd = Math.min(Infinity, ...ends.filter((t) => t > now));
+
+  // Re-render as each row settles.
+  useEffect(() => {
+    if (!Number.isFinite(nextEnd)) return;
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, nextEnd - Date.now()) + 20);
+    return () => clearTimeout(timer);
+  }, [nextEnd]);
+  useEffect(() => setNow(Date.now()), [revealStartTimes]);
+
+  const settled = (roundNumber: number) => settleAt(roundNumber) <= now;
+  const pending = holdUntil > now;
+  const wins = (side: 'red' | 'blue') =>
+    !match ? 0 : pending ? openRounds.filter((r) => r.winner === side && settled(r.roundNumber)).length : side === 'red' ? match.roundWinsRed : match.roundWinsBlue;
+  return { settled, pending, holdUntil, wins };
 }
 
 interface StageDisplayViewProps {
   /** Set by /admin/led. */
   theme?: 'daylight' | 'night';
+  /** Seconds between the last pill turning and the result lighting up (set on the battle console). */
+  winnerDelay?: number;
 }
 
 const breakerName = (side?: BattleSide) =>
@@ -195,7 +236,7 @@ const judgeShortName = (name: string, code: string) => {
   return clean || code;
 };
 
-export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight' }) => {
+export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight', winnerDelay }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
 
@@ -259,15 +300,20 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
     };
   }, [match?.id]);
 
-  // 2. Judge pills flip one by one when a round is revealed
-  const revealStartTimes = useRevealStartTimes(match);
+  // 2. Judge pills flip one by one when a round is revealed; the result lights up once they have all turned
+  const revealStartTimes = useRevealStartTimes(match, judges.length);
+  const revealed = useRevealedResult(match, revealStartTimes, judges.length, winnerDelay);
 
   if (!match) return <div className="fixed inset-0 bg-black" />;
 
   // Announced result: the match winner once it's over, else the last revealed round until the next round's votes
   // start coming in. Shown in place, no pop-up: the winning corner lights up (photo, name bar, score), the other
   // greys out, and the centre says who won.
+  // A level score after the regulation rounds: no winner yet, the tie-break row is lit instead.
+  const tieRound = match.rounds.find((r) => r.isTieBreak);
+  const tiePending = !revealed.pending && Boolean(tieRound && !isRoundOpen(tieRound));
   const announcedWinner: 'red' | 'blue' | null = (() => {
+    if (revealed.pending || tiePending) return null;
     if (match.status === 'finished' && match.winnerSide) return match.winnerSide;
     const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
     if (current && !isRoundOpen(current) && Object.values(current.votes).some(Boolean)) return null;
@@ -283,8 +329,12 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   // it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
   const regularRounds = regulationRounds(match).length;
   const isTieBreakRound = (r: BattleMatch['rounds'][number]) => Boolean(r.isTieBreak);
-  const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak);
-  const roundRows: (BattleMatch['rounds'][number] | null)[] = [...regulationRounds(match), match.rounds.find(isTieBreakRound) ?? null];
+  const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak) && !revealed.pending;
+  // A tie-break opened by this very reveal stays a dim placeholder until the regulation rows have turned.
+  const roundRows: (BattleMatch['rounds'][number] | null)[] = [
+    ...regulationRounds(match),
+    (hasTieBreakRound && match.rounds.find(isTieBreakRound)) || null,
+  ];
   const isMatchTied =
     match.roundWinsRed === match.roundWinsBlue &&
     match.rounds.length > 0 &&
@@ -321,8 +371,9 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
     );
   };
 
-  const statusText =
-    match.status === 'finished'
+  const statusText = revealed.pending
+    ? 'Đang công bố kết quả…'
+    : match.status === 'finished'
       ? `Chung cuộc ${match.roundWinsRed} - ${match.roundWinsBlue}${hasTieBreakRound ? ' · thắng tie-break' : ''}`
       : hasTieBreakRound || isMatchTied
         ? `Hòa ${match.roundWinsRed} - ${match.roundWinsBlue} · tie-break phân định thắng thua`
@@ -402,14 +453,23 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
                 {announcedWinner === 'red' ? 'Đỏ' : 'Xanh'} thắng
               </span>
             </>
+          ) : tiePending ? (
+            <>
+              <span className="font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                Hòa {match.roundWinsRed}–{match.roundWinsBlue}
+              </span>
+              <span className="led-pop whitespace-nowrap rounded-full bg-amber-400 px-8 py-2.5 font-condensed text-[52px] font-black uppercase leading-none text-zinc-950 shadow-[0_0_50px_rgba(251,191,36,0.9)]">
+                Tie-break
+              </span>
+            </>
           ) : (
             <>
               <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">
                 VS
               </span>
-              {currentRound && (
+              {(revealed.pending || currentRound) && (
                 <span className="whitespace-nowrap rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
-                  {roundLabel(currentRound)}
+                  {revealed.pending ? 'Công bố kết quả' : roundLabel(currentRound)}
                 </span>
               )}
             </>
@@ -419,11 +479,11 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
         {/* Name bars from the screen edges, score at the inner end */}
         <div key={`rn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${lost('red') ? 'grayscale opacity-30' : ''} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
           <NameBar color="red" name={breakerName(match.sideRed)} sub={sideSub(match, match.sideRed)} won={won('red')} />
-          <ScoreBox color="red" value={match.roundWinsRed} won={won('red')} />
+          <ScoreBox color="red" value={revealed.wins('red')} won={won('red')} />
         </div>
         <div key={`bn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${lost('blue') ? 'grayscale opacity-30' : ''} ${isEntranceActive ? 'animate-entrance-right' : ''}`}>
           <NameBar color="blue" name={breakerName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} won={won('blue')} />
-          <ScoreBox color="blue" value={match.roundWinsBlue} won={won('blue')} />
+          <ScoreBox color="blue" value={revealed.wins('blue')} won={won('blue')} />
         </div>
 
         {/* Judges × rounds */}
@@ -458,7 +518,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
               const isCurrent = round.roundNumber === match.currentRound && match.status !== 'finished';
               const isRevealed = isRoundOpen(round);
               const revealAt = revealStartTimes[round.roundNumber];
-              const flipping = isRevealed && revealAt && Date.now() - revealAt < judges.length * 150 + 200;
+              const flipping = isRevealed && !revealed.settled(round.roundNumber);
               const votes = Object.values(round.votes).filter(Boolean).length;
               return (
                 <div
@@ -502,7 +562,9 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
         <div className="absolute inset-x-0 bottom-[16px] flex justify-center">
           <span
             className={`rounded-lg px-5 py-1.5 font-condensed text-[26px] font-black uppercase leading-none tracking-wider ${
-              match.status === 'finished'
+              revealed.pending
+                ? 'bg-black/60 text-white/85 ring-1 ring-white/15'
+                : match.status === 'finished'
                 ? 'bg-emerald-500 text-zinc-950'
                 : hasTieBreakRound || isMatchTied
                   ? 'bg-amber-400 text-zinc-950'
@@ -514,7 +576,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
         </div>
 
         {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
-        <AutomatedVictoryDisplay match={match} overlay={false} />
+        <AutomatedVictoryDisplay match={match} overlay={false} holdUntil={revealed.holdUntil} />
       </div>
     </div>
   );

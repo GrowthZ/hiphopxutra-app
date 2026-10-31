@@ -7,6 +7,7 @@ export type ActiveViewType =
   | 'prelim_screen'
   | 'prelim_screen_led'
   | 'bracket_guest'
+  | 'bracket_screen'
   | 'match_guest'
   | 'teams'
   | 'bracket'
@@ -32,6 +33,7 @@ export interface StageState {
   category: CategoryType; // category for the prelim leaderboard scene
   theme: 'daylight' | 'night';
   blackout: boolean; // overrides scene with the idle/logo screen
+  winnerDelay?: number; // seconds between the last ballot flipping over and the result lighting up (default 0.5)
   updatedAt: number;
   updatedBy: string;
 }
@@ -117,6 +119,7 @@ export interface BattleMatch {
   rounds: BattleRound[];
   winnerSide?: 'red' | 'blue' | null;
   status: 'upcoming' | 'ongoing' | 'finished';
+  forfeitSide?: 'red' | 'blue'; // that side withdrew (bỏ cuộc): the other one goes through without a battle
   victoryTriggerTimestamp?: number; // Timestamp when victory animation was triggered
   entranceTriggerTimestamp?: number; // Timestamp when team entrance animation was triggered
 }

@@ -15,9 +15,14 @@ interface AutomatedVictoryDisplayProps {
   match: BattleMatch;
   /** false: fanfare and confetti only, the screen shows the result itself (arch LED). */
   overlay?: boolean;
+  /** Not before this time (ms): the LED is still flipping the judges' pills of the reveal that decided the match. */
+  holdUntil?: number;
 }
 
-export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = ({ match, overlay = true }) => {
+export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = ({ match, overlay = true, holdUntil = 0 }) => {
+  const holdRef = useRef(holdUntil);
+  holdRef.current = holdUntil;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { storageConfig } = useTournament();
   const [isVisible, setIsVisible] = useState<boolean>(() => match.status === 'finished' && !!match.winnerSide);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -120,12 +125,26 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
     }, 12000);
   };
 
+  // Wait a beat (the LED learns the reveal times on its next render), then until the last pill has turned.
+  const launchAfterReveal = (side: 'red' | 'blue') => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    const tick = () => {
+      const wait = holdRef.current - Date.now();
+      if (wait > 0) holdTimerRef.current = setTimeout(tick, wait);
+      else launchCelebration(side);
+    };
+    holdTimerRef.current = setTimeout(tick, 80);
+  };
+  useEffect(() => () => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+  }, []);
+
   // 1. React to match victoryTriggerTimestamp update from Context
   useEffect(() => {
     if (match.status === 'finished' && match.winnerSide) {
       if (match.victoryTriggerTimestamp && match.victoryTriggerTimestamp !== lastTimestampRef.current) {
         lastTimestampRef.current = match.victoryTriggerTimestamp;
-        launchCelebration(match.winnerSide);
+        launchAfterReveal(match.winnerSide);
       } else if (!isVisible && !lastTimestampRef.current) {
         setIsVisible(true);
       }
@@ -141,7 +160,7 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
       const customEvent = e as CustomEvent<{ matchId: string; side: 'red' | 'blue'; winnerName: string; timestamp: number }>;
       if (customEvent.detail && customEvent.detail.matchId === match.id) {
         lastTimestampRef.current = customEvent.detail.timestamp;
-        launchCelebration(customEvent.detail.side);
+        launchAfterReveal(customEvent.detail.side);
       }
     };
 

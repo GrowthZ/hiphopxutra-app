@@ -3,7 +3,7 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { adminAuth, createJudge, event, signInAdmin, waitForDoc } from './emulator';
 
 // The three flows that must work on competition day, in order, sharing one emulator database:
-// an admin opens the dashboard (seeds Firestore), a judge scores a prelim, the admin announces a battle round,
+// an admin opens the dashboard (seeds Firestore), a judge scores a prelim, the admin reveals a battle's rounds,
 // and the LED follows the admin's scene changes.
 
 test.describe.configure({ mode: 'serial' });
@@ -188,24 +188,34 @@ test('tie-break: any of the 8 judges scores a flagged dancer, never an unflagged
   await flagged.ref.update({ tieBreak: false, tieBreakScores: {} });
 });
 
-test('admin announces a battle round and the result is published', async () => {
+test('admin reveals every round in one press; a level score opens the tie-break', async () => {
   const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
-  // The other 8 judges vote red too, as their phones would.
+  // The judges' phones: round 1 all red, round 2 all blue (1–1).
   await event
     .collection('votes')
     .doc(activeMatchId)
-    .set({ r1: Object.fromEntries(JUDGES.map((j) => [j, 'red'])) }, { merge: true });
+    .set(
+      { r1: Object.fromEntries(JUDGES.map((j) => [j, 'red'])), r2: Object.fromEntries(JUDGES.map((j) => [j, 'blue'])) },
+      { merge: true }
+    );
 
   await admin.goto('/admin/battle');
-  await expect(admin.getByText('9/9').first()).toBeVisible();
-  await admin.getByRole('button', { name: /Công Bố & Xác Nhận Round 1/ }).click();
+  await expect(admin.getByText('9/9 phiếu')).toHaveCount(2);
 
-  const match = await waitForDoc<{ rounds: { isConfirmed: boolean; winner?: string }[]; currentRound: number }>(
+  // The winner delay is the LED's setting, saved for every screen.
+  await admin.getByLabel('Độ trễ hiện người thắng (giây)').fill('1,2');
+  await admin.getByLabel('Độ trễ hiện người thắng (giây)').press('Enter');
+  await waitForDoc<{ winnerDelay?: number }>('screens/san-khau-chinh', (s) => s?.winnerDelay === 1.2);
+
+  await admin.getByRole('button', { name: 'Công bố kết quả' }).click();
+  const match = await waitForDoc<{ rounds: { isConfirmed: boolean; winner?: string; isTieBreak?: boolean }[]; status: string }>(
     `matches/${activeMatchId}`,
-    (m) => Boolean(m?.rounds[0].isConfirmed)
+    (m) => Boolean(m?.rounds[0].isConfirmed && m.rounds[1].isConfirmed)
   );
-  expect(match.rounds[0].winner).toBe('red');
-  expect(match.currentRound).toBe(2);
+  expect(match.rounds.map((r) => r.winner).slice(0, 2)).toEqual(['red', 'blue']);
+  expect(match.rounds.some((r) => r.isTieBreak)).toBe(true);
+  expect(match.status).toBe('ongoing');
+  await expect(admin.getByRole('button', { name: 'Công bố tie-break' })).toBeVisible();
   // Guests see the real sides only after the announcement (before it they are 'hidden').
   await waitForDoc<{ r1?: Record<string, string> }>(`publicVotes/${activeMatchId}`, (v) => v?.r1?.['gk-1'] === 'red');
 });
@@ -254,6 +264,43 @@ test('judges vote only in the match on stage; past matches are read-only', async
   expect((await vote(next)).status).toBe(200);
 
   await event.collection('votes').doc(next).delete();
+  await event.collection('meta').doc('current').update({ activeMatchId });
+});
+
+test('a judge sends a ballot: the LED shows a green tick at once, the console the colour', async ({ browser }) => {
+  const { activeMatchId } = await waitForDoc<{ activeMatchId: string }>('meta/current', (m) => Boolean(m?.activeMatchId));
+  const votes = new Set((await event.collection('votes').get()).docs.map((d) => d.id));
+  const fresh = (await event.collection('matches').get()).docs.find((d) => !votes.has(d.id) && d.data().status !== 'finished')!.id;
+  await event.collection('meta').doc('current').update({ activeMatchId: fresh });
+  await event.collection('screens').doc('san-khau-chinh').set({ scene: 'battle', blackout: false }, { merge: true });
+
+  const ledContext = await browser.newContext({ viewport: { width: 1280, height: 768 } });
+  const led = await ledContext.newPage();
+  await led.goto('/led?khung=vom');
+  await expect(led.getByRole('img', { name: 'GK 01: chờ phiếu' }).first()).toBeVisible();
+  await admin.goto('/admin/battle');
+  await expect(admin.getByText('0/9 phiếu').first()).toBeVisible();
+
+  const judgeContext = await browser.newContext();
+  const judge = await judgeContext.newPage();
+  await judge.goto('/giam-khao');
+  await judge.getByRole('button', { name: /GK 01/ }).click();
+  for (const digit of '123456') await judge.getByRole('button', { name: digit, exact: true }).click();
+  await judge.getByRole('button', { name: /Vào bàn chấm điểm/ }).click();
+  await openScoring(judge, 'Main Battle');
+  await judge.getByRole('button', { name: /Chọn góc đỏ/ }).click();
+  const sent = Date.now();
+  await judge.getByRole('button', { name: /Gửi phiếu: Đỏ/ }).click();
+
+  // The LED: a green tick, never the colour before the reveal. The console: the colour, live.
+  await expect(led.getByRole('img', { name: 'GK 01: đã chấm' }).first()).toBeVisible({ timeout: 5_000 });
+  console.log(`ballot on the LED after ${Date.now() - sent} ms`);
+  await expect(led.getByRole('img', { name: 'GK 01: Đỏ' })).toHaveCount(0);
+  await expect(admin.getByText('1/9 phiếu').first()).toBeVisible({ timeout: 5_000 });
+
+  await judgeContext.close();
+  await ledContext.close();
+  await event.collection('votes').doc(fresh).delete();
   await event.collection('meta').doc('current').update({ activeMatchId });
 });
 
@@ -363,6 +410,53 @@ test('check-in staff registers a walk-in and hands out an SBD, nothing else', as
 });
 
 // Last: switching to the rehearsal data reloads every open page, including the shared admin one.
+test('the live draw is entered by hand, a side withdraws, and the public bracket follows', async ({ browser }) => {
+  test.setTimeout(120_000); // three pages: the draw, the bracket console, the public bracket
+  const accept = (d: Dialog) => d.accept();
+  admin.on('dialog', accept);
+
+  await admin.goto('/admin/boc-tham');
+  await expect(admin.getByText('32/32')).toBeVisible(); // the saved teams are in
+  await admin.getByRole('button', { name: 'Điền ngẫu nhiên' }).click();
+  await expect(admin.getByText('Có thay đổi chưa lưu')).toBeVisible();
+  const team1 = [
+    await admin.getByLabel('Đội 01 · thí sinh 1').inputValue(),
+    await admin.getByLabel('Đội 01 · thí sinh 2').inputValue(),
+  ];
+  const team2 = [
+    await admin.getByLabel('Đội 02 · thí sinh 1').inputValue(),
+    await admin.getByLabel('Đội 02 · thí sinh 2').inputValue(),
+  ];
+  await admin.getByRole('button', { name: 'Lưu đội & tạo nhánh đấu' }).click();
+  // Top 16, battle 1: team 1 (red) vs team 2 (blue), in the order entered.
+  await waitForDoc<{ sideRed: { dancerIds: string[] }; sideBlue: { dancerIds: string[] } }>(
+    'matches/match-pro_2v2-top16-1',
+    (m) => m?.sideRed.dancerIds.join() === team1.join() && m.sideBlue.dancerIds.join() === team2.join()
+  );
+
+  // Team 2 withdraws: team 1 goes through.
+  await admin.goto('/admin/nhanh-dau');
+  await admin.getByRole('button', { name: /Kid Pro/ }).click();
+  await admin.getByRole('button', { name: 'Sự cố' }).first().click();
+  const dialog = admin.getByRole('dialog', { name: /Top 16 · Trận 01/ });
+  await dialog.getByRole('button', { name: 'Bỏ cuộc' }).nth(1).click();
+  await waitForDoc<{ status: string; winnerSide: string; forfeitSide: string }>(
+    'matches/match-pro_2v2-top16-1',
+    (m) => m?.status === 'finished' && m.winnerSide === 'red' && m.forfeitSide === 'blue'
+  );
+  await dialog.getByRole('button', { name: 'Đóng' }).click();
+  admin.off('dialog', accept);
+
+  // Anyone can follow it on the public bracket, live.
+  const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
+  const guest = await context.newPage();
+  await guest.goto('/ket-qua/so-do');
+  await expect(guest.getByRole('tab', { name: 'Kid Pro 2vs2' })).toHaveAttribute('aria-selected', 'true');
+  await expect(guest.getByText('Bỏ cuộc')).toBeVisible();
+  await expect(guest.getByText('Vô địch')).toBeVisible();
+  await context.close();
+});
+
 test('rehearsal: sample data in its own tree, switched on for every device, then deleted', async ({ browser }) => {
   const rehearsal = getFirestore().collection('events').doc('hiphopxutra-2026-dev');
   const realNewbies = (await event.collection('newbieDancers').count().get()).data().count;

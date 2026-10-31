@@ -1,27 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { ArrowRight, CheckCircle2, ChevronDown, Eye, RotateCcw, Swords, Timer, Trophy, Tv, Zap } from 'lucide-react';
 import { TeamThumb } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
-import {
-  Swords,
-  RotateCcw,
-  Tv,
-  CheckCircle2,
-  ArrowRight,
-  Trophy,
-  Eye,
-  Zap,
-  Award,
-} from 'lucide-react';
-
-import {
-  getTeamPhotoUrl,
-  getDancerAvatarUrl,
-  stripBreakerPrefix,
-} from '../../shared/placeholderAssets';
+import { useStageController, DEFAULT_SCREEN_ID } from '../../state/useStage';
 import { useOnlineJudgeIds } from '../../state/useJudgePresence';
+import { getTeamPhotoUrl, getDancerAvatarUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
+import { BattleMatch, BattleRound, BattleSide } from '../../domain/types';
+import { isRoundOpen } from '../../domain/model';
+import { regulationRounds } from '../../domain/battle';
+import { DEFAULT_WINNER_DELAY } from '../../domain/reveal';
 
+type Side = 'red' | 'blue';
+
+const sideName = (side: BattleSide) =>
+  side.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ') || stripBreakerPrefix(side.name);
+const roundLabel = (r: BattleRound) => (r.isTieBreak ? 'Tie-break' : `Round ${r.roundNumber}`);
+const votesIn = (r: BattleRound) => Object.values(r.votes).filter(Boolean).length;
+
+/**
+ * /admin/battle: one match on stage. The whole match at a glance (every round × the 9 judges), one primary action
+ * at a time: reveal the regulation rounds in one press (the LED flips them row after row, then lights the result up
+ * after the winner delay; a level score opens the tie-break), reveal the tie-break, then move on to the next match.
+ * Manual overrides live in a folded section below.
+ */
 export const BattleOperatorView: React.FC = () => {
   const {
+    authUser,
     matches,
     activeMatchId,
     setActiveMatchId,
@@ -32,7 +36,6 @@ export const BattleOperatorView: React.FC = () => {
     declareMatchWinner,
     triggerVictoryAnimation,
     triggerTeamEntrance,
-    advanceToNextRound,
     addTieBreakRound,
     resetMatch,
     setActiveView,
@@ -40,592 +43,412 @@ export const BattleOperatorView: React.FC = () => {
     storageConfig,
   } = useTournament();
   const onlineJudgeIds = useOnlineJudgeIds();
-
-  const [selectedRoundNum, setSelectedRoundNum] = React.useState<number | null>(null);
+  const stage = useStageController(DEFAULT_SCREEN_ID, authUser?.email ?? '');
+  const winnerDelay = stage.state.winnerDelay ?? DEFAULT_WINNER_DELAY;
 
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
-  const activeRoundNum = selectedRoundNum ?? (match?.currentRound || 1);
-  const currentRound = match?.rounds.find((r) => r.roundNumber === activeRoundNum) || match?.rounds[0];
+  const [overrideRound, setOverrideRound] = useState<number | null>(null);
+  useEffect(() => setOverrideRound(null), [match?.id]);
 
-  React.useEffect(() => {
-    setSelectedRoundNum(null);
-  }, [match?.id]);
+  if (!match) return <div className="p-8 text-center text-zinc-500">Chưa có trận đấu nào.</div>;
 
-  if (!match) return <div className="p-8 text-center text-zinc-500">Không tìm thấy trận đấu</div>;
+  const regular = regulationRounds(match);
+  const tieBreak = match.rounds.find((r) => r.isTieBreak);
+  const regularHidden = regular.some((r) => !isRoundOpen(r));
+  const missingVotes = regular.reduce((n, r) => n + Math.max(0, judges.length - votesIn(r)), 0);
+  const tieHidden = Boolean(tieBreak && !isRoundOpen(tieBreak));
+  const nextMatch = matches[matches.findIndex((m) => m.id === match.id) + 1];
+  const winnerName = match.winnerSide ? sideName(match.winnerSide === 'red' ? match.sideRed : match.sideBlue) : '';
 
-  const totalVotesCount = Object.keys(currentRound?.votes || {}).length;
+  const revealRegular = () => {
+    if (missingVotes > 0 && !window.confirm(`Còn thiếu ${missingVotes} phiếu. Vẫn công bố? Ô thiếu phiếu hiện "—".`)) return;
+    revealAllRounds(match.id, winnerDelay);
+  };
+  const revealTieBreak = () => {
+    if (!tieBreak) return;
+    const missing = judges.length - votesIn(tieBreak);
+    if (missing > 0 && !window.confirm(`Tie-break còn thiếu ${missing} phiếu. Vẫn công bố?`)) return;
+    confirmRoundResult(match.id, tieBreak.roundNumber, winnerDelay);
+  };
+
+  const overrideTarget = match.rounds.find((r) => r.roundNumber === overrideRound) ?? match.rounds.find((r) => !isRoundOpen(r)) ?? match.rounds[0];
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-5">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-200 pb-4">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-4">
+      {/* Header: which match, the way to the next one and to the LED */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-3 border-b border-zinc-200 pb-4">
         <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
-              BÀN ĐIỀU HÀNH BATTLE (MC / DJ)
-            </span>
-            <span className="text-xs text-zinc-500 font-medium">9 Giám Khảo Chấm Trực Tiếp</span>
-          </div>
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-800 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-200">
+            Bàn điều hành battle
+          </span>
           <h1 className="font-condensed font-black text-2xl sm:text-3xl text-zinc-900 tracking-tight mt-1 uppercase">
-            Điều hành trận đối kháng trực tiếp
+            {match.category === 'pro_2v2' ? 'Pro 2vs2' : 'Newbie 1vs1'} · {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
           </h1>
         </div>
-
-        {/* Match Quick Selector */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={match.id}
             onChange={(e) => setActiveMatchId(e.target.value)}
-            className="bg-white border border-zinc-300 text-zinc-900 text-xs font-bold rounded px-3 py-2 outline-none cursor-pointer shadow-xs"
+            aria-label="Trận đang đấu"
+            className="max-w-full bg-white border border-zinc-300 text-zinc-900 text-xs font-bold rounded px-3 py-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
           >
             {matches.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.category === 'pro_2v2' ? 'PRO 2v2' : 'NEWBIE 1v1'} • {m.stageName} • Trận {m.matchNumber} ({m.sideRed.name} vs {m.sideBlue.name})
+                {m.category === 'pro_2v2' ? 'Pro 2v2' : 'Newbie 1v1'} · {m.stageName} · Trận {m.matchNumber} ({sideName(m.sideRed)} vs {sideName(m.sideBlue)})
+                {m.status === 'finished' ? ' ✓' : ''}
               </option>
             ))}
           </select>
-
           <button
             onClick={() => setActiveView('stage_control')}
-            className="flex items-center gap-1.5 px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-2 rounded border border-zinc-300 bg-white text-zinc-800 hover:bg-zinc-100 text-xs font-bold cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
           >
-            <Tv className="w-3.5 h-3.5" />
-            <span>Xem Màn LED Sân Khấu</span>
+            <Tv className="w-3.5 h-3.5" /> Màn LED
           </button>
         </div>
       </div>
 
-      {/* Main Console Panel (Dark Sports Terminal) */}
-      <div className="bg-white text-zinc-900 rounded p-5 border border-zinc-200 shadow-sm space-y-5">
-        {/* Match Metadata Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-zinc-200 pb-3">
-          <div>
-            <div className="text-[11px] font-mono text-zinc-500 font-bold tracking-wider uppercase">
-              {match.category === 'pro_2v2' ? 'HẠNG MỤC PRO 2VS2' : 'HẠNG MỤC NEWBIE 1VS1'}
-            </div>
-            <div className="font-condensed font-black text-2xl text-zinc-900 mt-0.5 uppercase">
-              {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
-            </div>
+      {/* Scoreboard */}
+      <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 rounded-lg border border-zinc-200 bg-white p-3 sm:p-4">
+        <Corner match={match} side="red" placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)} avatar={getDancerAvatarUrl(match.sideRed.dancers[0], storageConfig.placeholders)} winner={match.winnerSide} />
+        <div className="flex flex-col items-center gap-1.5">
+          <div className="flex items-center gap-2 font-condensed font-black text-5xl tabular-nums leading-none">
+            <span className="text-red-600">{match.roundWinsRed}</span>
+            <span className="text-zinc-300">–</span>
+            <span className="text-blue-600">{match.roundWinsBlue}</span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded font-condensed font-black text-xs tracking-widest uppercase border ${
-              currentRound?.isTieBreak
-                ? 'bg-amber-50 text-amber-700 border-amber-500 animate-pulse'
-                : 'bg-zinc-50 text-zinc-900 border-zinc-300'
-            }`}>
-              {currentRound?.isTieBreak ? `ROUND TIE-BREAK (HIỆP PHỤ)` : `ĐANG XEM: ROUND ${activeRoundNum} / ${match.totalRoundsRequired}`}
-            </span>
-          </div>
-        </div>
-
-        {/* Round Selector Tabs for Admin */}
-        <div className="flex items-center gap-2 p-1.5 bg-white/90 border border-zinc-200 rounded-lg overflow-x-auto">
-          <span className="text-[11px] font-mono font-bold text-zinc-500 px-2 shrink-0">CHỌN ROUND ĐIỀU HÀNH:</span>
-          {match.rounds.map((r) => {
-            const isSelected = r.roundNumber === activeRoundNum;
-            const votesCount = Object.keys(r.votes).length;
-            const isRev = r.isConfirmed || r.isRevealed;
-
-            return (
-              <button
-                key={r.roundNumber}
-                onClick={() => setSelectedRoundNum(r.roundNumber)}
-                className={`px-3 py-1.5 rounded font-condensed font-black text-xs uppercase tracking-wider flex items-center gap-2 cursor-pointer transition-all ${
-                  isSelected
-                    ? r.isTieBreak
-                      ? 'bg-amber-500 text-black shadow-md ring-2 ring-amber-400'
-                      : 'bg-white text-black shadow-md ring-2 ring-white/50'
-                    : r.isTieBreak
-                    ? 'bg-amber-50 text-amber-700 border border-amber-600/70 hover:bg-amber-100'
-                    : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
-                }`}
-              >
-                <span>{r.isTieBreak ? '⚡ TIE-BREAK' : `ROUND ${r.roundNumber}`}</span>
-                <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
-                  isRev
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : votesCount >= 9
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-zinc-200 text-zinc-700'
-                }`}>
-                  {isRev ? (r.winner === 'red' ? 'ĐỎ THẮNG' : r.winner === 'blue' ? 'XANH THẮNG' : 'HÒA') : `${votesCount}/9 GK`}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* 2 Corners Split Score */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
-          {/* GÓC ĐỎ */}
-          <div className="bg-zinc-50 border border-red-600/70 rounded p-4 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <TeamThumb
-                photoUrl={match.category === 'pro_2v2' ? match.sideRed.teamPhotoUrl : getDancerAvatarUrl(match.sideRed.dancers[0], storageConfig.placeholders)}
-                dancers={match.category === 'pro_2v2' ? match.sideRed.dancers : []}
-                placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
-                alt={match.sideRed.name}
-                className="w-14 h-14 rounded object-cover border-2 border-red-600 shrink-0"
-                overlapClassName="-ml-7"
-              />
-              <div className="space-y-0.5">
-                <span className="text-[10px] font-condensed font-black text-red-600 uppercase tracking-widest">
-                  GÓC ĐỎ • RED CORNER
-                </span>
-                <div className="font-condensed font-black text-2xl text-zinc-900 uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
-                  {match.sideRed.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ') || stripBreakerPrefix(match.sideRed.name)}
-                </div>
-                <div className="text-xs text-red-700 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
-                  {match.category === 'pro_2v2'
-                    ? `${match.sideRed.name} · ${match.sideRed.sbdText}`
-                    : [match.sideRed.dancers[0]?.crew, match.sideRed.sbdText].filter(Boolean).join(' · ')}
-                </div>
-              </div>
-            </div>
-            <div className="w-16 h-16 rounded bg-red-600 flex items-center justify-center font-condensed font-black text-4xl text-white shadow-sm shrink-0 tabular-nums">
-              {match.roundWinsRed}
-            </div>
-          </div>
-
-          {/* GÓC XANH */}
-          <div className="bg-zinc-50 border border-blue-600/70 rounded p-4 flex items-center justify-between gap-4">
-            <div className="w-16 h-16 rounded bg-blue-600 flex items-center justify-center font-condensed font-black text-4xl text-white shadow-sm shrink-0 tabular-nums">
-              {match.roundWinsBlue}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="text-right space-y-0.5 min-w-0">
-                <span className="text-[10px] font-condensed font-black text-blue-600 uppercase tracking-widest">
-                  BLUE CORNER • GÓC XANH
-                </span>
-                <div className="font-condensed font-black text-2xl text-zinc-900 uppercase leading-tight whitespace-nowrap overflow-hidden text-ellipsis">
-                  {match.sideBlue.dancers.map((d) => stripBreakerPrefix(d.name)).join(' & ') || stripBreakerPrefix(match.sideBlue.name)}
-                </div>
-                <div className="text-xs text-blue-700 font-bold uppercase whitespace-nowrap overflow-hidden text-ellipsis">
-                  {match.category === 'pro_2v2'
-                    ? `${match.sideBlue.name} · ${match.sideBlue.sbdText}`
-                    : [match.sideBlue.dancers[0]?.crew, match.sideBlue.sbdText].filter(Boolean).join(' · ')}
-                </div>
-              </div>
-              <TeamThumb
-                photoUrl={match.category === 'pro_2v2' ? match.sideBlue.teamPhotoUrl : getDancerAvatarUrl(match.sideBlue.dancers[0], storageConfig.placeholders)}
-                dancers={match.category === 'pro_2v2' ? match.sideBlue.dancers : []}
-                placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)}
-                alt={match.sideBlue.name}
-                className="w-14 h-14 rounded object-cover border-2 border-blue-600 shrink-0"
-                overlapClassName="-ml-7"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Entrance & Stage Visual Cues */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5 px-3.5 py-2.5 bg-zinc-50 border border-zinc-200 rounded-xl shadow-sm">
-          <div className="flex items-center gap-2 text-xs text-zinc-700">
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
-            <span className="font-bold text-amber-700 uppercase tracking-wider font-mono text-[11px]">
-              ĐIỀU PHỐI MÀN LED SÂN KHẤU:
-            </span>
-            <span className="text-zinc-500 text-xs hidden sm:inline">
-              Hiệu ứng 2 team lướt từ 2 bên ngoài vào sân kèm âm thanh va chạm VS
-            </span>
-          </div>
-
           <button
             onClick={() => triggerTeamEntrance(match.id)}
-            className="px-4 py-2 rounded-lg bg-gradient-to-r from-red-600 via-amber-500 to-blue-600 hover:brightness-110 text-white font-condensed font-black text-xs uppercase tracking-wider shadow-md flex items-center gap-2 transition-all transform hover:scale-102 active:scale-98 cursor-pointer shrink-0"
-            title="Kích hoạt hiệu ứng 2 team ra sân từ ngoài vào trên Màn LED"
+            className="flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
+            title="Hai bên lướt vào sân trên màn LED, kèm âm thanh"
           >
-            <Swords className="w-4 h-4 text-amber-700" />
-            <span>🎬 HIỆU ỨNG RA SÂN (2 TEAM TỪ NGOÀI VÀO)</span>
+            <Swords className="h-3.5 w-3.5" /> Hiệu ứng ra sân
           </button>
         </div>
+        <Corner match={match} side="blue" placeholder={getTeamPhotoUrl(undefined, storageConfig.placeholders)} avatar={getDancerAvatarUrl(match.sideBlue.dancers[0], storageConfig.placeholders)} winner={match.winnerSide} />
+      </div>
 
-        {/* =========================================================================
-            ADMIN BROADCAST ANNOUNCEMENT CENTER (ĐIỀU HÀNH CÔNG BỐ KẾT QUẢ LÊN MÀN LED)
-            - Màn LED sân khấu không có nút tương tác (chỉ phát sóng).
-            - Mọi lệnh công bố được thực hiện tại đây bởi Admin!
-            ========================================================================= */}
-        {(() => {
-          const tieBreakRound = match.rounds.find((r) => r.isTieBreak);
-          const regRounds = match.rounds.filter((r) => !r.isTieBreak);
-          const hasUnrevealedReg = regRounds.some((r) => !r.isRevealed && !r.isConfirmed);
-          const allRegVoted = regRounds.length > 0 && regRounds.every((r) => Object.keys(r.votes).length >= 9);
-          const isTieBreakUnrevealed = tieBreakRound && !tieBreakRound.isRevealed && !tieBreakRound.isConfirmed;
-
-          return (
-            <div className="space-y-3">
-              {/* Notice Banner to Admin */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between text-xs px-3.5 py-2.5 rounded bg-zinc-50 border border-zinc-200 text-zinc-700 font-medium gap-2">
-                <div className="flex items-center gap-2">
-                  <span className={`w-2.5 h-2.5 rounded-full ${hasUnrevealedReg || isTieBreakUnrevealed ? 'bg-emerald-400 animate-pulse' : 'bg-blue-400'}`} />
-                  <span>
-                    <strong>Trạng thái Màn LED:</strong>{' '}
-                    {hasUnrevealedReg || isTieBreakUnrevealed ? (
-                      <span className="text-emerald-700 font-bold">Đang hiển thị Ô XANH LÁ TÍCH ✓ (BẢO MẬT PHIẾU BẦU)</span>
-                    ) : (
-                      <span className="text-sky-300 font-bold">Đã công bố màu ĐỎ / XANH của Giám khảo</span>
-                    )}
-                  </span>
-                </div>
-                <span className="text-[11px] text-zinc-500 italic">
-                  * Màn LED sân khấu chỉ hiển thị kết quả, không có nút bấm tương tác.
-                </span>
-              </div>
-
-              {/* ACTION 1: CÔNG BỐ KẾT QUẢ CẢ 2 ROUND LÊN MÀN LED */}
-              {hasUnrevealedReg && allRegVoted && (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-amber-500/25 via-amber-400/35 to-amber-500/25 border-2 border-amber-400 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
-                  <div className="space-y-1">
-                    <div className="font-condensed font-black text-xl text-amber-700 uppercase flex items-center gap-2">
-                      <Eye className="w-6 h-6 text-amber-700" />
-                      <span>CẢ 2 ROUND ĐÃ ĐỦ 9/9 PHIẾU BẦU · SẴN SÀNG CÔNG BỐ</span>
-                    </div>
-                    <div className="text-xs text-zinc-800">
-                      Ấn nút công bố để màn LED đồng loạt hiển thị màu sắc 9 Giám Khảo. Nếu hòa 1 - 1, hệ thống sẽ tự động xuất hiện dòng Round Tie-Break.
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => revealAllRounds(match.id)}
-                    className="px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-condensed font-black text-base uppercase tracking-wider shadow-[0_0_25px_rgba(251,191,36,0.9)] border-2 border-white cursor-pointer flex items-center gap-2 transition-all transform hover:scale-102 active:scale-98 shrink-0 animate-pulse"
-                  >
-                    <Eye className="w-5 h-5 text-black" />
-                    <span>📢 ADMIN CÔNG BỐ KẾT QUẢ CẢ 2 ROUNDS LÊN MÀN LED</span>
-                  </button>
-                </div>
-              )}
-
-              {/* ACTION 2: CÔNG BỐ KẾT QUẢ HIỆP PHỤ TIE-BREAK */}
-              {isTieBreakUnrevealed && (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-red-600/30 via-amber-500/35 to-red-600/30 border-2 border-amber-400 flex flex-col md:flex-row items-center justify-between gap-4 shadow-xl">
-                  <div className="space-y-1">
-                    <div className="font-condensed font-black text-xl text-amber-700 uppercase flex items-center gap-2">
-                      <Zap className="w-6 h-6 text-amber-700 fill-amber-300" />
-                      <span>ROUND TIE-BREAK (HIỆP PHỤ): {Object.keys(tieBreakRound.votes).length}/9 GK ĐÃ NỘP</span>
-                    </div>
-                    <div className="text-xs text-zinc-800">
-                      Trận đấu hòa {match.roundWinsRed} - {match.roundWinsBlue}. Sau khi các giám khảo chấm xong Tie-Break, Admin ấn công bố để trao cúp chiến thắng!
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0">
-                    {Object.keys(tieBreakRound.votes).length < 9 && (
-                      <button
-                        onClick={() => {
-                          const sampleVotes: Record<string, 'red' | 'blue'> = {
-                            'gk-1': 'red', 'gk-2': 'blue', 'gk-3': 'red', 'gk-4': 'blue',
-                            'gk-5': 'red', 'gk-6': 'red', 'gk-7': 'blue', 'gk-8': 'red', 'gk-9': 'blue',
-                          };
-                          judges.forEach((j) => {
-                            submitJudgeVote(match.id, tieBreakRound.roundNumber, j.id, sampleVotes[j.id]);
-                          });
-                        }}
-                        className="px-3.5 py-2.5 rounded-lg bg-amber-100 hover:bg-amber-500/30 border border-amber-400 text-amber-700 text-xs font-mono font-bold cursor-pointer transition-colors"
-                      >
-                        + Mô phỏng 9 GK nộp phiếu Tie-Break
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => confirmRoundResult(match.id, tieBreakRound.roundNumber)}
-                      className="px-6 py-3.5 rounded-xl bg-gradient-to-r from-red-600 to-amber-500 hover:brightness-110 text-white font-condensed font-black text-base uppercase tracking-wider shadow-[0_0_25px_rgba(239,68,68,0.9)] border-2 border-amber-300 cursor-pointer flex items-center gap-2 transition-all transform hover:scale-102 active:scale-98 animate-pulse"
-                    >
-                      <Zap className="w-5 h-5 text-amber-700 fill-amber-300" />
-                      <span>⚡ ADMIN CÔNG BỐ KẾT QUẢ TIE-BREAK LÊN MÀN LED</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* =========================================================================
-            ADMIN VICTORY CONTROLS: CHỌN NGƯỜI THẮNG & KÍCH HOẠT HOẠT ẢNH MÀN LED
-            ========================================================================= */}
-        <div className="p-4 rounded-xl bg-zinc-50 border-2 border-amber-500/70 space-y-3 shadow-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-zinc-200 pb-2.5">
-            <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-600 fill-amber-400" />
-              <span className="font-condensed font-black text-base uppercase text-zinc-900 tracking-wide">
-                ĐIỀU HÀNH KẾT QUẢ CHUNG CUỘC & KÍCH HOẠT HIỆU ỨNG CHIẾN THẮNG (MÀN LED)
-              </span>
-            </div>
-            {match.status === 'finished' ? (
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-700 font-bold text-xs uppercase flex items-center gap-1.5 self-start sm:self-auto">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                ĐÃ CHỌN THẮNG: {match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}
-              </span>
-            ) : (
-              <span className="text-[11px] text-zinc-500 font-mono italic">
-                * Tự động bật pháo hoa, âm thanh fanfare & khung vinh danh trên Màn LED
-              </span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {/* GÓC ĐỎ WINNER BUTTON */}
-            <button
-              onClick={() => declareMatchWinner(match.id, 'red')}
-              className={`p-3.5 rounded-xl border-2 flex items-center justify-between gap-3 text-left transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md ${
-                match.status === 'finished' && match.winnerSide === 'red'
-                  ? 'bg-red-600/30 border-red-500 text-zinc-900 shadow-[0_0_20px_rgba(239,68,68,0.5)] ring-2 ring-red-400'
-                  : 'bg-zinc-100 hover:bg-red-50 border-red-600/60 text-zinc-800 hover:text-zinc-900'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-lg bg-red-600 flex items-center justify-center font-condensed font-black text-xl text-white shrink-0">
-                  ĐỎ
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-mono text-red-600 uppercase font-black tracking-wider">
-                    GÓC ĐỎ • RED CORNER
-                  </div>
-                  <div className="font-condensed font-black text-lg text-zinc-900 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
-                    {stripBreakerPrefix(match.sideRed.name)}
-                  </div>
-                  <div className="text-xs text-zinc-500">
-                    Tỉ số hiện tại: {match.roundWinsRed} rounds thắng
-                  </div>
-                </div>
-              </div>
-
-              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-condensed font-black text-xs uppercase tracking-wider">
-                <Trophy className="w-4 h-4 text-amber-700" />
-                <span>CHỌN THẮNG</span>
-              </div>
-            </button>
-
-            {/* GÓC XANH WINNER BUTTON */}
-            <button
-              onClick={() => declareMatchWinner(match.id, 'blue')}
-              className={`p-3.5 rounded-xl border-2 flex items-center justify-between gap-3 text-left transition-all transform hover:scale-[1.01] active:scale-[0.99] cursor-pointer shadow-md ${
-                match.status === 'finished' && match.winnerSide === 'blue'
-                  ? 'bg-blue-600/30 border-blue-500 text-zinc-900 shadow-[0_0_20px_rgba(59,130,246,0.5)] ring-2 ring-blue-400'
-                  : 'bg-zinc-100 hover:bg-blue-50 border-blue-600/60 text-zinc-800 hover:text-zinc-900'
-              }`}
-            >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center font-condensed font-black text-xl text-white shrink-0">
-                  XANH
-                </div>
-                <div className="min-w-0">
-                  <div className="text-[10px] font-mono text-blue-600 uppercase font-black tracking-wider">
-                    GÓC XANH • BLUE CORNER
-                  </div>
-                  <div className="font-condensed font-black text-lg text-zinc-900 uppercase whitespace-nowrap overflow-hidden text-ellipsis">
-                    {stripBreakerPrefix(match.sideBlue.name)}
-                  </div>
-                  <div className="text-xs text-zinc-500">
-                    Tỉ số hiện tại: {match.roundWinsBlue} rounds thắng
-                  </div>
-                </div>
-              </div>
-
-              <div className="shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-condensed font-black text-xs uppercase tracking-wider">
-                <Trophy className="w-4 h-4 text-amber-700" />
-                <span>CHỌN THẮNG</span>
-              </div>
-            </button>
-          </div>
-
-          {/* Quick trigger replay button for stage LED screen */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-200">
-            <span className="text-xs text-zinc-500">
-              {match.status === 'finished'
-                ? `Đã chọn người chiến thắng: ${match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}`
-                : 'Chưa chốt người thắng chung cuộc. Có thể chọn ngay hoặc chờ chấm hết các round.'}
-            </span>
-
-            <button
-              onClick={() => triggerVictoryAnimation(match.id)}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 hover:brightness-110 text-black font-condensed font-black text-xs uppercase tracking-wider flex items-center gap-2 shadow-md cursor-pointer transition-transform hover:scale-102 active:scale-98"
-            >
-              <Trophy className="w-4 h-4 text-black" />
-              <span>KÍCH HOẠT LẠI HOẠT ẢNH CHIẾN THẮNG (MÀN LED)</span>
-            </button>
-          </div>
+      {/* The one thing to do next */}
+      <div className="flex flex-col md:flex-row md:items-center gap-4 rounded-lg border-2 border-amber-400 bg-amber-50 p-4">
+        <div className="min-w-0 flex-1">
+          {match.status === 'finished' ? (
+            <>
+              <p className="flex items-center gap-2 font-condensed text-2xl font-black uppercase text-zinc-900">
+                <Trophy className="h-6 w-6 text-amber-500" /> {winnerName} thắng {match.roundWinsRed}–{match.roundWinsBlue}
+              </p>
+              <p className="text-xs text-zinc-600">Trận đã kết thúc. Người thắng tự vào trận kế tiếp trên nhánh đấu.</p>
+            </>
+          ) : tieHidden && tieBreak ? (
+            <>
+              <p className="flex items-center gap-2 font-condensed text-2xl font-black uppercase text-amber-700">
+                <Zap className="h-6 w-6" /> Hòa {match.roundWinsRed}–{match.roundWinsBlue} · Tie-break
+              </p>
+              <p className="text-xs text-zinc-600">
+                Dòng tie-break đã sáng trên LED. Giám khảo chấm tie-break: {votesIn(tieBreak)}/{judges.length} phiếu.
+              </p>
+            </>
+          ) : regularHidden ? (
+            <>
+              <p className="font-condensed text-2xl font-black uppercase text-zinc-900">
+                Công bố {regular.length > 1 ? `cả ${regular.length} round` : 'kết quả'}
+              </p>
+              <p className="text-xs text-zinc-600">
+                {regular.map((r) => `${roundLabel(r)}: ${votesIn(r)}/${judges.length}`).join(' · ')}. Bấm một lần: LED lật lần lượt từng ô,
+                hết round này sang round kia, rồi sáng người thắng. Hòa thì dòng tie-break sáng lên.
+              </p>
+            </>
+          ) : (
+            <p className="text-sm font-bold text-zinc-700">Đã công bố. Chờ điều hành chọn bước tiếp theo.</p>
+          )}
         </div>
 
-        {/* Live Status of 9 Judges for Active Round */}
-        <div className="space-y-2.5 pt-1">
-          <div className="flex items-center justify-between text-xs">
-            <div className="font-bold text-zinc-700 flex items-center gap-2">
-              <span>Trạng thái nhận phiếu 9 Giám khảo ({currentRound?.isTieBreak ? 'Hiệp phụ Tie-Break' : `Round ${activeRoundNum}`})</span>
-              <span className="font-mono text-xs font-bold text-emerald-700 bg-zinc-50 px-2 py-0.5 rounded border border-zinc-300">
-                {totalVotesCount} / 9 đã gửi
-              </span>
-            </div>
-            <div className="text-[11px] text-zinc-500">
-              Quy tắc: từ 5/9 phiếu sẽ thắng round (không hòa round). Nếu hòa 1 - 1 sau 2 round sẽ đấu Tie-break.
-            </div>
-          </div>
+        <label className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700">
+          <Timer className="h-4 w-4 text-amber-600" />
+          Hiện người thắng sau
+          <DelayInput value={winnerDelay} onChange={stage.setWinnerDelay} />
+          giây
+        </label>
 
-          {/* 9 Judges vote cards */}
-          <div className="grid grid-cols-3 sm:grid-cols-9 gap-2">
-            {judges.map((j) => {
-              const vote = currentRound?.votes[j.id];
-
-              return (
-                <div
-                  key={j.id}
-                  className={`p-2 rounded border text-center transition-colors ${
-                    vote === 'red'
-                      ? 'bg-red-50 border-red-600 text-zinc-900'
-                      : vote === 'blue'
-                      ? 'bg-blue-50 border-blue-600 text-zinc-900'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-500'
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-1 text-[11px] font-mono font-bold truncate text-amber-600">
-                    <span
-                      className={`w-1.5 h-1.5 rounded-full shrink-0 ${onlineJudgeIds.has(j.id) ? 'bg-emerald-400' : 'bg-zinc-600'}`}
-                      title={onlineJudgeIds.has(j.id) ? 'Giám khảo đang online' : 'Giám khảo offline'}
-                    />
-                    {j.code}
-                  </div>
-                  <div className="text-[10px] text-zinc-700 font-bold truncate uppercase">{j.judgeName || j.name.split('•')[1]?.trim() || j.code}</div>
-                  <div className="font-condensed font-black text-sm mt-0.5 uppercase">
-                    {vote === 'red' ? (
-                      <span className="text-red-600">ĐỎ</span>
-                    ) : vote === 'blue' ? (
-                      <span className="text-blue-600">XANH</span>
-                    ) : (
-                      <span className="text-zinc-500 font-sans text-xs">Chờ...</span>
-                    )}
-                  </div>
-                  {/* Operator manual override buttons */}
-                  <div className="flex justify-center gap-1 mt-1 pt-1 border-t border-zinc-200">
-                    <button
-                      onClick={() => submitJudgeVote(match.id, activeRoundNum, j.id, 'red')}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-red-800 hover:bg-red-700 text-white font-bold cursor-pointer"
-                      title="Gán phiếu ĐỎ"
-                    >
-                      Đ
-                    </button>
-                    <button
-                      onClick={() => submitJudgeVote(match.id, activeRoundNum, j.id, 'blue')}
-                      className="px-1.5 py-0.5 rounded text-[10px] bg-blue-800 hover:bg-blue-700 text-white font-bold cursor-pointer"
-                      title="Gán phiếu XANH"
-                    >
-                      X
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Round Tally & Control Actions */}
-        <div className="p-3.5 bg-zinc-50 rounded border border-zinc-200 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-4 text-xs font-semibold">
-            <div>
-              Phiếu Đỏ: <span className="font-condensed font-black text-red-600 text-base tabular-nums">{currentRound?.redVotesCount || 0}</span>
-            </div>
-            <div>
-              Phiếu Xanh: <span className="font-condensed font-black text-blue-600 text-base tabular-nums">{currentRound?.blueVotesCount || 0}</span>
-            </div>
-            {currentRound?.isConfirmed ? (
-              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px] border border-emerald-200 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                Đã chốt {currentRound?.isTieBreak ? 'Tie-Break' : `Round ${activeRoundNum}`}
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-500 font-bold text-[11px]">
-                Chưa công bố ({totalVotesCount}/9 GK)
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {!currentRound?.isConfirmed ? (
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {match.status === 'finished' ? (
+            <>
               <button
-                onClick={() => confirmRoundResult(match.id, activeRoundNum)}
-                className="px-4 py-2 rounded bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5 shadow-md"
+                onClick={() => triggerVictoryAnimation(match.id)}
+                className="flex items-center gap-1.5 rounded-lg border border-zinc-300 bg-white px-3 py-3 text-xs font-bold text-zinc-800 hover:bg-zinc-100 cursor-pointer"
               >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Công Bố & Xác Nhận {currentRound?.isTieBreak ? 'Tie-Break' : `Round ${activeRoundNum}`} Lên Màn LED</span>
+                <Trophy className="h-4 w-4" /> Phát lại hiệu ứng thắng
               </button>
-            ) : match.status !== 'finished' ? (
-              <button
-                onClick={() => advanceToNextRound(match.id)}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <span>Chuyển Sang Round Tiếp Theo</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 text-emerald-700 font-bold text-xs bg-emerald-50 px-2.5 py-1 rounded border border-emerald-700">
-                  <Trophy className="w-4 h-4 text-amber-600" />
-                  <span>Thắng: {match.winnerSide === 'red' ? match.sideRed.name : match.sideBlue.name}</span>
-                </div>
+              {nextMatch && (
                 <button
-                  onClick={() => triggerVictoryAnimation(match.id)}
-                  className="px-2.5 py-1 rounded bg-amber-400 hover:bg-amber-300 text-black font-condensed font-black text-xs uppercase flex items-center gap-1 cursor-pointer shadow transition-transform hover:scale-105 active:scale-95"
-                  title="Kích hoạt lại hoạt ảnh chiến thắng trên Màn LED"
+                  onClick={() => setActiveMatchId(nextMatch.id)}
+                  className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-5 py-3 font-condensed text-base font-black uppercase text-zinc-950 hover:bg-amber-400 cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
                 >
-                  <Tv className="w-3.5 h-3.5" />
-                  <span>Màn LED</span>
+                  Trận tiếp theo <ArrowRight className="h-4 w-4" />
                 </button>
-              </div>
-            )}
-
-            {/* Tie-Break Round Button for Operator */}
-            {(match.roundWinsRed === match.roundWinsBlue || match.rounds.some((r) => r.isTieBreak)) && (
-              <button
-                onClick={() => addTieBreakRound(match.id)}
-                className="px-3 py-2 rounded bg-amber-500 hover:bg-amber-400 text-black font-black text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center gap-1 shadow-md"
-                title="Kích hoạt thêm hiệp phụ Tie-break"
-              >
-                <span>⚡ Thêm Tie-Break</span>
-              </button>
-            )}
-
+              )}
+            </>
+          ) : tieHidden ? (
             <button
-              onClick={() => {
-                if (window.confirm('Đặt lại tỉ số trận đấu này về 0-0?')) {
-                  resetMatch(match.id);
-                }
-              }}
-              className="p-2 rounded bg-zinc-100 hover:bg-zinc-200 text-zinc-500 hover:text-zinc-900 transition-colors cursor-pointer"
-              title="Đặt lại trận đấu về 0-0"
+              onClick={revealTieBreak}
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 font-condensed text-lg font-black uppercase text-zinc-950 hover:bg-amber-400 cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <Zap className="h-5 w-5" /> Công bố tie-break
             </button>
-          </div>
-        </div>
-
-        {/* DJ & MC Quick Audio Deck */}
-        <div className="pt-2 border-t border-zinc-200 flex flex-wrap items-center justify-between gap-2 text-xs">
-          <div className="text-zinc-500 text-[11px] font-bold uppercase tracking-wider">
-            Âm thanh MC & DJ:
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5">
+          ) : regularHidden ? (
             <button
-              onClick={() => playAudioEffect('airhorn')}
-              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
+              onClick={revealRegular}
+              className="flex items-center gap-2 rounded-lg bg-amber-500 px-6 py-3 font-condensed text-lg font-black uppercase text-zinc-950 hover:bg-amber-400 cursor-pointer focus-visible:outline-2 focus-visible:outline-zinc-900"
             >
-              🎺 Airhorn
+              <Eye className="h-5 w-5" /> Công bố kết quả
             </button>
-            <button
-              onClick={() => playAudioEffect('roundWin')}
-              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
-            >
-              🥊 Cồng Thắng Round
-            </button>
-            <button
-              onClick={() => playAudioEffect('champion')}
-              className="px-2.5 py-1 rounded bg-zinc-50 hover:bg-zinc-100 border border-zinc-300 text-zinc-800 text-xs font-bold transition-colors cursor-pointer"
-            >
-              🏆 Kèn Vô Địch
-            </button>
-          </div>
+          ) : null}
         </div>
       </div>
+      {stage.error && <p role="alert" className="text-xs font-bold text-red-600">Không lưu được độ trễ: {stage.error}</p>}
+
+      {/* Every round × the 9 judges: what the judges sent (the LED shows ✓ until the reveal) */}
+      <div className="overflow-x-auto rounded-lg border border-zinc-200 bg-white">
+        <table className="w-full min-w-[760px] border-collapse text-xs">
+          <thead>
+            <tr className="border-b border-zinc-200 bg-zinc-50">
+              <th className="w-32 px-3 py-2 text-left font-mono text-[11px] font-bold uppercase text-zinc-500">Round</th>
+              {judges.map((j) => (
+                <th key={j.id} className="px-1 py-2 text-center">
+                  <span className="flex items-center justify-center gap-1 font-mono text-[11px] font-black text-amber-600">
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${onlineJudgeIds.has(j.id) ? 'bg-emerald-500' : 'bg-zinc-300'}`}
+                      title={onlineJudgeIds.has(j.id) ? 'Đang online' : 'Offline'}
+                    />
+                    {j.code}
+                  </span>
+                  <span className="block truncate text-[10px] font-bold uppercase text-zinc-600">{j.judgeName || j.code}</span>
+                </th>
+              ))}
+              <th className="w-32 px-3 py-2 text-right font-mono text-[11px] font-bold uppercase text-zinc-500">Kết quả</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[...regular, tieBreak ?? null].map((r) =>
+              r ? (
+                <RoundRow key={r.roundNumber} round={r} match={match} judgeIds={judges.map((j) => j.id)} />
+              ) : (
+                <tr key="tie-off" className="border-t border-zinc-100 text-zinc-300">
+                  <td className="px-3 py-2 font-condensed text-base font-black uppercase">
+                    <span className="flex items-center gap-1">
+                      <Zap className="h-3.5 w-3.5" /> Tie-break
+                    </span>
+                  </td>
+                  <td colSpan={judges.length + 1} className="px-3 py-2 text-xs font-bold">
+                    Chỉ mở khi hòa: sáng lên trên LED sau khi công bố.
+                  </td>
+                </tr>
+              )
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Manual overrides, folded away */}
+      <details className="group rounded-lg border border-zinc-200 bg-white">
+        <summary className="flex cursor-pointer list-none items-center justify-between px-4 py-3 text-xs font-bold uppercase tracking-wide text-zinc-600">
+          Can thiệp thủ công (khi máy giám khảo gặp sự cố)
+          <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
+        </summary>
+        <div className="space-y-4 border-t border-zinc-200 p-4">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold text-zinc-600">
+              Gán phiếu thay giám khảo cho
+              {match.rounds.map((r) => (
+                <button
+                  key={r.roundNumber}
+                  onClick={() => setOverrideRound(r.roundNumber)}
+                  className={`rounded px-2.5 py-1 font-condensed text-sm font-black uppercase cursor-pointer ${
+                    overrideTarget.roundNumber === r.roundNumber ? 'bg-zinc-900 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  }`}
+                >
+                  {roundLabel(r)}
+                </button>
+              ))}
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-9">
+              {judges.map((j) => (
+                <div key={j.id} className="rounded border border-zinc-200 p-1.5 text-center">
+                  <p className="font-mono text-[11px] font-black text-amber-600">{j.code}</p>
+                  <div className="mt-1 flex justify-center gap-1">
+                    {(['red', 'blue'] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => submitJudgeVote(match.id, overrideTarget.roundNumber, j.id, s)}
+                        disabled={isRoundOpen(overrideTarget)}
+                        className={`rounded px-2 py-0.5 text-[11px] font-bold text-white disabled:opacity-30 cursor-pointer ${
+                          s === 'red' ? 'bg-red-700 hover:bg-red-600' : 'bg-blue-700 hover:bg-blue-600'
+                        } ${overrideTarget.votes[j.id] === s ? 'ring-2 ring-amber-400' : ''}`}
+                        aria-label={`${j.code} ${roundLabel(overrideTarget)}: ${s === 'red' ? 'Đỏ' : 'Xanh'}`}
+                      >
+                        {s === 'red' ? 'Đ' : 'X'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 border-t border-zinc-200 pt-3">
+            {(['red', 'blue'] as Side[]).map((s) => (
+              <button
+                key={s}
+                onClick={() => window.confirm(`Chọn ${s === 'red' ? 'ĐỎ' : 'XANH'} thắng trận này?`) && declareMatchWinner(match.id, s)}
+                className={`flex items-center gap-1.5 rounded px-3 py-2 text-xs font-bold text-white cursor-pointer ${
+                  s === 'red' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                <Trophy className="h-3.5 w-3.5" /> Chọn {s === 'red' ? 'Đỏ' : 'Xanh'} thắng
+              </button>
+            ))}
+            {!tieBreak && (
+              <button
+                onClick={() => addTieBreakRound(match.id)}
+                className="flex items-center gap-1 rounded bg-amber-500 px-3 py-2 text-xs font-bold text-zinc-950 hover:bg-amber-400 cursor-pointer"
+              >
+                <Zap className="h-3.5 w-3.5" /> Mở tie-break
+              </button>
+            )}
+            <button
+              onClick={() => window.confirm('Đặt lại trận này về 0–0, xoá kết quả các round?') && resetMatch(match.id)}
+              className="ml-auto flex items-center gap-1.5 rounded border border-zinc-300 px-3 py-2 text-xs font-bold text-zinc-600 hover:bg-zinc-100 cursor-pointer"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Đặt lại 0–0
+            </button>
+          </div>
+        </div>
+      </details>
+
+      {/* DJ & MC sounds */}
+      <div className="flex flex-wrap items-center gap-1.5 text-xs">
+        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Âm thanh MC & DJ:</span>
+        {(
+          [
+            ['airhorn', '🎺 Airhorn'],
+            ['roundWin', '🥊 Cồng thắng round'],
+            ['champion', '🏆 Kèn vô địch'],
+          ] as const
+        ).map(([effect, label]) => (
+          <button
+            key={effect}
+            onClick={() => playAudioEffect(effect)}
+            className="rounded border border-zinc-300 bg-white px-2.5 py-1 font-bold text-zinc-800 hover:bg-zinc-100 cursor-pointer"
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
+  );
+};
+
+/** One corner on the scoreboard; greyed once the other corner has won. */
+const Corner: React.FC<{ match: BattleMatch; side: Side; placeholder: string; avatar: string; winner: Side | null | undefined }> = ({
+  match,
+  side,
+  placeholder,
+  avatar,
+  winner,
+}) => {
+  const data = side === 'red' ? match.sideRed : match.sideBlue;
+  const pro = match.category === 'pro_2v2';
+  const sub = pro ? [data.name, data.sbdText].filter(Boolean).join(' · ') : [data.dancers[0]?.crew, data.sbdText].filter(Boolean).join(' · ');
+  return (
+    <div
+      className={`flex min-w-0 items-center gap-3 ${side === 'blue' ? 'flex-row-reverse text-right' : ''} ${
+        match.status === 'finished' && winner && winner !== side ? 'opacity-40 grayscale' : ''
+      }`}
+    >
+      <TeamThumb
+        photoUrl={pro ? data.teamPhotoUrl : avatar}
+        dancers={pro ? data.dancers : []}
+        placeholder={placeholder}
+        alt={data.name}
+        className={`h-14 w-14 shrink-0 rounded object-cover border-2 ${side === 'red' ? 'border-red-600' : 'border-blue-600'}`}
+        overlapClassName="-ml-7"
+      />
+      <div className="min-w-0">
+        <p className={`text-[10px] font-black uppercase tracking-widest ${side === 'red' ? 'text-red-600' : 'text-blue-600'}`}>
+          Góc {side === 'red' ? 'Đỏ' : 'Xanh'}
+          {match.status === 'finished' && winner === side && ' · Thắng'}
+        </p>
+        <p className="truncate font-condensed text-2xl font-black uppercase leading-tight text-zinc-900">{sideName(data)}</p>
+        <p className="truncate text-xs font-bold text-zinc-500">{sub}</p>
+      </div>
+    </div>
+  );
+};
+
+/** One round: each judge's vote (admins see the colour before the reveal), then the count or the result. */
+const RoundRow: React.FC<{ round: BattleRound; match: BattleMatch; judgeIds: string[] }> = ({ round, match, judgeIds }) => {
+  const open = isRoundOpen(round);
+  const red = Object.values(round.votes).filter((v) => v === 'red').length;
+  const blue = Object.values(round.votes).filter((v) => v === 'blue').length;
+  const tie = Boolean(round.isTieBreak);
+  return (
+    <tr className={`border-t border-zinc-100 ${tie ? 'bg-amber-50' : ''}`}>
+      <td className="px-3 py-2">
+        <span className={`flex items-center gap-1 font-condensed text-base font-black uppercase ${tie ? 'text-amber-700' : 'text-zinc-900'}`}>
+          {tie && <Zap className="h-3.5 w-3.5" />}
+          {roundLabel(round)}
+        </span>
+        {!open && round.roundNumber === match.currentRound && match.status !== 'finished' && (
+          <span className="text-[10px] font-bold uppercase text-amber-600">Đang đấu</span>
+        )}
+      </td>
+      {judgeIds.map((id) => {
+        const v = round.votes[id];
+        return (
+          <td key={id} className="px-1 py-2">
+            <span
+              className={`flex h-8 items-center justify-center rounded font-condensed text-sm font-black uppercase ${
+                v === 'red' ? 'bg-red-600 text-white' : v === 'blue' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-400'
+              } ${!open && v ? 'opacity-70' : ''}`}
+            >
+              {v === 'red' ? 'Đỏ' : v === 'blue' ? 'Xanh' : '—'}
+            </span>
+          </td>
+        );
+      })}
+      <td className="px-3 py-2 text-right">
+        {open ? (
+          <span className={`inline-flex items-center gap-1 font-bold ${round.winner === 'red' ? 'text-red-600' : 'text-blue-600'}`}>
+            <CheckCircle2 className="h-3.5 w-3.5" />
+            {round.winner === 'red' ? 'Đỏ' : 'Xanh'} {Math.max(red, blue)}–{Math.min(red, blue)}
+          </span>
+        ) : (
+          <span className={`font-mono font-bold ${red + blue === judgeIds.length ? 'text-emerald-600' : 'text-zinc-500'}`}>
+            {red + blue}/{judgeIds.length} phiếu
+          </span>
+        )}
+      </td>
+    </tr>
+  );
+};
+
+/** Seconds, 0–5 in tenths; saved when the field is left or Enter is pressed. */
+const DelayInput: React.FC<{ value: number; onChange: (seconds: number) => void }> = ({ value, onChange }) => {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft(String(value)), [value]);
+  const commit = () => {
+    const n = Math.round(Math.min(5, Math.max(0, Number(draft.replace(',', '.')) || 0)) * 10) / 10;
+    setDraft(String(n));
+    if (n !== value) onChange(n);
+  };
+  return (
+    <input
+      inputMode="decimal"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => e.key === 'Enter' && commit()}
+      aria-label="Độ trễ hiện người thắng (giây)"
+      className="w-14 rounded border border-zinc-300 px-2 py-1 text-center font-mono text-sm font-black tabular-nums text-zinc-900 focus-visible:outline-2 focus-visible:outline-amber-500"
+    />
   );
 };

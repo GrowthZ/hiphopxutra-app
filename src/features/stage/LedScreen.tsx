@@ -69,7 +69,12 @@ export const LedScreen: React.FC = () => {
     <div className={`relative min-h-screen bg-black ${cursorHidden ? 'cursor-none' : ''}`}>
       <div className="kiosk">
         {scene === 'idle' && <StageIdleScreen />}
-        {scene === 'battle' && (IS_ARCH_LED ? <ArchBattleView /> : <StageDisplayView theme={state.theme} />)}
+        {scene === 'battle' &&
+          (IS_ARCH_LED ? (
+            <ArchBattleView winnerDelay={state.winnerDelay} />
+          ) : (
+            <StageDisplayView theme={state.theme} winnerDelay={state.winnerDelay} />
+          ))}
         {scene === 'prelim_leaderboard' && <PrelimResultsView />}
       </div>
 

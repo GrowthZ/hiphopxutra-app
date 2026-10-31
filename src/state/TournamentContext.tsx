@@ -53,6 +53,7 @@ import { useAuthSession } from './useAuthSession';
 import { useSoundSettings, AudioEffect } from './useSoundSettings';
 import { useGoogleSheets } from './useGoogleSheets';
 import { usePublisherHeartbeat } from './usePublisher';
+import { revealMs } from '../domain/reveal';
 import { legacy } from './legacyStorage';
 
 export type DancerMediaUpdate = Partial<Pick<Dancer, 'avatarUrl' | 'halfBodyUrl' | 'avatarCrop' | 'gender'>>;
@@ -112,6 +113,11 @@ interface TournamentContextType {
   // Teams (Pro 2vs2)
   proTeams: Team2v2[];
   shuffleProTeams: () => void;
+  /** The live draw, entered by hand: team N = pairs[N-1] (dancer ids); Top 16 is team 1 vs 2, 3 vs 4, ... */
+  saveProLineup: (pairs: [string, string][]) => void;
+  /** Incidents: another team / dancer takes a corner, or a side withdraws (the other goes through). */
+  replaceMatchSide: (matchId: string, color: Side, candidateId: string) => void;
+  forfeitMatch: (matchId: string, side: Side) => void;
 
   // Battles & Bracket
   matches: BattleMatch[];
@@ -119,8 +125,9 @@ interface TournamentContextType {
   setActiveMatchId: (id: string) => void;
   activeMatch: BattleMatch | undefined;
   submitJudgeVote: (matchId: string, roundNumber: number, judgeId: string, side: Side) => Promise<boolean>;
-  confirmRoundResult: (matchId: string, roundNumber: number) => void;
-  revealAllRounds: (matchId: string) => void;
+  /** `winnerDelay` (s): the LED lights the result up that long after the last pill has turned; cues wait for it. */
+  confirmRoundResult: (matchId: string, roundNumber: number, winnerDelay?: number) => void;
+  revealAllRounds: (matchId: string, winnerDelay?: number) => void;
   declareMatchWinner: (matchId: string, side: Side) => void;
   triggerVictoryAnimation: (matchId: string) => void;
   triggerTeamEntrance: (matchId: string) => void;
@@ -442,6 +449,42 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setActiveMatchId(newMatches[0]?.id || '');
   };
 
+  const saveProLineup = (pairs: [string, string][]) => {
+    const byId = new Map(proDancers.map((d) => [d.id, d]));
+    const newTeams: Team2v2[] = pairs.map(([a, b], i) => {
+      const old = teamsBase.find((t) => t.teamNumber === i + 1);
+      const same = old && old.dancer1.id === a && old.dancer2.id === b;
+      return {
+        id: `team-${i + 1}`,
+        teamNumber: i + 1,
+        name: `ĐỘI ${String(i + 1).padStart(2, '0')}`,
+        dancer1: byId.get(a)!,
+        dancer2: byId.get(b)!,
+        ...(same && old.teamPhotoUrl ? { teamPhotoUrl: old.teamPhotoUrl } : {}),
+      };
+    });
+    setProTeams(newTeams);
+    const newMatches = battle.seedProTop16(newTeams);
+    replaceCategoryMatches('pro_2v2', newMatches);
+    setActiveMatchId(newMatches[0]?.id || '');
+  };
+
+  const replaceMatchSide = (matchId: string, color: Side, candidateId: string) => {
+    const m = matchesBase.find((x) => x.id === matchId);
+    if (!m) return;
+    const team = m.category === 'pro_2v2' ? proTeams.find((t) => t.id === candidateId) : undefined;
+    const dancer = m.category === 'newbie_1v1' ? newbieDancers.find((d) => d.id === candidateId) : undefined;
+    const side = team
+      ? battle.teamSide(team)
+      : dancer && { id: dancer.id, name: dancer.name, dancers: [dancer], sbdText: `SBD ${dancer.sbd}` };
+    if (side) updateMatch(matchId, (x) => battle.replaceSide(x, color, side));
+  };
+
+  const forfeitMatch = (matchId: string, side: Side) => {
+    updateMatch(matchId, (x) => battle.forfeitMatch(x, side));
+    clearVotes([matchId]).catch((err: Error) => setActionError(`Không xoá được phiếu: ${err.message}`));
+  };
+
   const updateTieBreakScore = (category: CategoryType, dancerId: string, judgeId: string, score: number) => {
     const validScore = Math.min(100, Math.max(0, Math.round(score)));
     return writeTieBreakScore(category, dancerId, judgeId, validScore).then(
@@ -577,34 +620,39 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     return saved;
   };
 
-  const confirmRoundResult = (matchId: string, roundNumber: number) => {
+  const confirmRoundResult = (matchId: string, roundNumber: number, winnerDelay?: number) => {
     const now = Date.now();
     const m = currentMatch(matchId);
     const outcome = m && battle.confirmRound(m, roundNumber, now);
     updateMatch(matchId, (x) => battle.confirmRound(x, roundNumber, now)?.match ?? x);
 
+    const lit = revealMs(1, judges.length, winnerDelay);
     if (m && outcome) {
       if (outcome.matchWinner) {
-        cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), 450);
+        cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), lit);
       } else {
-        cues.celebrateRoundWin(outcome.roundWinner, battle.sideName(m, outcome.roundWinner), roundNumber);
+        cues.celebrateRoundWin(outcome.roundWinner, battle.sideName(m, outcome.roundWinner), roundNumber, lit);
       }
     }
     cues.revealRounds(matchId, [roundNumber]);
   };
 
-  const revealAllRounds = (matchId: string) => {
+  /** One press: every regulation round flips on the LED, row after row; a level score opens the tie-break. */
+  const revealAllRounds = (matchId: string, winnerDelay?: number) => {
     const now = Date.now();
     const m = currentMatch(matchId);
     updateMatch(matchId, (x) => battle.revealAllRounds(x, now).match);
+    if (!m) return;
 
     soundFX.playRevealSuspense();
-    const outcome = m && battle.revealAllRounds(m, now);
-    if (m && outcome?.tieBreak) cues.announceTieBreak();
-    else if (m && outcome?.matchWinner) {
-      cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), 500);
+    const rounds = battle.regulationRounds(m).map((r) => r.roundNumber);
+    const lit = revealMs(rounds.length, judges.length, winnerDelay);
+    const outcome = battle.revealAllRounds(m, now);
+    if (outcome.tieBreak) cues.announceTieBreak(lit);
+    else if (outcome.matchWinner) {
+      cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), lit);
     }
-    cues.revealRounds(matchId, [1, 2]);
+    cues.revealRounds(matchId, rounds);
   };
 
   const declareMatchWinner = (matchId: string, side: Side) => {
@@ -690,6 +738,9 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         setJudgesPick,
         proTeams,
         shuffleProTeams,
+        saveProLineup,
+        replaceMatchSide,
+        forfeitMatch,
         matches,
         activeMatchId,
         setActiveMatchId,

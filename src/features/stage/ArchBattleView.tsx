@@ -6,7 +6,7 @@ import { regulationRounds } from '../../domain/battle';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
-import { JudgeBallotCard, useRevealStartTimes } from './StageDisplayView';
+import { JudgeBallotCard, useRevealedResult, useRevealStartTimes } from './StageDisplayView';
 import {
   ARCH_CLIP_PATH,
   ARCH_COLUMNS,
@@ -14,6 +14,7 @@ import {
   ARCH_OFFSET_X,
   ARCH_WIDTH,
   columnTop,
+  edgeInset,
   HIDDEN,
   HIDDEN_ROWS,
   MODULE_PX,
@@ -32,8 +33,8 @@ import {
 // A result is shown in place, no pop-up: the winning corner lights up (photo, name bar, score), the other greys out.
 // Positions are fractions of the wall (x across, heights from the bottom), so a corrected pixel map just works.
 
-const GRID = { top: HIDDEN + 0.215, bottom: HIDDEN + 0.005 }; // judge names + one row per round
-const BAR = { top: GRID.top + 0.12, bottom: GRID.top + 0.02 }; // names
+const GRID = { top: HIDDEN + 0.205, bottom: HIDDEN + 0.002 }; // judge names + one row per round
+const BAR = { top: GRID.top + 0.115, bottom: GRID.top + 0.018 }; // names
 
 const box = (left: number, right: number, top: number, bottom: number): React.CSSProperties => ({
   position: 'absolute',
@@ -53,10 +54,12 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
   return [sbd && `SBD ${sbd}`, team].filter(Boolean).join('  ·  ');
 };
 
-export const ArchBattleView: React.FC = () => {
+/** `winnerDelay`: seconds between the last pill turning and the result lighting up (set on the battle console). */
+export const ArchBattleView: React.FC<{ winnerDelay?: number }> = ({ winnerDelay }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
-  const revealStartTimes = useRevealStartTimes(match);
+  const revealStartTimes = useRevealStartTimes(match, judges.length);
+  const revealed = useRevealedResult(match, revealStartTimes, judges.length, winnerDelay);
 
   // The picture keeps its pixel size on the HDMI output; only a smaller preview window scales it down.
   const [scale, setScale] = useState(1);
@@ -80,7 +83,7 @@ export const ArchBattleView: React.FC = () => {
         className={`h-full w-full object-contain object-bottom ${shadow}`}
         boxClassName="h-full w-full"
         cutoutClassName={shadow}
-        overlapClassName="-ml-[15%]"
+        overlapClassName="-ml-[22%]"
       />
     ) : (
       <img
@@ -94,21 +97,29 @@ export const ArchBattleView: React.FC = () => {
   // 2vs2: the pair centred in its own flank. 1vs1: one half-body near the centre, small enough to show whole above the bars.
   const photoBox =
     match.category === 'pro_2v2'
-      ? { red: [0.16, 0.42], blue: [0.58, 0.84], top: 0.8, bottom: BAR.bottom - 0.03 } // mid-flank, under the 10-row steps
-      : { red: [0.24, 0.45], blue: [0.55, 0.76], top: 0.82, bottom: BAR.bottom - 0.02 }; // under the match label: raised arms stay clear
+      ? { red: [0.16, 0.42], blue: [0.58, 0.84], top: 0.78, bottom: BAR.bottom - 0.03 } // mid-flank, under the 10-row steps
+      : { red: [0.24, 0.45], blue: [0.55, 0.76], top: 0.8, bottom: BAR.bottom - 0.02 }; // under the match label: raised arms stay clear
 
   // One row per regulation round of this stage (1, 2 or 4), then the tie-break row: shown dim until a level score
   // opens it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
   const isTieBreak = (r: BattleRound) => Boolean(r.isTieBreak);
   const roundLabel = (r?: BattleRound) => (!r ? '' : isTieBreak(r) ? 'Tie-break' : `Round ${r.roundNumber}`);
-  const tieRound = match.rounds.find(isTieBreak);
+  const tieRound = revealed.pending ? undefined : match.rounds.find(isTieBreak);
   const roundRows: (BattleRound | null)[] = [...regulationRounds(match), tieRound ?? null];
 
   // Announced result: the match winner once it's over, else the last revealed round until the next votes come in.
   const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
   const lastOpen = [...match.rounds].reverse().find(isRoundOpen);
   const nextStarted = current && !isRoundOpen(current) && Object.values(current.votes).some(Boolean);
-  const winner = match.status === 'finished' && match.winnerSide ? match.winnerSide : nextStarted ? null : (lastOpen?.winner ?? null);
+  // A level score after the regulation rounds: no winner yet, the tie-break row is lit instead.
+  const tiePending = Boolean(tieRound && !isRoundOpen(tieRound));
+  const winner = revealed.pending || tiePending
+    ? null
+    : match.status === 'finished' && match.winnerSide
+      ? match.winnerSide
+      : nextStarted
+        ? null
+        : (lastOpen?.winner ?? null);
   const lost = (side: 'red' | 'blue') => winner !== null && winner !== side;
   const won = (side: 'red' | 'blue') => winner === side;
   const dim = (side: 'red' | 'blue') => `transition-all duration-700 ${lost(side) ? 'grayscale opacity-30' : ''}`;
@@ -118,8 +129,8 @@ export const ArchBattleView: React.FC = () => {
   const rows = roundRows.length;
   const rowH = Math.min(Math.floor((gridPx - 52 - 2 * 10) / 4), Math.floor((gridPx - 52 - rows * 10) / rows));
   const cols = `260px repeat(${Math.max(judges.length, 1)}, minmax(0, 1fr))`;
-  // Name text starts past the outermost column, which is too short to show the bar.
-  const barPad = MODULE_PX + 40;
+  // Name text starts where the wall's edge is high enough to show the whole bar.
+  const barPad = edgeInset(BAR.top * ARCH_HEIGHT) + 40;
 
   return (
     <div className="fixed inset-0 overflow-hidden bg-black">
@@ -136,10 +147,10 @@ export const ArchBattleView: React.FC = () => {
           <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_56px)]" />
 
           {/* Arch top: logo in the tower (kept off the top edge), category · stage · match on the step below */}
-          <div style={box(0.36, 0.64, 0.97, 0.885)} className="flex items-center justify-center">
+          <div style={box(0.36, 0.64, 0.95, 0.865)} className="flex items-center justify-center">
             <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-full w-auto drop-shadow-[0_0_30px_rgba(239,68,68,0.45)]" />
           </div>
-          <div style={box(0.31, 0.69, 0.875, 0.825)} className="flex items-center justify-center">
+          <div style={box(0.31, 0.69, 0.855, 0.805)} className="flex items-center justify-center">
             <span className="whitespace-nowrap rounded-xl bg-gradient-to-b from-amber-200 to-amber-400 px-6 py-1.5 font-condensed text-[40px] font-black uppercase leading-none text-zinc-950">
               {match.category === 'pro_2v2' ? 'Kid Pro 2vs2' : 'Kid Newbie 1vs1'} · {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
             </span>
@@ -149,7 +160,7 @@ export const ArchBattleView: React.FC = () => {
           {winner && (
             <div
               key={`glow-${winner}`}
-              style={box(winner === 'red' ? 0.05 : 0.5, winner === 'red' ? 0.5 : 0.95, 0.85, BAR.bottom)}
+              style={box(winner === 'red' ? 0.05 : 0.5, winner === 'red' ? 0.5 : 0.95, 0.83, BAR.bottom)}
               className={`led-pop rounded-full blur-[120px] ${winner === 'red' ? 'bg-red-500/45' : 'bg-blue-500/45'}`}
             />
           )}
@@ -166,7 +177,7 @@ export const ArchBattleView: React.FC = () => {
           <div style={box(0, 1, BAR.top, 0)} className="bg-gradient-to-b from-transparent via-[#05060f]/80 via-35% to-[#05060f]/95" />
 
           {/* Centre: VS and the round being danced; after a result, who won it (the scores below tell by how much) */}
-          <div style={box(0.36, 0.64, 0.81, BAR.top + 0.125)} className="flex flex-col items-center justify-center gap-3">
+          <div style={box(0.36, 0.64, 0.79, BAR.top + 0.125)} className="flex flex-col items-center justify-center gap-3">
             {winner ? (
               <>
                 <span className="font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
@@ -181,12 +192,21 @@ export const ArchBattleView: React.FC = () => {
                   {winner === 'red' ? 'Đỏ' : 'Xanh'} thắng
                 </span>
               </>
+            ) : tiePending ? (
+              <>
+                <span className="font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                  Hòa {match.roundWinsRed}–{match.roundWinsBlue}
+                </span>
+                <span className="led-pop whitespace-nowrap rounded-full bg-amber-400 px-9 py-3 font-condensed text-[64px] font-black uppercase leading-none text-zinc-950 shadow-[0_0_60px_rgba(251,191,36,0.9)]">
+                  Tie-break
+                </span>
+              </>
             ) : (
               <>
                 <span className="font-condensed text-[150px] font-black italic leading-none text-white drop-shadow-[0_0_40px_rgba(251,191,36,0.6)]">VS</span>
-                {current && (
+                {(revealed.pending || current) && (
                   <span className="whitespace-nowrap rounded-full bg-amber-400 px-7 py-2 font-condensed text-[44px] font-black uppercase leading-none text-zinc-950">
-                    {roundLabel(current)}
+                    {revealed.pending ? 'Công bố kết quả' : roundLabel(current)}
                   </span>
                 )}
               </>
@@ -196,11 +216,11 @@ export const ArchBattleView: React.FC = () => {
           {/* Name bars from the wall edges (the steps cut them off), score at the inner end */}
           <div className={`absolute inset-0 ${dim('red')}`}>
             <NameBar color="red" name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} pad={barPad} won={won('red')} style={box(0, 0.47, BAR.top, BAR.bottom)} />
-            <ScoreBox color="red" value={match.roundWinsRed} won={won('red')} style={box(0.435, 0.495, BAR.top + 0.09, BAR.bottom + 0.04)} />
+            <ScoreBox color="red" value={revealed.wins('red')} won={won('red')} style={box(0.435, 0.495, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>
           <div className={`absolute inset-0 ${dim('blue')}`}>
             <NameBar color="blue" name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} pad={barPad} won={won('blue')} style={box(0.53, 1, BAR.top, BAR.bottom)} />
-            <ScoreBox color="blue" value={match.roundWinsBlue} won={won('blue')} style={box(0.505, 0.565, BAR.top + 0.09, BAR.bottom + 0.04)} />
+            <ScoreBox color="blue" value={revealed.wins('blue')} won={won('blue')} style={box(0.505, 0.565, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>
 
           {/* Judges × rounds, kept clear of the band the seated judges hide */}
@@ -248,7 +268,7 @@ export const ArchBattleView: React.FC = () => {
                       <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${tie ? 'text-[32px] text-amber-300' : 'text-[38px]'}`}>
                         {roundLabel(round)}
                       </span>
-                      {open && round.winner && (
+                      {open && round.winner && revealed.settled(round.roundNumber) && (
                         <span className={`h-5 w-5 shrink-0 rounded-full ${round.winner === 'red' ? 'bg-red-500' : 'bg-blue-500'}`} />
                       )}
                     </div>
@@ -274,7 +294,7 @@ export const ArchBattleView: React.FC = () => {
           </div>
 
           {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
-          <AutomatedVictoryDisplay match={match} overlay={false} />
+          <AutomatedVictoryDisplay match={match} overlay={false} holdUntil={revealed.holdUntil} />
         </div>
 
         {SHOW_ARCH_GRID && <ArchGrid />}

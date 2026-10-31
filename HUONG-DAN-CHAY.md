@@ -78,6 +78,7 @@ Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi
 | `module` | Số pixel mỗi cabinet trong khung HDMI | `128` |
 | `che` | Số hàng dưới cùng bị bàn giám khảo che (0,5 m mỗi hàng): không đặt thông tin quan trọng | `3` |
 | `lech` | Vị trí mép trái của vòm trong khung HDMI (px) | `0` |
+| `bac` | `1` = vẽ sát mép bậc thang của cabinet; mặc định vẽ trong một đường vòm cong nằm gọn trong các bậc (viền trơn, không răng cưa) | không |
 | `luoi=1` | Vẽ lưới cabinet, vùng bị cắt và vạch vùng bị che, để căn với màn thật | tắt |
 
 Ví dụ: `/led?khung=vom&che=2&lech=1792&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.

@@ -41,26 +41,33 @@ const sideConfetti = (side: Side, particleCount = 140) =>
     colors: side === 'red' ? ['#ef4444', '#f87171', '#ffffff'] : ['#3b82f6', '#60a5fa', '#ffffff'],
   });
 
-/** Match won: fanfare + announcement (after `delay`, e.g. following a reveal), confetti, LED victory screen. */
+/**
+ * Match won: fanfare + announcement, confetti, LED celebration. `delay`: when the LED lights the result up after a
+ * reveal (the pills flipping plus the winner delay), so everything lands together.
+ */
 export function celebrateMatchWin(matchId: string, side: Side, winnerName: string, delay = 0) {
-  setTimeout(() => soundFX.playChampionFanfare(side), delay);
-  setTimeout(() => soundFX.announceMatchWinner(side, winnerName), Math.max(delay, 450));
-  sideConfetti(side);
-  broadcast('REMOTE_AUDIO', { effect: 'MATCH_WIN', side, winnerName });
-  display('VICTORY_TRIGGER', { matchId, side, winnerName, timestamp: Date.now() });
+  setTimeout(() => {
+    soundFX.playChampionFanfare(side);
+    sideConfetti(side);
+    broadcast('REMOTE_AUDIO', { effect: 'MATCH_WIN', side, winnerName });
+    display('VICTORY_TRIGGER', { matchId, side, winnerName, timestamp: Date.now() });
+  }, delay);
+  setTimeout(() => soundFX.announceMatchWinner(side, winnerName), delay + 450);
 }
 
-export function celebrateRoundWin(side: Side, winnerName: string, roundNumber: number) {
+export function celebrateRoundWin(side: Side, winnerName: string, roundNumber: number, delay = 450) {
   setTimeout(() => {
     soundFX.playRoundWinner(side);
     soundFX.announceRoundWinner(roundNumber, side, winnerName);
-  }, 450);
-  broadcast('REMOTE_AUDIO', { effect: 'ROUND_WIN', side, winnerName, roundNumber });
+    broadcast('REMOTE_AUDIO', { effect: 'ROUND_WIN', side, winnerName, roundNumber });
+  }, delay);
 }
 
-export function announceTieBreak() {
-  setTimeout(() => soundFX.playRoundWinner('tie'), 500);
-  broadcast('REMOTE_AUDIO', { effect: 'TIE_BREAK' });
+export function announceTieBreak(delay = 500) {
+  setTimeout(() => {
+    soundFX.playRoundWinner('tie');
+    broadcast('REMOTE_AUDIO', { effect: 'TIE_BREAK' });
+  }, delay);
 }
 
 export const revealRounds = (matchId: string, roundNumbers: number[]) =>

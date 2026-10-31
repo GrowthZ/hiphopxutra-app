@@ -24,7 +24,7 @@ const halfBodies = (dancers: (Dancer | undefined)[]) => {
  */
 export const TeamPhoto: React.FC<
   Props & { className: string; boxClassName: string; cutoutClassName?: string; overlapClassName?: string }
-> = ({ photoUrl, dancers, placeholder, alt = '', className, boxClassName, cutoutClassName = '', overlapClassName = '-ml-[10%]' }) => {
+> = ({ photoUrl, dancers, placeholder, alt = '', className, boxClassName, cutoutClassName = '', overlapClassName = '-ml-[16%]' }) => {
   const pair = photoUrl ? null : halfBodies(dancers);
   if (!pair) return <img src={photoUrl || placeholder} alt={alt} className={className} />;
   return (

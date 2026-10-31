@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Mic,
   FlaskConical,
+  Network,
 } from 'lucide-react';
 import { openInNewTab, SCREEN_VIEWS } from '../../app/routes';
 
@@ -41,6 +42,7 @@ export const AdminSidebar: React.FC = () => {
     { id: 'prelim_screen_led', label: 'Màn chiếu LED', icon: MonitorPlay },
     { id: 'teams', label: 'Ghép đội 2vs2', icon: Shuffle },
     { id: 'bracket', label: 'Nhánh đấu', icon: GitFork },
+    { id: 'bracket_screen', label: 'Sơ đồ knockout (công khai)', icon: Network },
     { id: 'battle', label: 'Điều hành Battle (9 GK)', icon: Swords },
     { id: 'stage_control', label: 'Điều khiển màn LED', icon: Tv },
     { id: 'judge', label: 'Cổng Giám khảo', icon: Smartphone },

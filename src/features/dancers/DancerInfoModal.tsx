@@ -21,14 +21,17 @@ export const DancerInfoModal: React.FC<{
     if (!dancer) return;
     setForm({ name: dancer.name, realName: dancer.realName ?? '', crew: dancer.crew ?? '', gender: dancer.gender });
     setError(null);
-  }, [dancer]);
+    // Only when another dancer is opened: live updates of the same one must not wipe what is being typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dancer?.id]);
 
+  const open = Boolean(dancer);
   useEffect(() => {
-    if (!dancer) return;
+    if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [dancer, onClose]);
+  }, [open, onClose]);
 
   if (!dancer) return null;
 

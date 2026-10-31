@@ -171,6 +171,7 @@ export function resetMatch(m: BattleMatch): BattleMatch {
     rounds,
     winnerSide: null,
     status: 'upcoming',
+    forfeitSide: undefined,
   };
 }
 
@@ -227,7 +228,7 @@ export const seedNewbieTop32 = (top32: Dancer[]): BattleMatch[] =>
     );
   });
 
-const teamSide = (t: Team2v2) => ({
+export const teamSide = (t: Team2v2): BattleSide => ({
   id: t.id,
   name: t.name,
   dancers: [t.dancer1, t.dancer2],
@@ -239,3 +240,17 @@ export const seedProTop16 = (teams: Team2v2[]): BattleMatch[] =>
   Array.from({ length: 8 }, (_, m) =>
     createInitialMatch('pro_2v2', 'top16', m + 1, teamSide(teams[m * 2]), teamSide(teams[m * 2 + 1]))
   );
+
+// ---------- Incidents ----------
+
+/** One side withdraws (bỏ cuộc): the other goes through without a battle; votes so far no longer count. */
+export const forfeitMatch = (m: BattleMatch, side: Side): BattleMatch => ({
+  ...resetMatch(m),
+  status: 'finished',
+  winnerSide: side === 'red' ? 'blue' : 'red',
+  forfeitSide: side,
+});
+
+/** Another team / dancer takes one corner (a swap after the draw, a replacement). */
+export const replaceSide = (m: BattleMatch, color: Side, side: BattleSide): BattleMatch =>
+  color === 'red' ? { ...m, sideRed: side } : { ...m, sideBlue: side };

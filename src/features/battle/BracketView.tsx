@@ -5,7 +5,12 @@ import {
   Swords,
   Tv,
   CheckCircle2,
+  AlertTriangle,
+  ExternalLink,
 } from 'lucide-react';
+import { BattleMatch } from '../../domain/types';
+import { openInNewTab } from '../../app/routes';
+import { MatchIncidentModal } from './MatchIncidentModal';
 import {
   getTeamPhotoUrl,
   getDancerAvatarUrl,
@@ -24,6 +29,8 @@ export const BracketView: React.FC = () => {
   } = useTournament();
 
   const [selectedStage, setSelectedStage] = useState<string>('all');
+  const [incidentId, setIncidentId] = useState<string | null>(null);
+  const incident: BattleMatch | null = matches.find((m) => m.id === incidentId) ?? null;
 
   const categoryMatches = matches.filter((m) => m.category === activeCategory);
 
@@ -73,6 +80,13 @@ export const BracketView: React.FC = () => {
           </p>
         </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+        <button
+          onClick={() => openInNewTab('bracket_screen')}
+          className="flex items-center gap-1.5 px-3 py-2 rounded bg-white border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-bold cursor-pointer"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Sơ đồ công khai
+        </button>
         {/* Category Switcher */}
         <div className="flex items-center gap-1 bg-zinc-200 p-1 rounded text-xs font-bold">
           <button
@@ -101,6 +115,7 @@ export const BracketView: React.FC = () => {
           >
             Kid Pro • 2vs2
           </button>
+        </div>
         </div>
       </div>
 
@@ -193,9 +208,13 @@ export const BracketView: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="font-condensed font-black text-lg px-2 py-0.5 rounded bg-white border border-zinc-200 tabular-nums">
-                    {m.roundWinsRed}
-                  </div>
+                  {m.forfeitSide === 'red' ? (
+                    <span className="text-[10px] font-black uppercase text-zinc-500 bg-zinc-200 px-1.5 py-0.5 rounded">Bỏ cuộc</span>
+                  ) : (
+                    <div className="font-condensed font-black text-lg px-2 py-0.5 rounded bg-white border border-zinc-200 tabular-nums">
+                      {m.roundWinsRed}
+                    </div>
+                  )}
                 </div>
 
                 {/* Blue Side */}
@@ -226,9 +245,13 @@ export const BracketView: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  <div className="font-condensed font-black text-lg px-2 py-0.5 rounded bg-white border border-zinc-200 tabular-nums">
-                    {m.roundWinsBlue}
-                  </div>
+                  {m.forfeitSide === 'blue' ? (
+                    <span className="text-[10px] font-black uppercase text-zinc-500 bg-zinc-200 px-1.5 py-0.5 rounded">Bỏ cuộc</span>
+                  ) : (
+                    <div className="font-condensed font-black text-lg px-2 py-0.5 rounded bg-white border border-zinc-200 tabular-nums">
+                      {m.roundWinsBlue}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -243,6 +266,14 @@ export const BracketView: React.FC = () => {
                 </button>
 
                 <button
+                  onClick={() => setIncidentId(m.id)}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 text-xs font-bold transition-colors cursor-pointer"
+                  title="Đổi đội / thí sinh, bỏ cuộc, đặt lại trận"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Sự cố
+                </button>
+
+                <button
                   onClick={() => handleSelectMatchForStage(m.id)}
                   className="p-1.5 rounded border border-zinc-300 text-zinc-700 hover:bg-zinc-50 transition-colors cursor-pointer"
                   title="Hiện lên Màn LED Sân Khấu"
@@ -254,6 +285,8 @@ export const BracketView: React.FC = () => {
           );
         })}
       </div>
+
+      <MatchIncidentModal match={incident} onClose={() => setIncidentId(null)} />
     </div>
   );
 };
