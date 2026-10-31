@@ -265,7 +265,8 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   if (!match) return <div className="fixed inset-0 bg-black" />;
 
   // Announced result: the match winner once it's over, else the last revealed round until the next round's votes
-  // start coming in. Drives RED WIN / BLUE WIN in the centre and greys out the losing side.
+  // start coming in. Shown in place, no pop-up: the winning corner lights up (photo, name bar, score), the other
+  // greys out, and the centre says who won.
   const announcedWinner: 'red' | 'blue' | null = (() => {
     if (match.status === 'finished' && match.winnerSide) return match.winnerSide;
     const current = match.rounds.find((r) => r.roundNumber === match.currentRound);
@@ -275,7 +276,8 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   })();
   const announcedRound = [...match.rounds].reverse().find(isRoundOpen);
   const lost = (side: 'red' | 'blue') => announcedWinner !== null && announcedWinner !== side;
-  const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35' : '');
+  const won = (side: 'red' | 'blue') => announcedWinner === side;
+  const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-30' : won(side) ? 'scale-105 brightness-110' : '');
 
   // One row per regulation round of this stage (1, 2 or 4), then the tie-break row: dim until a level score opens
   // it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
@@ -359,6 +361,16 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           </div>
         </div>
 
+        {/* The winning corner lights up: a glow in its colour behind the photo */}
+        {announcedWinner && (
+          <div
+            key={`glow-${announcedWinner}`}
+            className={`led-pop absolute top-[140px] h-[560px] w-[900px] rounded-full blur-[120px] ${
+              announcedWinner === 'red' ? 'left-[-60px] bg-red-500/45' : 'right-[-60px] bg-blue-500/45'
+            }`}
+          />
+        )}
+
         {/* Corner photos (behind everything else). A 1vs1 half-body runs down behind the judge table; a 2vs2 photo is
             usually landscape, so it gets a wider box that ends a little under the name bar, keeping the team in view */}
         <div key={`rp-${entranceKey}`} className={`absolute left-[20px] top-[165px] ${photoBox} transition-all duration-700 ${dim('red')} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
@@ -374,50 +386,44 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           style={{ top: BAR_TOP }}
         />
 
-        {/* Centre: RED WIN / BLUE WIN, or VS and the round being danced */}
-        {announcedWinner ? (
-          <div
-            key={`win-${announcedWinner}-${announcedRound?.roundNumber}-${match.status}`}
-            className="led-pop absolute left-[560px] right-[560px] top-[140px] flex h-[220px] flex-col items-center justify-center"
-          >
-            <span
-              className={`whitespace-nowrap font-condensed text-[170px] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
-                announcedWinner === 'red'
-                  ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.95)] [-webkit-text-stroke:6px_#dc2626]'
-                  : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.95)] [-webkit-text-stroke:6px_#2563eb]'
-              }`}
-            >
-              {announcedWinner === 'red' ? 'Red' : 'Blue'} win
-            </span>
-            <span
-              className={`mt-3 rounded-full px-6 py-2 font-condensed text-[36px] font-black uppercase leading-none ${
-                announcedWinner === 'red' ? 'bg-red-600' : 'bg-blue-600'
-              }`}
-            >
-              {match.status === 'finished' ? 'Chung cuộc' : roundLabel(announcedRound)}
-            </span>
-          </div>
-        ) : (
-          <div className="absolute left-[760px] right-[760px] top-[170px] flex h-[180px] flex-col items-center justify-center gap-3">
-            <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">
-              VS
-            </span>
-            {currentRound && (
-              <span className="whitespace-nowrap rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
-                {roundLabel(currentRound)}
+        {/* Centre: VS and the round being danced; after a result, who won it (the scores below tell by how much) */}
+        <div className="absolute left-[660px] right-[660px] top-[170px] flex h-[180px] flex-col items-center justify-center gap-3">
+          {announcedWinner ? (
+            <>
+              <span className="font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                {match.status === 'finished' ? 'Chung cuộc' : roundLabel(announcedRound)}
               </span>
-            )}
-          </div>
-        )}
+              <span
+                key={`win-${announcedWinner}-${announcedRound?.roundNumber}-${match.status}`}
+                className={`led-pop whitespace-nowrap rounded-full px-8 py-2.5 font-condensed text-[52px] font-black uppercase leading-none text-white ${
+                  announcedWinner === 'red' ? 'bg-red-600 shadow-[0_0_50px_rgba(239,68,68,0.9)]' : 'bg-blue-600 shadow-[0_0_50px_rgba(59,130,246,0.9)]'
+                }`}
+              >
+                {announcedWinner === 'red' ? 'Đỏ' : 'Xanh'} thắng
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">
+                VS
+              </span>
+              {currentRound && (
+                <span className="whitespace-nowrap rounded-full bg-amber-400 px-5 py-1.5 font-condensed text-[34px] font-black uppercase leading-none text-zinc-950">
+                  {roundLabel(currentRound)}
+                </span>
+              )}
+            </>
+          )}
+        </div>
 
         {/* Name bars from the screen edges, score at the inner end */}
-        <div key={`rn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${dim('red')} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
-          <NameBar color="red" name={breakerName(match.sideRed)} sub={sideSub(match, match.sideRed)} />
-          <ScoreBox color="red" value={match.roundWinsRed} />
+        <div key={`rn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${lost('red') ? 'grayscale opacity-30' : ''} ${isEntranceActive ? 'animate-entrance-left' : ''}`}>
+          <NameBar color="red" name={breakerName(match.sideRed)} sub={sideSub(match, match.sideRed)} won={won('red')} />
+          <ScoreBox color="red" value={match.roundWinsRed} won={won('red')} />
         </div>
-        <div key={`bn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${dim('blue')} ${isEntranceActive ? 'animate-entrance-right' : ''}`}>
-          <NameBar color="blue" name={breakerName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} />
-          <ScoreBox color="blue" value={match.roundWinsBlue} />
+        <div key={`bn-${entranceKey}`} className={`absolute inset-0 transition-all duration-700 ${lost('blue') ? 'grayscale opacity-30' : ''} ${isEntranceActive ? 'animate-entrance-right' : ''}`}>
+          <NameBar color="blue" name={breakerName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} won={won('blue')} />
+          <ScoreBox color="blue" value={match.roundWinsBlue} won={won('blue')} />
         </div>
 
         {/* Judges × rounds */}
@@ -507,20 +513,21 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           </span>
         </div>
 
-        <AutomatedVictoryDisplay match={match} />
+        {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
+        <AutomatedVictoryDisplay match={match} overlay={false} />
       </div>
     </div>
   );
 };
 
 /** Name bar from the screen edge to near the centre; the score box sits on its inner end. */
-const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string }> = ({ color, name, sub }) => (
+const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; won: boolean }> = ({ color, name, sub, won }) => (
   <div
     className={`absolute flex h-[118px] flex-col justify-center gap-1.5 ${
       color === 'red'
         ? 'left-0 w-[880px] items-start rounded-r-2xl bg-gradient-to-r from-red-700/95 via-red-600/95 to-red-500/90 pl-[60px] pr-[190px] shadow-[0_10px_50px_rgba(239,68,68,0.45)]'
         : 'right-0 w-[880px] items-end rounded-l-2xl bg-gradient-to-l from-blue-700/95 via-blue-600/95 to-blue-500/90 pl-[190px] pr-[60px] text-right shadow-[0_10px_50px_rgba(59,130,246,0.45)]'
-    }`}
+    } ${won ? (color === 'red' ? 'brightness-125 shadow-[0_0_90px_rgba(239,68,68,0.9)]' : 'brightness-125 shadow-[0_0_90px_rgba(59,130,246,0.9)]') : ''}`}
     style={{ top: BAR_TOP }}
   >
     <span className={`max-w-full truncate font-condensed font-black uppercase leading-[0.9] drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)] ${nameSize(name)}`}>
@@ -531,9 +538,11 @@ const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string }> = 
 );
 
 /** Rounds won, overlapping the top of the name bar's inner end (as on the WDSF broadcast). */
-const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number }> = ({ color, value }) => (
+const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number; won: boolean }> = ({ color, value, won }) => (
   <div
-    className={`absolute flex h-[160px] w-[160px] items-center justify-center rounded-2xl font-condensed text-[130px] font-black leading-none tabular-nums ${
+    className={`absolute flex h-[160px] w-[160px] items-center justify-center rounded-2xl font-condensed text-[130px] font-black leading-none tabular-nums transition-transform duration-700 ${
+      won ? 'z-10 scale-110 ring-8 ring-white/90' : ''
+    } ${
       color === 'red'
         ? 'left-[730px] bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_50px_rgba(239,68,68,0.65)] ring-4 ring-red-300/60'
         : 'right-[730px] bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_50px_rgba(59,130,246,0.65)] ring-4 ring-blue-300/60'

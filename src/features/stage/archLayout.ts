@@ -1,11 +1,11 @@
 // Stepped-arch LED wall (10 m × 6 m, 500 mm cabinets): which pixels physically exist.
-// Defaults follow the venue drawing (public/led/size-led.jpg): 20 columns × 12 rows of 128 px cabinets, 2560×1536 px.
+// Defaults follow the venue drawing (public/led/led-update.jpg): 20 columns × 12 rows of 128 px cabinets, 2560×1536 px.
 // The real pixel map from the LED vendor can still be dialled in through the URL, no deploy needed:
 //   /led?khung=vom                      turn the arch layout on
 //   &cot=6,8,9,10,10,11,11,12,12,12     cabinets per column, left half (mirrored) or all 20 columns
 //   &module=128                         pixels per cabinet in the HDMI picture
 //   &che=3                              bottom rows hidden behind the judges' table: nothing important drawn there
-//   &lech=1408                          arch's left edge in the HDMI picture (side screens 1408 px each: 5376 px in all)
+//   &lech=1792                          arch's left edge in the HDMI picture (side screens 1792 px each: 6144 px in all)
 //   &luoi=1                             draw the cabinet grid, the cut-out outline and the hidden band (setup / preview)
 // The picture sits at the top of the HDMI output, `lech` px from the left (0 by default).
 

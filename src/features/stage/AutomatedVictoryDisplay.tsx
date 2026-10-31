@@ -13,9 +13,11 @@ import { useTournament } from '../../state/TournamentContext';
 
 interface AutomatedVictoryDisplayProps {
   match: BattleMatch;
+  /** false: fanfare and confetti only, the screen shows the result itself (arch LED). */
+  overlay?: boolean;
 }
 
-export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = ({ match }) => {
+export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = ({ match, overlay = true }) => {
   const { storageConfig } = useTournament();
   const [isVisible, setIsVisible] = useState<boolean>(() => match.status === 'finished' && !!match.winnerSide);
   const [isMinimized, setIsMinimized] = useState<boolean>(false);
@@ -164,7 +166,7 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
   }, [match.id, breakerName]);
 
   // If not visible or match is ongoing, render nothing
-  if (!isVisible || match.status !== 'finished' || !match.winnerSide) {
+  if (!overlay || !isVisible || match.status !== 'finished' || !match.winnerSide) {
     return null;
   }
 

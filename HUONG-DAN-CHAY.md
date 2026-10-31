@@ -62,15 +62,15 @@ Tải ảnh thí sinh: chỉ cần **1 ảnh nửa người**; kéo/phóng vòng
 
 ## 0c. Màn LED vòm bậc thang (sân khấu chính)
 
-Màn LED vòm giữa 10 m × 6 m (**2560×1536 px**, bản vẽ `public/led/size-led.jpg`) dùng bố cục riêng cho cảnh
+Màn LED vòm giữa 10 m × 6 m (**2560×1536 px**, bản vẽ `public/led/led-update.jpg`) dùng bố cục riêng cho cảnh
 **Trận Battle**: mở `/led?khung=vom` trên máy nối LED qua HDMI, bấm vào màn hình để vào toàn màn hình. Hình chỉ vẽ trong
 phần có LED. Từ dưới lên: **1,5 m dưới cùng bị bàn giám khảo ngồi che** nên chỉ có tên sự kiện; bảng giám khảo × round
 ở 1,6–2,8 m; tên + tỉ số ở 2,9–3,5 m; ảnh thí sinh hai bên sườn; logo và trận đấu trên đỉnh vòm.
 Admin xem trước ở `/admin/led` → **Xem trước khung vòm**.
 
 Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi cabinet, chiều cao từng cột (từ ngoài vào giữa)
-6, 8, 9, 10, 10, 11, 11, 12, 12, 12. Hai màn bên 1408×1024 px là nguồn khác; nếu cả 3 màn chung một khung HDMI
-5376×1536 thì vòm bắt đầu ở x = 1408, thêm `&lech=1408`. Chỉnh không cần deploy, chỉ sửa link:
+6, 8, 9, 10, 10, 11, 11, 12, 12, 12. Hai màn bên 7 m × 4 m (1792×1024 px) là nguồn khác; nếu cả 3 màn chung một khung HDMI
+6144×1536 thì vòm bắt đầu ở x = 1792, thêm `&lech=1792`. Chỉnh không cần deploy, chỉ sửa link:
 
 | Tham số | Ý nghĩa | Mặc định |
 |---|---|---|
@@ -80,7 +80,7 @@ Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi
 | `lech` | Vị trí mép trái của vòm trong khung HDMI (px) | `0` |
 | `luoi=1` | Vẽ lưới cabinet, vùng bị cắt và vạch vùng bị che, để căn với màn thật | tắt |
 
-Ví dụ: `/led?khung=vom&che=2&lech=1408&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.
+Ví dụ: `/led?khung=vom&che=2&lech=1792&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.
 
 ## Yêu cầu
 

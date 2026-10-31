@@ -24,16 +24,16 @@ import {
 
 // Main battle on the stepped-arch LED wall (/led?khung=vom, 2560×1536, 10 m × 6 m), in the same style as the 16:9
 // screen (StageDisplayView). Zones follow what the audience can actually see (heights for the default map):
-//   arch top (6-cabinet tower)       event logo, then category · stage · match on the step below
+//   arch top (6-cabinet tower)       event logo, clear of the top edge, then category · stage · match below
 //   upper flanks                     the two corners' photos, kept inside the steps
 //   2.9–3.5 m                        name bars from the wall edges, score at their inner end
 //   1.6–2.8 m                        judges × rounds, on a dark fade so the red / blue votes stand out
 //   bottom 1.5 m (&che=3)            hidden by the seated judges: event name only, nothing that matters
+// A result is shown in place, no pop-up: the winning corner lights up (photo, name bar, score), the other greys out.
 // Positions are fractions of the wall (x across, heights from the bottom), so a corrected pixel map just works.
 
-const GRID = { top: HIDDEN + 0.23, bottom: HIDDEN + 0.015 }; // judge names + one row per round
+const GRID = { top: HIDDEN + 0.215, bottom: HIDDEN + 0.005 }; // judge names + one row per round
 const BAR = { top: GRID.top + 0.12, bottom: GRID.top + 0.02 }; // names
-const PHOTO_TOP = 0.9;
 
 const box = (left: number, right: number, top: number, bottom: number): React.CSSProperties => ({
   position: 'absolute',
@@ -94,8 +94,8 @@ export const ArchBattleView: React.FC = () => {
   // 2vs2: the pair centred in its own flank. 1vs1: one half-body near the centre, small enough to show whole above the bars.
   const photoBox =
     match.category === 'pro_2v2'
-      ? { red: [0.16, 0.42], blue: [0.58, 0.84], top: 0.82, bottom: BAR.bottom - 0.03 } // mid-flank, under the 10-row steps
-      : { red: [0.24, 0.45], blue: [0.55, 0.76], top: 0.85, bottom: BAR.bottom - 0.02 }; // under the match label: raised arms stay clear
+      ? { red: [0.16, 0.42], blue: [0.58, 0.84], top: 0.8, bottom: BAR.bottom - 0.03 } // mid-flank, under the 10-row steps
+      : { red: [0.24, 0.45], blue: [0.55, 0.76], top: 0.82, bottom: BAR.bottom - 0.02 }; // under the match label: raised arms stay clear
 
   // One row per regulation round of this stage (1, 2 or 4), then the tie-break row: shown dim until a level score
   // opens it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
@@ -110,7 +110,8 @@ export const ArchBattleView: React.FC = () => {
   const nextStarted = current && !isRoundOpen(current) && Object.values(current.votes).some(Boolean);
   const winner = match.status === 'finished' && match.winnerSide ? match.winnerSide : nextStarted ? null : (lastOpen?.winner ?? null);
   const lost = (side: 'red' | 'blue') => winner !== null && winner !== side;
-  const dim = (side: 'red' | 'blue') => (lost(side) ? 'grayscale opacity-35 transition-all duration-700' : 'transition-all duration-700');
+  const won = (side: 'red' | 'blue') => winner === side;
+  const dim = (side: 'red' | 'blue') => `transition-all duration-700 ${lost(side) ? 'grayscale opacity-30' : ''}`;
 
   // Judge rows: half the height two rows would get from the strip, smaller only when 5 rows (4 + tie-break) need it.
   const gridPx = yFromBottom(GRID.bottom) - yFromBottom(GRID.top);
@@ -134,62 +135,72 @@ export const ArchBattleView: React.FC = () => {
           <div className="absolute -right-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-blue-600/25 blur-[140px]" />
           <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_56px)]" />
 
-          {/* Arch top: logo in the tower, category · stage · match on the step below */}
-          <div style={box(0.36, 0.64, 0.995, 0.925)} className="flex items-center justify-center">
+          {/* Arch top: logo in the tower (kept off the top edge), category · stage · match on the step below */}
+          <div style={box(0.36, 0.64, 0.97, 0.885)} className="flex items-center justify-center">
             <img src="/logo.png" alt="HipHop Xứ Trà U16" className="h-full w-auto drop-shadow-[0_0_30px_rgba(239,68,68,0.45)]" />
           </div>
-          <div style={box(0.31, 0.69, 0.915, 0.855)} className="flex items-center justify-center">
+          <div style={box(0.31, 0.69, 0.875, 0.825)} className="flex items-center justify-center">
             <span className="whitespace-nowrap rounded-xl bg-gradient-to-b from-amber-200 to-amber-400 px-6 py-1.5 font-condensed text-[40px] font-black uppercase leading-none text-zinc-950">
               {match.category === 'pro_2v2' ? 'Kid Pro 2vs2' : 'Kid Newbie 1vs1'} · {match.stageName} · Trận {String(match.matchNumber).padStart(2, '0')}
             </span>
           </div>
 
+          {/* The winning corner lights up: a glow in its colour behind the photo */}
+          {winner && (
+            <div
+              key={`glow-${winner}`}
+              style={box(winner === 'red' ? 0.05 : 0.5, winner === 'red' ? 0.5 : 0.95, 0.85, BAR.bottom)}
+              className={`led-pop rounded-full blur-[120px] ${winner === 'red' ? 'bg-red-500/45' : 'bg-blue-500/45'}`}
+            />
+          )}
+
           {/* Corner photos, inside the steps */}
-          <div key={`r-${match.id}`} style={box(photoBox.red[0], photoBox.red[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('red')}`}>
+          <div key={`r-${match.id}`} style={box(photoBox.red[0], photoBox.red[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('red')} ${won('red') ? 'scale-105 brightness-110' : ''}`}>
             {photo(match.sideRed, 'red')}
           </div>
-          <div key={`b-${match.id}`} style={box(photoBox.blue[0], photoBox.blue[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('blue')}`}>
+          <div key={`b-${match.id}`} style={box(photoBox.blue[0], photoBox.blue[1], photoBox.top, photoBox.bottom)} className={`led-rise ${dim('blue')} ${won('blue') ? 'scale-105 brightness-110' : ''}`}>
             {photo(match.sideBlue, 'blue')}
           </div>
 
           {/* From the name bars down: fade to dark so the vote colours read clearly over the photos */}
           <div style={box(0, 1, BAR.top, 0)} className="bg-gradient-to-b from-transparent via-[#05060f]/80 via-35% to-[#05060f]/95" />
 
-          {/* Centre: the announced winner, or VS and the round being danced */}
-          {winner ? (
-            <div key={`win-${winner}-${lastOpen?.roundNumber}`} style={box(0.28, 0.72, 0.85, BAR.top + 0.125)} className="led-pop flex flex-col items-center justify-center">
-              <span
-                className={`whitespace-nowrap font-condensed text-[250px] font-black italic uppercase leading-[0.85] tracking-tight text-white ${
-                  winner === 'red'
-                    ? 'drop-shadow-[0_0_60px_rgba(239,68,68,0.95)] [-webkit-text-stroke:8px_#dc2626]'
-                    : 'drop-shadow-[0_0_60px_rgba(59,130,246,0.95)] [-webkit-text-stroke:8px_#2563eb]'
-                }`}
-              >
-                {winner === 'red' ? 'Red' : 'Blue'} win
-              </span>
-              <span className={`mt-4 rounded-full px-8 py-2.5 font-condensed text-[44px] font-black uppercase leading-none ${winner === 'red' ? 'bg-red-600' : 'bg-blue-600'}`}>
-                {match.status === 'finished' ? 'Chung cuộc' : roundLabel(lastOpen)}
-              </span>
-            </div>
-          ) : (
-            <div style={box(0.41, 0.59, 0.86, BAR.top + 0.125)} className="flex flex-col items-center justify-center gap-3">
-              <span className="font-condensed text-[150px] font-black italic leading-none text-white drop-shadow-[0_0_40px_rgba(251,191,36,0.6)]">VS</span>
-              {current && (
-                <span className="whitespace-nowrap rounded-full bg-amber-400 px-7 py-2 font-condensed text-[44px] font-black uppercase leading-none text-zinc-950">
-                  {roundLabel(current)}
+          {/* Centre: VS and the round being danced; after a result, who won it (the scores below tell by how much) */}
+          <div style={box(0.36, 0.64, 0.81, BAR.top + 0.125)} className="flex flex-col items-center justify-center gap-3">
+            {winner ? (
+              <>
+                <span className="font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                  {match.status === 'finished' ? 'Chung cuộc' : roundLabel(lastOpen)}
                 </span>
-              )}
-            </div>
-          )}
+                <span
+                  key={`win-${winner}-${lastOpen?.roundNumber}`}
+                  className={`led-pop whitespace-nowrap rounded-full px-9 py-3 font-condensed text-[64px] font-black uppercase leading-none text-white ${
+                    winner === 'red' ? 'bg-red-600 shadow-[0_0_60px_rgba(239,68,68,0.9)]' : 'bg-blue-600 shadow-[0_0_60px_rgba(59,130,246,0.9)]'
+                  }`}
+                >
+                  {winner === 'red' ? 'Đỏ' : 'Xanh'} thắng
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="font-condensed text-[150px] font-black italic leading-none text-white drop-shadow-[0_0_40px_rgba(251,191,36,0.6)]">VS</span>
+                {current && (
+                  <span className="whitespace-nowrap rounded-full bg-amber-400 px-7 py-2 font-condensed text-[44px] font-black uppercase leading-none text-zinc-950">
+                    {roundLabel(current)}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Name bars from the wall edges (the steps cut them off), score at the inner end */}
           <div className={`absolute inset-0 ${dim('red')}`}>
-            <NameBar color="red" name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} pad={barPad} style={box(0, 0.47, BAR.top, BAR.bottom)} />
-            <ScoreBox color="red" value={match.roundWinsRed} style={box(0.435, 0.495, BAR.top + 0.09, BAR.bottom + 0.04)} />
+            <NameBar color="red" name={sideName(match.sideRed)} sub={sideSub(match, match.sideRed)} pad={barPad} won={won('red')} style={box(0, 0.47, BAR.top, BAR.bottom)} />
+            <ScoreBox color="red" value={match.roundWinsRed} won={won('red')} style={box(0.435, 0.495, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>
           <div className={`absolute inset-0 ${dim('blue')}`}>
-            <NameBar color="blue" name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} pad={barPad} style={box(0.53, 1, BAR.top, BAR.bottom)} />
-            <ScoreBox color="blue" value={match.roundWinsBlue} style={box(0.505, 0.565, BAR.top + 0.09, BAR.bottom + 0.04)} />
+            <NameBar color="blue" name={sideName(match.sideBlue)} sub={sideSub(match, match.sideBlue)} pad={barPad} won={won('blue')} style={box(0.53, 1, BAR.top, BAR.bottom)} />
+            <ScoreBox color="blue" value={match.roundWinsBlue} won={won('blue')} style={box(0.505, 0.565, BAR.top + 0.09, BAR.bottom + 0.04)} />
           </div>
 
           {/* Judges × rounds, kept clear of the band the seated judges hide */}
@@ -262,7 +273,8 @@ export const ArchBattleView: React.FC = () => {
             <p className="font-condensed text-[72px] font-black uppercase tracking-[0.35em] text-white/15">HipHop Xứ Trà 2026 · Breaking U16</p>
           </div>
 
-          <AutomatedVictoryDisplay match={match} />
+          {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
+          <AutomatedVictoryDisplay match={match} overlay={false} />
         </div>
 
         {SHOW_ARCH_GRID && <ArchGrid />}
@@ -272,11 +284,12 @@ export const ArchBattleView: React.FC = () => {
 };
 
 /** `pad`: room on the outer end for the edge column, which is too short to show the bar. */
-const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; pad: number; style: React.CSSProperties }> = ({
+const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; pad: number; won: boolean; style: React.CSSProperties }> = ({
   color,
   name,
   sub,
   pad,
+  won,
   style,
 }) => (
   <div
@@ -285,7 +298,7 @@ const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; pad:
       color === 'red'
         ? 'items-start rounded-r-2xl bg-gradient-to-r from-red-700/95 via-red-600/95 to-red-500/90 pr-[150px] shadow-[0_10px_50px_rgba(239,68,68,0.45)]'
         : 'items-end rounded-l-2xl bg-gradient-to-l from-blue-700/95 via-blue-600/95 to-blue-500/90 pl-[150px] text-right shadow-[0_10px_50px_rgba(59,130,246,0.45)]'
-    }`}
+    } ${won ? (color === 'red' ? 'brightness-125 shadow-[0_0_90px_rgba(239,68,68,0.9)]' : 'brightness-125 shadow-[0_0_90px_rgba(59,130,246,0.9)]') : ''}`}
   >
     <span
       className={`max-w-full truncate font-condensed font-black uppercase leading-[0.9] drop-shadow-[0_3px_6px_rgba(0,0,0,0.6)] ${
@@ -299,10 +312,12 @@ const NameBar: React.FC<{ color: 'red' | 'blue'; name: string; sub: string; pad:
 );
 
 /** Rounds won: the two boxes side by side under VS, overlapping the top of the name bars' inner ends. */
-const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number; style: React.CSSProperties }> = ({ color, value, style }) => (
+const ScoreBox: React.FC<{ color: 'red' | 'blue'; value: number; won: boolean; style: React.CSSProperties }> = ({ color, value, won, style }) => (
   <div
     style={style}
-    className={`flex items-center justify-center rounded-2xl font-condensed text-[140px] font-black leading-none tabular-nums ${
+    className={`flex items-center justify-center rounded-2xl font-condensed text-[140px] font-black leading-none tabular-nums transition-transform duration-700 ${
+      won ? 'z-10 scale-110 ring-8 ring-white/90' : ''
+    } ${
       color === 'red'
         ? 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_50px_rgba(239,68,68,0.65)] ring-4 ring-red-300/60'
         : 'bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_50px_rgba(59,130,246,0.65)] ring-4 ring-blue-300/60'
