@@ -1,6 +1,7 @@
 import React from 'react';
 import { ArrowRight, ListChecks, Swords, Zap } from 'lucide-react';
 import { useTournament } from '../../state/TournamentContext';
+import { soundFX } from '../../services/soundEffects';
 import { panelOfJudge } from '../../domain/model';
 import { getJudgeAvatarUrl, DEFAULT_JUDGE_AVATAR } from '../../shared/placeholderAssets';
 
@@ -25,13 +26,13 @@ const Step: React.FC<{ icon: React.ReactNode; title: string; tone?: string; chil
  * a greeting, a short guide to what they score today, and one button into scoring. Fits one phone screen, no scrolling.
  */
 export const JudgeWelcomeScreen: React.FC<{ onEnterPortal: () => void }> = ({ onEnterPortal }) => {
-  const { activeJudge, prelimPanels, playAudioEffect } = useTournament();
+  const { activeJudge, prelimPanels } = useTournament();
 
   const name = activeJudge.judgeName || activeJudge.name.split('•')[1]?.trim() || activeJudge.code;
   const panel = panelOfJudge(activeJudge.id, prelimPanels);
 
   const start = () => {
-    playAudioEffect('vote');
+    soundFX.confirm();
     onEnterPortal();
   };
 

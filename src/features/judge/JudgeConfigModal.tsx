@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTournament } from '../../state/TournamentContext';
+import { soundFX } from '../../services/soundEffects';
 import Cropper, { Area, Point } from 'react-easy-crop';
 import { CropArea, loadImage, renderWebp, SIZES, uploadImage, uploadPhoto } from '../../services/media';
 import { Judge } from '../../domain/types';
@@ -36,7 +37,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
   onClose,
   initialJudgeId,
 }) => {
-  const { judges, updateJudgePhotos, playAudioEffect } = useTournament();
+  const { judges, updateJudgePhotos } = useTournament();
 
   const [selectedJudgeId, setSelectedJudgeId] = useState<string>(initialJudgeId || 'gk-1');
   const [avatarUrl, setAvatarUrl] = useState<string>('');
@@ -98,7 +99,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
 
     try {
       setFullPhotoUrl(await uploadPhoto(file, 'judges', `${currentJudge.id}-full`, SIZES.photo));
-      playAudioEffect('tick');
+      soundFX.click();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
     }
@@ -115,7 +116,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
     try {
       const blob = await renderWebp(await loadImage(avatarFile.file), SIZES.avatar, cropArea, 0.85);
       setAvatarUrl(await uploadImage(blob, 'judges', `${currentJudge.id}-avatar`));
-      playAudioEffect('tick');
+      soundFX.click();
       cancelAvatarCrop();
     } catch (err) {
       alert(err instanceof Error ? err.message : String(err));
@@ -134,7 +135,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
       judgeName: customName.split('•')[1]?.trim() || currentJudge.judgeName,
     });
 
-    playAudioEffect('vote');
+    soundFX.confirm();
     setSaveSuccess(true);
     setTimeout(() => {
       setSaveSuccess(false);
@@ -185,7 +186,7 @@ export const JudgeConfigModal: React.FC<JudgeConfigModalProps> = ({
                   key={j.id}
                   onClick={() => {
                     setSelectedJudgeId(j.id);
-                    playAudioEffect('tick');
+                    soundFX.click();
                   }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                     isSelected

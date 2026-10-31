@@ -39,7 +39,6 @@ export const BattleOperatorView: React.FC = () => {
     addTieBreakRound,
     resetMatch,
     setActiveView,
-    playAudioEffect,
     storageConfig,
   } = useTournament();
   const onlineJudgeIds = useOnlineJudgeIds();
@@ -120,7 +119,7 @@ export const BattleOperatorView: React.FC = () => {
           <button
             onClick={() => triggerTeamEntrance(match.id)}
             className="flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-bold text-zinc-700 hover:bg-zinc-100 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500"
-            title="Hai bên lướt vào sân trên màn LED, kèm âm thanh"
+            title="Hai bên lướt vào sân trên màn LED"
           >
             <Swords className="h-3.5 w-3.5" /> Hiệu ứng ra sân
           </button>
@@ -323,26 +322,6 @@ export const BattleOperatorView: React.FC = () => {
           </div>
         </div>
       </details>
-
-      {/* DJ & MC sounds */}
-      <div className="flex flex-wrap items-center gap-1.5 text-xs">
-        <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-zinc-500">Âm thanh MC & DJ:</span>
-        {(
-          [
-            ['airhorn', '🎺 Airhorn'],
-            ['roundWin', '🥊 Cồng thắng round'],
-            ['champion', '🏆 Kèn vô địch'],
-          ] as const
-        ).map(([effect, label]) => (
-          <button
-            key={effect}
-            onClick={() => playAudioEffect(effect)}
-            className="rounded border border-zinc-300 bg-white px-2.5 py-1 font-bold text-zinc-800 hover:bg-zinc-100 cursor-pointer"
-          >
-            {label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 };

@@ -78,13 +78,13 @@ export const BattleScoringPanel: React.FC = () => {
 
   const pick = (s: Side) => {
     if (locked) return;
-    soundFX.playVoteClick();
+    soundFX.click();
     setSide(s);
   };
 
   const send = async () => {
     if (!match || !side || locked) return;
-    soundFX.playVoteConfirmed();
+    soundFX.confirm();
     setSave('saving');
     const ok = await submitJudgeVote(match.id, roundNum, selectedJudgeId, side);
     setSave(ok ? 'idle' : 'failed');
@@ -209,7 +209,7 @@ export const BattleScoringPanel: React.FC = () => {
               role="tab"
               aria-selected={active}
               onClick={() => {
-                soundFX.playVoteClick();
+                soundFX.click();
                 setPickedRound(r.roundNumber);
               }}
               className={`flex flex-col items-center justify-center rounded-lg py-1.5 cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${

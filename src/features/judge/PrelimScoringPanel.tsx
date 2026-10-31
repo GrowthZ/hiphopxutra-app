@@ -127,7 +127,7 @@ export const PrelimScoringPanel: React.FC = () => {
 
   const press = (key: (typeof KEYS)[number]) => {
     if (locked || !dancer) return;
-    soundFX.playVoteClick();
+    soundFX.click();
     if (key === 'clear') {
       setInput('');
     } else if (key === 'back') {
@@ -144,7 +144,7 @@ export const PrelimScoringPanel: React.FC = () => {
     if (!dancer || locked || value === null) return;
     if (!dirty) return hasNext && goTo(index + 1);
     const target = dancer;
-    soundFX.playVoteConfirmed();
+    soundFX.confirm();
     setError(null);
     setSending((s) => ({ ...s, [target.id]: value }));
     (tie ? updateTieBreakScore : updatePrelimScore)(activeCategory, target.id, selectedJudgeId, value).then((ok) => {

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import { useStageState, DEFAULT_SCREEN_ID } from '../../state/useStage';
 import { IS_LED_PREVIEW } from '../../app/routes';
-import { soundFX } from '../../services/soundEffects';
 import { StageDisplayView } from './StageDisplayView';
 import { ArchBattleView } from './ArchBattleView';
 import { IS_ARCH_LED } from './archLayout';
@@ -48,10 +47,6 @@ export const LedScreen: React.FC = () => {
   const { state, isOnline } = useStageState(DEFAULT_SCREEN_ID, { heartbeat: !IS_LED_PREVIEW });
   const [cursorHidden, setCursorHidden] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-
-  useEffect(() => {
-    if (IS_LED_PREVIEW) soundFX.enabled = false; // the preview lives on the admin laptop
-  }, []);
 
   useEffect(() => {
     setActiveCategory(state.category);

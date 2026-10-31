@@ -2,7 +2,6 @@ import React, { useEffect, useState, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { Trophy, Award, Zap, Minimize2, Maximize2, X, Check } from 'lucide-react';
 import { BattleMatch, BattleSide } from '../../domain/types';
-import { soundFX } from '../../services/soundEffects';
 import {
   getDancerHalfBodyUrl,
   getTeamPhotoUrl,
@@ -105,16 +104,6 @@ export const AutomatedVictoryDisplay: React.FC<AutomatedVictoryDisplayProps> = (
     setIsVisible(true);
     setIsMinimized(false);
     fireVictoryConfetti(side);
-
-    // Play fanfare
-    try {
-      soundFX.playChampionFanfare(side);
-      setTimeout(() => {
-        soundFX.announceMatchWinner(side, breakerName);
-      }, 500);
-    } catch {
-      // Audio autoplay policy fallback
-    }
 
     // Auto-minimize after 12 seconds so stage operators can see 9-judge matrix
     if (autoMinimizeTimerRef.current) {

@@ -57,7 +57,7 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
 
   // Keypad actions
   const handleDigit = useCallback((digit: string) => {
-    soundFX.playVoteClick();
+    soundFX.click();
     setInputStr((prev) => {
       // If current is '0' or empty, replace with digit
       if (prev === '0' || prev === '') {
@@ -71,7 +71,7 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
   }, []);
 
   const handleBackspace = useCallback(() => {
-    soundFX.playVoteClick();
+    soundFX.click();
     setInputStr((prev) => {
       if (prev.length <= 1) return '0';
       return prev.slice(0, -1);
@@ -79,17 +79,17 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
   }, []);
 
   const handleClear = useCallback(() => {
-    soundFX.playVoteClick();
+    soundFX.click();
     setInputStr('0');
   }, []);
 
   const handleQuickPreset = useCallback((preset: number) => {
-    soundFX.playVoteClick();
+    soundFX.click();
     setInputStr(String(preset));
   }, []);
 
   const handleDelta = useCallback((delta: number) => {
-    soundFX.playVoteClick();
+    soundFX.click();
     setInputStr((prev) => {
       const val = parseInt(prev, 10) || 0;
       const next = Math.min(100, Math.max(0, val + delta));
@@ -98,13 +98,13 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
   }, []);
 
   const handleConfirmDone = useCallback(() => {
-    soundFX.playVoteConfirmed();
+    soundFX.confirm();
     onSave(numericScore);
     onClose();
   }, [numericScore, onSave, onClose]);
 
   const handleConfirmNextJudge = useCallback(() => {
-    soundFX.playVoteConfirmed();
+    soundFX.confirm();
     if (onSaveAndNextJudge) {
       onSaveAndNextJudge(numericScore);
     } else {
@@ -114,7 +114,7 @@ export const BankingScoreKeypadModal: React.FC<BankingScoreKeypadModalProps> = (
   }, [numericScore, onSaveAndNextJudge, onSave, onClose]);
 
   const handleConfirmNextDancer = useCallback(() => {
-    soundFX.playVoteConfirmed();
+    soundFX.confirm();
     if (onSaveAndNextDancer) {
       onSaveAndNextDancer(numericScore);
     } else {

@@ -54,7 +54,6 @@ import * as cues from '../services/stageCues';
 import { useSyncedCollection } from './useSyncedCollection';
 import { useNavigation } from './useNavigation';
 import { useAuthSession } from './useAuthSession';
-import { useSoundSettings, AudioEffect } from './useSoundSettings';
 import { useGoogleSheets } from './useGoogleSheets';
 import { usePublisherHeartbeat } from './usePublisher';
 import { revealMs } from '../domain/reveal';
@@ -88,15 +87,6 @@ interface TournamentContextType {
   ) => void;
   isJudgeConfigModalOpen: boolean;
   setIsJudgeConfigModalOpen: (open: boolean) => void;
-
-  // Sound
-  soundEnabled: boolean;
-  setSoundEnabled: (enabled: boolean) => void;
-  soundVolume: number;
-  setSoundVolume: (vol: number) => void;
-  voiceAnnounceEnabled: boolean;
-  setVoiceAnnounceEnabled: (enabled: boolean) => void;
-  playAudioEffect: (effect: AudioEffect) => void;
 
   // Dancers & Prelims
   activeCategory: CategoryType;
@@ -188,7 +178,6 @@ const TournamentContext = createContext<TournamentContextType | null>(null);
 
 export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigation = useNavigation();
-  const sound = useSoundSettings();
   const [actionError, setActionError] = useState<string | null>(null);
   const auth = useAuthSession(navigation.activeView, setActionError);
   const { isAdmin, staffRole, judgeAccountId } = auth;
@@ -667,7 +656,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     setProTeams((prev) => prev.map((t) => (t.id === teamId ? { ...t, teamPhotoUrl } : t)));
 
   const submitJudgeVote = (matchId: string, roundNumber: number, judgeId: string, side: Side) => {
-    const roundVotes = { ...votes[matchId]?.[`r${roundNumber}`], [judgeId]: side };
     const saved = writeBattleVote(matchId, roundNumber, judgeId, side).then(
       () => {
         recordOwnBallot((b) => ({
@@ -681,11 +669,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         return false;
       }
     );
-    cues.voteCast(
-      judges.find((j) => j.id === judgeId)?.code,
-      side,
-      Object.keys(roundVotes).length === judges.length
-    );
     return saved;
   };
 
@@ -696,12 +679,8 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     updateMatch(matchId, (x) => battle.confirmRound(x, roundNumber, now)?.match ?? x);
 
     const lit = revealMs(1, judges.length, winnerDelay);
-    if (m && outcome) {
-      if (outcome.matchWinner) {
-        cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), lit);
-      } else {
-        cues.celebrateRoundWin(outcome.roundWinner, battle.sideName(m, outcome.roundWinner), roundNumber, lit);
-      }
+    if (m && outcome?.matchWinner) {
+      cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), lit);
     }
     cues.revealRounds(matchId, [roundNumber]);
   };
@@ -713,12 +692,10 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     updateMatch(matchId, (x) => battle.revealAllRounds(x, now).match);
     if (!m) return;
 
-    soundFX.playRevealSuspense();
     const rounds = battle.regulationRounds(m).map((r) => r.roundNumber);
     const lit = revealMs(rounds.length, judges.length, winnerDelay);
     const outcome = battle.revealAllRounds(m, now);
-    if (outcome.tieBreak) cues.announceTieBreak(lit);
-    else if (outcome.matchWinner) {
+    if (!outcome.tieBreak && outcome.matchWinner) {
       cues.celebrateMatchWin(matchId, outcome.matchWinner, battle.sideName(m, outcome.matchWinner), lit);
     }
     cues.revealRounds(matchId, rounds);
@@ -750,12 +727,12 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
   const advanceToNextRound = (matchId: string) => {
     updateMatch(matchId, battle.advanceRound);
-    soundFX.playVoteClick();
+    soundFX.click();
   };
 
   const addTieBreakRound = (matchId: string) => {
     updateMatch(matchId, battle.addTieBreakRound);
-    soundFX.playVoteClick();
+    soundFX.click();
   };
 
   const resetMatch = (matchId: string) => {
@@ -792,7 +769,6 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateJudgePhotos,
         isJudgeConfigModalOpen,
         setIsJudgeConfigModalOpen,
-        ...sound,
         activeCategory,
         setActiveCategory,
         newbieDancers,

@@ -2,8 +2,6 @@ import React, { useState } from 'react';
 import { useTournament } from '../../state/TournamentContext';
 import {
   Trophy,
-  Volume2,
-  VolumeX,
   FileSpreadsheet,
   Tv,
   Smartphone,
@@ -11,20 +9,16 @@ import {
   Maximize2,
   CheckCircle2,
   AlertCircle,
-  Sliders,
   Cloud,
   Camera,
   Menu,
 } from 'lucide-react';
-import { AudioSettingsModal } from '../settings/AudioSettingsModal';
 
 export const Navbar: React.FC<{ onMenu?: () => void }> = ({ onMenu }) => {
   const {
     judges,
     selectedJudgeId,
     setSelectedJudgeId,
-    soundEnabled,
-    setSoundEnabled,
     sheetConfig,
     activeView,
     setActiveView,
@@ -231,28 +225,6 @@ export const Navbar: React.FC<{ onMenu?: () => void }> = ({ onMenu }) => {
             </span>
           </button>
 
-          {/* Sound FX Settings Modal */}
-          <button
-            onClick={() => setIsAudioModalOpen(true)}
-            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition-colors cursor-pointer"
-            title="Cài đặt hiệu ứng âm thanh giải đấu"
-          >
-            <Sliders className="w-4 h-4 text-zinc-700" />
-          </button>
-
-          {/* Mute/Unmute Toggle */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-1.5 rounded bg-zinc-50 hover:bg-zinc-200 text-zinc-700 hover:text-zinc-900 border border-zinc-200 transition-colors cursor-pointer"
-            title={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-4 h-4 text-emerald-700" />
-            ) : (
-              <VolumeX className="w-4 h-4 text-zinc-500" />
-            )}
-          </button>
-
           {/* Reset All Data (Testing tool) */}
           <button
             onClick={() => {
@@ -276,12 +248,6 @@ export const Navbar: React.FC<{ onMenu?: () => void }> = ({ onMenu }) => {
           </button>
         </div>
       </div>
-
-      {/* Audio Settings Modal */}
-      <AudioSettingsModal
-        isOpen={isAudioModalOpen}
-        onClose={() => setIsAudioModalOpen(false)}
-      />
     </header>
   );
 };

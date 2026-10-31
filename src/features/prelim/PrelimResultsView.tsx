@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useTournament } from '../../state/TournamentContext';
+import { soundFX } from '../../services/soundEffects';
 import { CategoryType, Dancer, Judge } from '../../domain/types';
 import { PANEL_SIZE, prelimJudgeIdsFor } from '../../domain/model';
 import { RankEmblem } from '../../shared/RankEmblem';
@@ -45,7 +46,6 @@ export const PrelimResultsView: React.FC = () => {
     isProTop32Locked,
     publishPrelim,
     setActiveView,
-    playAudioEffect,
     storageConfig,
   } = useTournament();
 
@@ -149,7 +149,6 @@ export const PrelimResultsView: React.FC = () => {
   const handleToggleLock = () => {
     const result = publishPrelim(activeCategory);
     if (result === 'locked') {
-      playAudioEffect('champion');
       confetti({
         particleCount: 100,
         spread: 70,
@@ -227,7 +226,7 @@ export const PrelimResultsView: React.FC = () => {
               <button data-kiosk-keep
                 onClick={() => {
                   setActiveCategory('newbie_1v1');
-                  playAudioEffect('tick');
+                  soundFX.click();
                 }}
                 className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
                   activeCategory === 'newbie_1v1'
@@ -240,7 +239,7 @@ export const PrelimResultsView: React.FC = () => {
               <button data-kiosk-keep
                 onClick={() => {
                   setActiveCategory('pro_2v2');
-                  playAudioEffect('tick');
+                  soundFX.click();
                 }}
                 className={`px-3 py-1.5 rounded text-xs font-bold transition-all cursor-pointer ${
                   activeCategory === 'pro_2v2'
@@ -262,7 +261,7 @@ export const PrelimResultsView: React.FC = () => {
                   onClick={() => {
                     setOngoingTopLimit(10);
                     if (viewScope !== 'auto') setViewScope('top10');
-                    playAudioEffect('tick');
+                    soundFX.click();
                   }}
                   className={`px-2.5 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
                     effectiveMode === 'top10'
@@ -277,7 +276,7 @@ export const PrelimResultsView: React.FC = () => {
                   onClick={() => {
                     setOngoingTopLimit(15);
                     if (viewScope !== 'auto') setViewScope('top15');
-                    playAudioEffect('tick');
+                    soundFX.click();
                   }}
                   className={`px-2.5 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
                     effectiveMode === 'top15'
@@ -292,7 +291,7 @@ export const PrelimResultsView: React.FC = () => {
                 <button
                   onClick={() => {
                     setViewScope(viewScope === 'all' ? 'auto' : 'all');
-                    playAudioEffect('tick');
+                    soundFX.click();
                   }}
                   className={`px-2.5 py-1 rounded text-xs font-bold transition-colors cursor-pointer ${
                     effectiveMode === 'all'

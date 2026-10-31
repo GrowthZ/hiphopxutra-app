@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Check } from 'lucide-react';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { useTournament } from '../../state/TournamentContext';
-import { soundFX } from '../../services/soundEffects';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { BattleMatch, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
@@ -55,11 +54,6 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
         flipTimerRef.current = setTimeout(() => {
           setIsFlipping(true);
           setHasFlipped(true);
-          try {
-            soundFX.playCardFlipTick(judgeIndex, vote === 'red' || vote === 'blue' ? vote : undefined);
-          } catch {
-            // ignore
-          }
           setTimeout(() => setIsFlipping(false), FLIP_MS);
         }, targetDelay - elapsed);
       } else {
@@ -218,11 +212,6 @@ export function useTeamEntrance(match?: BattleMatch) {
   const trigger = () => {
     setEntranceKey(Date.now());
     setIsEntranceActive(true);
-    try {
-      soundFX.playTeamEntranceSwoosh();
-    } catch {
-      // ignore
-    }
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => setIsEntranceActive(false), 1200);
   };
