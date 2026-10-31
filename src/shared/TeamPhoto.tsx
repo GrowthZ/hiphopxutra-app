@@ -19,17 +19,12 @@ const halfBodies = (dancers: (Dancer | undefined)[]) => {
 /**
  * Large picture (LED, team card): the two half-body cut-outs standing side by side, shoulders slightly
  * overlapping, both on the bottom edge. `className` styles the single image (team photo / placeholder),
- * `boxClassName` the side-by-side box, `cutoutClassName` each cut-out (e.g. a drop shadow on the LED).
+ * `boxClassName` the side-by-side box, `cutoutClassName` each cut-out (e.g. a drop shadow on the LED),
+ * `overlapClassName` how far the second cut-out tucks behind the first.
  */
-export const TeamPhoto: React.FC<Props & { className: string; boxClassName: string; cutoutClassName?: string }> = ({
-  photoUrl,
-  dancers,
-  placeholder,
-  alt = '',
-  className,
-  boxClassName,
-  cutoutClassName = '',
-}) => {
+export const TeamPhoto: React.FC<
+  Props & { className: string; boxClassName: string; cutoutClassName?: string; overlapClassName?: string }
+> = ({ photoUrl, dancers, placeholder, alt = '', className, boxClassName, cutoutClassName = '', overlapClassName = '-ml-[10%]' }) => {
   const pair = photoUrl ? null : halfBodies(dancers);
   if (!pair) return <img src={photoUrl || placeholder} alt={alt} className={className} />;
   return (
@@ -39,7 +34,7 @@ export const TeamPhoto: React.FC<Props & { className: string; boxClassName: stri
           key={i} // the two members may share a photo
           src={url}
           alt=""
-          className={`h-full w-auto min-w-0 max-w-[58%] object-contain object-bottom ${i === 1 ? '-ml-[10%]' : ''} ${cutoutClassName}`}
+          className={`h-full w-auto min-w-0 max-w-[58%] object-contain object-bottom ${i === 1 ? overlapClassName : ''} ${cutoutClassName}`}
         />
       ))}
     </div>

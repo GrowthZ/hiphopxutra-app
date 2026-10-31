@@ -30,7 +30,7 @@ Mỗi thí sinh do 4 GK của bảng mình chấm, tổng tối đa 400.
 - [ ] Nhập danh sách thí sinh: `bun run db dancer:import thi-sinh.tsv`, kiểm tra `bun run db dancer:list`.
 - [ ] Tải ảnh thí sinh (`/admin/thi-sinh`) và ảnh/tên giám khảo (**Cấu hình 2 ảnh (9 GK)**).
 - [ ] **Tập dượt toàn bộ trên dữ liệu dev** (mục 7), có cả tình huống rút cáp mạng.
-- [ ] Hỏi bên LED sơ đồ module thật; chỉnh tham số `cot`, `module` của `/led?khung=vom` (HUONG-DAN-CHAY.md mục 0c).
+- [ ] Đối chiếu sơ đồ LED (`public/led/size-led.jpg`, 2560×1536) với màn thật bằng `/led?khung=vom&luoi=1`; chỉnh `che` theo chiều cao bàn giám khảo, `lech` nếu vòm không nằm ở mép trái khung HDMI (HUONG-DAN-CHAY.md mục 0c).
 - [ ] `bun run db backup` rồi cất file sao lưu ra ngoài máy.
 
 ## 2. Sáng ngày thi: mở máy (60 phút trước giờ check-in)

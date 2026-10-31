@@ -1,15 +1,17 @@
-// Stepped-arch LED wall (10 m × 5.5 m, square cabinets): which pixels physically exist.
-// The defaults are estimated from the venue drawing (20 columns × 11 rows of 500 mm cabinets); the real pixel
-// map from the LED vendor can be dialled in through the URL, no deploy needed:
+// Stepped-arch LED wall (10 m × 6 m, 500 mm cabinets): which pixels physically exist.
+// Defaults follow the venue drawing (public/led/size-led.jpg): 20 columns × 12 rows of 128 px cabinets, 2560×1536 px.
+// The real pixel map from the LED vendor can still be dialled in through the URL, no deploy needed:
 //   /led?khung=vom                      turn the arch layout on
-//   &cot=5,7,8,8,9,10,10,11,11,11       cabinets per column, left half (mirrored) or all 20 columns
-//   &module=96                          pixels per cabinet in the HDMI picture (pitch × 500 mm)
-//   &luoi=1                             draw the cabinet grid and the cut-out outline (setup / preview)
-// The picture sits at the top-left of the HDMI output (1920×1080 by default), the LED processor's usual origin.
+//   &cot=6,8,9,10,10,11,11,12,12,12     cabinets per column, left half (mirrored) or all 20 columns
+//   &module=128                         pixels per cabinet in the HDMI picture
+//   &che=3                              bottom rows hidden behind the judges' table: nothing important drawn there
+//   &lech=1408                          arch's left edge in the HDMI picture (side screens 1408 px each: 5376 px in all)
+//   &luoi=1                             draw the cabinet grid, the cut-out outline and the hidden band (setup / preview)
+// The picture sits at the top of the HDMI output, `lech` px from the left (0 by default).
 
 const params = new URLSearchParams(window.location.search);
 
-const DEFAULT_HALF = [5, 7, 8, 8, 9, 10, 10, 11, 11, 11];
+const DEFAULT_HALF = [6, 8, 9, 10, 10, 11, 11, 12, 12, 12];
 
 function parseColumns(raw: string | null) {
   const nums = (raw ?? '')
@@ -20,14 +22,24 @@ function parseColumns(raw: string | null) {
   return nums.length > DEFAULT_HALF.length ? half : [...half, ...[...half].reverse()];
 }
 
+const intParam = (name: string, fallback: number) => {
+  const n = Number(params.get(name));
+  return params.has(name) && Number.isInteger(n) && n >= 0 ? n : fallback;
+};
+
 export const IS_ARCH_LED = params.get('khung') === 'vom';
 export const SHOW_ARCH_GRID = params.get('luoi') === '1';
 
 export const ARCH_COLUMNS = parseColumns(params.get('cot'));
-export const MODULE_PX = Math.max(16, Number(params.get('module')) || 96);
+export const MODULE_PX = Math.max(16, Number(params.get('module')) || 128);
 export const ARCH_ROWS = Math.max(...ARCH_COLUMNS);
 export const ARCH_WIDTH = ARCH_COLUMNS.length * MODULE_PX;
 export const ARCH_HEIGHT = ARCH_ROWS * MODULE_PX;
+export const ARCH_OFFSET_X = intParam('lech', 0);
+
+/** Bottom band hidden by the seated judges (default 3 rows = 1.5 m), as a fraction of the wall height. */
+export const HIDDEN_ROWS = Math.min(intParam('che', 3), ARCH_ROWS - 6);
+export const HIDDEN = HIDDEN_ROWS / ARCH_ROWS;
 
 /** Top edge (px from the top of the picture) of the LED at column `i`. */
 export const columnTop = (i: number) => (ARCH_ROWS - ARCH_COLUMNS[i]) * MODULE_PX;

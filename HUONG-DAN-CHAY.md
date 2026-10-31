@@ -62,22 +62,25 @@ Tải ảnh thí sinh: chỉ cần **1 ảnh nửa người**; kéo/phóng vòng
 
 ## 0c. Màn LED vòm bậc thang (sân khấu chính)
 
-Màn LED 10 m × 5,5 m dạng vòm bậc thang dùng bố cục riêng cho cảnh **Trận Battle**: mở `/led?khung=vom`
-trên máy nối LED qua HDMI (xuất 1920×1080), bấm vào màn hình để vào toàn màn hình. Hình được vẽ ở góc trên trái,
-chỉ trong phần có LED; tên + tỉ số nằm ở độ cao 2–3,1 m (trên đầu người đứng trên sàn), phần dưới 1,3 m chỉ có
-tên sự kiện vì thường bị che. Admin xem trước ở `/admin/led` → **Xem trước khung vòm**.
+Màn LED vòm giữa 10 m × 6 m (**2560×1536 px**, bản vẽ `public/led/size-led.jpg`) dùng bố cục riêng cho cảnh
+**Trận Battle**: mở `/led?khung=vom` trên máy nối LED qua HDMI, bấm vào màn hình để vào toàn màn hình. Hình chỉ vẽ trong
+phần có LED. Từ dưới lên: **1,5 m dưới cùng bị bàn giám khảo ngồi che** nên chỉ có tên sự kiện; bảng giám khảo × round
+ở 1,6–2,8 m; tên + tỉ số ở 2,9–3,5 m; ảnh thí sinh hai bên sườn; logo và trận đấu trên đỉnh vòm.
+Admin xem trước ở `/admin/led` → **Xem trước khung vòm**.
 
-Đang dùng số **ước lượng** từ bản vẽ: 20 cột × 11 hàng module 500 mm, chiều cao từng cột (từ ngoài vào giữa)
-5, 7, 8, 8, 9, 10, 10, 11, 11, 11 module, 96 px mỗi module. Khi bên LED gửi sơ đồ thật, chỉ cần sửa link:
+Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi cabinet, chiều cao từng cột (từ ngoài vào giữa)
+6, 8, 9, 10, 10, 11, 11, 12, 12, 12. Hai màn bên 1408×1024 px là nguồn khác; nếu cả 3 màn chung một khung HDMI
+5376×1536 thì vòm bắt đầu ở x = 1408, thêm `&lech=1408`. Chỉnh không cần deploy, chỉ sửa link:
 
-| Tham số | Ý nghĩa | Ví dụ |
+| Tham số | Ý nghĩa | Mặc định |
 |---|---|---|
-| `cot` | Số module mỗi cột: nửa trái (tự lấy đối xứng) hoặc đủ 20 cột | `cot=5,7,8,8,9,10,10,11,11,11` |
-| `module` | Số pixel mỗi module trong khung HDMI | `module=96` |
-| `luoi=1` | Vẽ lưới module và vùng bị cắt, để căn với màn thật | `luoi=1` |
+| `cot` | Số cabinet mỗi cột: nửa trái (tự lấy đối xứng) hoặc đủ 20 cột | `6,8,9,10,10,11,11,12,12,12` |
+| `module` | Số pixel mỗi cabinet trong khung HDMI | `128` |
+| `che` | Số hàng dưới cùng bị bàn giám khảo che (0,5 m mỗi hàng): không đặt thông tin quan trọng | `3` |
+| `lech` | Vị trí mép trái của vòm trong khung HDMI (px) | `0` |
+| `luoi=1` | Vẽ lưới cabinet, vùng bị cắt và vạch vùng bị che, để căn với màn thật | tắt |
 
-Ví dụ: `/led?khung=vom&cot=6,7,8,9,9,10,10,11,11,11&module=96&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim**
-vẫn là bố cục 16:9.
+Ví dụ: `/led?khung=vom&che=2&lech=1408&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.
 
 ## Yêu cầu
 
