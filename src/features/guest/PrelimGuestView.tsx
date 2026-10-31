@@ -228,7 +228,7 @@ export const PrelimGuestView: React.FC = () => {
                     </span>
                   </span>
                   {/* Under the photo, only its top edge touching the ring, so the face stays clear */}
-                  <RankEmblem rank={i + 1} className={`${first ? '-mt-5 h-[68px]' : '-mt-4 h-12'} relative`} />
+                  <RankEmblem rank={i + 1} className={`${first ? '-mt-8 h-[68px]' : '-mt-6 h-12'} relative`} />
                   <span className={`${first ? 'mt-0.5 text-lg' : 'mt-0.5 text-base'} w-full truncate px-0.5 font-condensed font-black uppercase leading-tight`}>
                     {stripBreakerPrefix(d.name)}
                   </span>
@@ -405,7 +405,7 @@ const DancerSheet: React.FC<{
               </span>
             </div>
             {/* Under the photo, only its top edge touching the ring, so the face stays clear */}
-            {medal && <RankEmblem rank={rank} className={`relative -mt-6 ${rank === 1 ? 'h-20' : 'h-16'}`} glow />}
+            {medal && <RankEmblem rank={rank} className={`relative -mt-9 ${rank === 1 ? 'h-20' : 'h-16'}`} glow />}
 
             <p
               className={`${medal ? 'mt-2' : 'mt-4'} font-condensed text-sm font-black uppercase tracking-[0.2em]`}
