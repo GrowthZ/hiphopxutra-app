@@ -8,7 +8,7 @@ import { getTeamPhotoUrl, getDancerAvatarUrl, stripBreakerPrefix } from '../../s
 import { BattleMatch, BattleRound, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
 import { regulationRounds } from '../../domain/battle';
-import { DEFAULT_WINNER_DELAY } from '../../domain/reveal';
+import { DEFAULT_CHAMPION_DELAY, DEFAULT_WINNER_DELAY } from '../../domain/reveal';
 
 type Side = 'red' | 'blue';
 
@@ -44,6 +44,7 @@ export const BattleOperatorView: React.FC = () => {
   const onlineJudgeIds = useOnlineJudgeIds();
   const stage = useStageController(DEFAULT_SCREEN_ID, authUser?.email ?? '');
   const winnerDelay = stage.state.winnerDelay ?? DEFAULT_WINNER_DELAY;
+  const championDelay = stage.state.championDelay ?? DEFAULT_CHAMPION_DELAY;
 
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
   const [overrideRound, setOverrideRound] = useState<number | null>(null);
@@ -167,6 +168,14 @@ export const BattleOperatorView: React.FC = () => {
           <DelayInput value={winnerDelay} onChange={stage.setWinnerDelay} />
           giây
         </label>
+        {match.stage === 'final' && (
+          <label className="flex shrink-0 items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700">
+            <Trophy className="h-4 w-4 text-amber-600" />
+            Vinh danh vô địch sau
+            <DelayInput value={championDelay} onChange={stage.setChampionDelay} min={1} max={60} label="Thời gian chờ hiện vinh danh vô địch (giây)" />
+            giây
+          </label>
+        )}
 
         <div className="flex shrink-0 flex-wrap gap-2">
           {match.status === 'finished' ? (
@@ -411,11 +420,17 @@ const RoundRow: React.FC<{ round: BattleRound; match: BattleMatch; judgeIds: str
 };
 
 /** Seconds, 0–5 in tenths; saved when the field is left or Enter is pressed. */
-const DelayInput: React.FC<{ value: number; onChange: (seconds: number) => void }> = ({ value, onChange }) => {
+const DelayInput: React.FC<{ value: number; onChange: (seconds: number) => void; min?: number; max?: number; label?: string }> = ({
+  value,
+  onChange,
+  min = 0,
+  max = 5,
+  label = 'Độ trễ hiện người thắng (giây)',
+}) => {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [value]);
   const commit = () => {
-    const n = Math.round(Math.min(5, Math.max(0, Number(draft.replace(',', '.')) || 0)) * 10) / 10;
+    const n = Math.round(Math.min(max, Math.max(min, Number(draft.replace(',', '.')) || 0)) * 10) / 10;
     setDraft(String(n));
     if (n !== value) onChange(n);
   };
@@ -426,7 +441,7 @@ const DelayInput: React.FC<{ value: number; onChange: (seconds: number) => void 
       onChange={(e) => setDraft(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => e.key === 'Enter' && commit()}
-      aria-label="Độ trễ hiện người thắng (giây)"
+      aria-label={label}
       className="w-14 rounded border border-zinc-300 px-2 py-1 text-center font-mono text-sm font-black tabular-nums text-zinc-900 focus-visible:outline-2 focus-visible:outline-amber-500"
     />
   );

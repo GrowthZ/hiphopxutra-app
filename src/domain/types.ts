@@ -34,6 +34,7 @@ export interface StageState {
   theme: 'daylight' | 'night' | 'light'; // main battle backdrop: navy, near-black, or white (light)
   blackout: boolean; // overrides scene with the idle/logo screen
   winnerDelay?: number; // seconds between the last ballot flipping over and the result lighting up (default 0.5)
+  championDelay?: number; // seconds between the final's result lighting up and the champion popup (default 5)
   archEdge?: 'full' | 'dome'; // arch LED: full picture cut by the wall itself (default), or a smooth dome inside it
   bracketTheme?: 'light' | 'dark'; // knockout bracket scene (default dark)
   idleImageUrl?: string; // standby screen picture uploaded by an admin; empty = the built-in logo screen

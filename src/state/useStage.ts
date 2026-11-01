@@ -89,6 +89,7 @@ export function useStageController(screenId = DEFAULT_SCREEN_ID, adminEmail = ''
     setTheme: (theme: StageState['theme']) => update({ theme }),
     setBlackout: (blackout: boolean) => update({ blackout }),
     setWinnerDelay: (winnerDelay: number) => update({ winnerDelay }),
+    setChampionDelay: (championDelay: number) => update({ championDelay }),
     setArchEdge: (archEdge: 'full' | 'dome') => update({ archEdge }),
     setBracketTheme: (bracketTheme: 'light' | 'dark') => update({ bracketTheme }),
     setIdleImage: (idleImageUrl: string) => update({ idleImageUrl }),

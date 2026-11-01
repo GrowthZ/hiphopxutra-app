@@ -7,6 +7,8 @@ export const FLIP_MS = 450; // one pill turning over
 const ROUND_GAP_MS = 300; // pause before the next round's row starts
 
 export const DEFAULT_WINNER_DELAY = 0.5; // seconds
+/** After the final's result has lit up, this long before the champion popup (seconds). */
+export const DEFAULT_CHAMPION_DELAY = 5;
 
 /** When the row in position `index` of one reveal starts flipping, from the reveal's start. */
 export const roundOffset = (index: number, judges: number) => index * ((judges - 1) * FLIP_STEP_MS + FLIP_MS + ROUND_GAP_MS);

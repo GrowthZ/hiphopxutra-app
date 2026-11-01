@@ -6,6 +6,7 @@ import { regulationRounds } from '../../domain/battle';
 import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../../shared/placeholderAssets';
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
+import { ChampionPopup } from './ChampionPopup';
 import { ArchFrame } from './ArchFrame';
 import { BattleTheme, battlePalette } from './battleTheme';
 import { JudgeBallotCard, useRevealedResult, useRevealStartTimes, useTeamEntrance } from './StageDisplayView';
@@ -54,8 +55,9 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
  * `edge` (set at /admin/led): the full picture, cut by the wall itself (default), or drawn inside a smooth dome.
  * `theme` (set at /admin/led): daylight, night or light backdrop, as on the 16:9 screen.
  */
-export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; theme?: BattleTheme }> = ({
+export const ArchBattleView: React.FC<{ winnerDelay?: number; championDelay?: number; edge?: ArchEdge; theme?: BattleTheme }> = ({
   winnerDelay,
+  championDelay,
   edge = 'full',
   theme = 'daylight',
 }) => {
@@ -288,6 +290,9 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
 
           {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
           <AutomatedVictoryDisplay match={match} overlay={false} holdUntil={revealed.holdUntil} />
+
+          {/* After the final: the champion, over the whole wall */}
+          <ChampionPopup match={match} holdUntil={revealed.holdUntil} delay={championDelay} layout="arch" />
     </ArchFrame>
   );
 };

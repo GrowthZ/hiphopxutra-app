@@ -208,6 +208,11 @@
   100% { opacity: 1; transform: none; }
 }
 .led-pop { animation: led-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+/* Champion popup backdrop */
+@keyframes led-fade-in {
+  from { opacity: 0; }
+}
+.led-fade-in { animation: led-fade-in 0.8s ease-out both; }
 @media (prefers-reduced-motion: reduce) {
-  .led-pop { animation: none; }
+  .led-pop, .led-fade-in { animation: none; }
 }

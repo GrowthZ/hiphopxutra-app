@@ -7,6 +7,7 @@ import { BattleMatch, BattleSide } from '../../domain/types';
 import { isRoundOpen } from '../../domain/model';
 import { regulationRounds } from '../../domain/battle';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
+import { ChampionPopup } from './ChampionPopup';
 import { DEFAULT_WINNER_DELAY, FLIP_MS, FLIP_STEP_MS, roundOffset, rowFlipMs } from '../../domain/reveal';
 import { BattleTheme, battlePalette } from './battleTheme';
 
@@ -256,6 +257,8 @@ interface StageDisplayViewProps {
   theme?: BattleTheme;
   /** Seconds between the last pill turning and the result lighting up (set on the battle console). */
   winnerDelay?: number;
+  /** After the final: seconds from the result lighting up to the champion popup (set on the battle console). */
+  championDelay?: number;
 }
 
 const breakerName = (side?: BattleSide) =>
@@ -283,7 +286,7 @@ const judgeShortName = (name: string, code: string) => {
   return clean || code;
 };
 
-export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight', winnerDelay }) => {
+export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight', winnerDelay, championDelay }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
   const p = battlePalette(theme);
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
@@ -576,6 +579,9 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
 
         {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
         <AutomatedVictoryDisplay match={match} overlay={false} holdUntil={revealed.holdUntil} />
+
+        {/* After the final: the champion, full screen */}
+        <ChampionPopup match={match} holdUntil={revealed.holdUntil} delay={championDelay} layout="wide" />
       </div>
     </div>
   );
