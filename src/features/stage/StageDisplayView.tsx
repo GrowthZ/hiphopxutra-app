@@ -26,12 +26,10 @@ interface JudgeBallotCardProps {
   vote?: 'red' | 'blue' | 'hidden' | null;
   isRevealed: boolean;
   revealStartTime?: number;
-  /** Light backdrop: outline the white waiting pill so it doesn't melt into the background. */
-  light?: boolean;
 }
 
 /** One judge's pill in a round row: white while waiting, green once voted, flips to red / blue on reveal. */
-export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, judgeIndex, vote, isRevealed, revealStartTime, light }) => {
+export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, judgeIndex, vote, isRevealed, revealStartTime }) => {
   const [hasFlipped, setHasFlipped] = useState<boolean>(() => {
     if (!isRevealed) return false;
     if (!revealStartTime) return true;
@@ -87,9 +85,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
             ? 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_24px_rgba(239,68,68,0.85)] ring-2 ring-red-300/70'
             : vote === 'blue'
               ? 'bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_24px_rgba(59,130,246,0.85)] ring-2 ring-blue-300/70'
-              : light
-                ? 'bg-zinc-200 text-zinc-400'
-                : 'bg-white/10 text-white/40'
+              : 'bg-white/10 text-white/40'
         }`}
       >
         {vote === 'red' ? 'Đỏ' : vote === 'blue' ? 'Xanh' : '—'}
@@ -106,7 +102,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
   }
 
   return (
-    <div role="img" aria-label={`${judgeCode}: chờ phiếu`} className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)] ${light ? 'ring-1 ring-zinc-300' : ''}`}>
+    <div role="img" aria-label={`${judgeCode}: chờ phiếu`} className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]`}>
       {judgeCode.replace('GK ', '')}
     </div>
   );
@@ -493,7 +489,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
             {judges.map((j) => (
               <span
                 key={j.id}
-                className={`truncate rounded-md px-2 py-1.5 text-center font-condensed text-[26px] font-black uppercase leading-none ${p.chip}`}
+                className="truncate rounded-md bg-black/55 px-2 py-1.5 text-center font-condensed text-[26px] font-black uppercase leading-none text-white ring-1 ring-white/10"
               >
                 {j.judgeName || judgeShortName(j.name, j.code)}
               </span>
@@ -505,11 +501,11 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
               if (!round) {
                 return (
                   <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
-                    <div className={`flex items-center rounded-xl px-4 ${p.chip}`}>
-                      <span className={`whitespace-nowrap font-condensed text-[28px] font-black uppercase leading-none ${p.tieText}`}>Tie-break</span>
+                    <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
+                      <span className="whitespace-nowrap font-condensed text-[28px] font-black uppercase leading-none text-amber-300">Tie-break</span>
                     </div>
                     {judges.map((j) => (
-                      <span key={j.id} className={`rounded-xl ${p.emptyPill}`} />
+                      <span key={j.id} className="rounded-xl bg-white/10" />
                     ))}
                   </div>
                 );
@@ -528,15 +524,15 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
                 >
                   <div
                     className={`flex items-center justify-between gap-2 rounded-xl px-3 ${
-                      isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? p.chipLive : p.chip
+                      isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
                     }`}
                   >
-                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? `text-[24px] ${p.tieText}` : 'text-[28px]'}`}>
+                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? 'text-[24px] text-amber-300' : 'text-[28px] text-white'}`}>
                       {roundLabel(round)}
                     </span>
                     <span
                       className={`whitespace-nowrap text-[13px] font-black uppercase leading-none ${
-                        isRevealed && !flipping ? (round.winner === 'red' ? p.wonText[0] : p.wonText[1]) : p.votedText
+                        isRevealed && !flipping ? (round.winner === 'red' ? 'text-red-400' : 'text-blue-400') : 'text-emerald-300'
                       }`}
                     >
                       {isRevealed ? (flipping ? 'Đang lật phiếu…' : round.winner === 'red' ? 'Đỏ thắng' : 'Xanh thắng') : `${votes}/${judges.length} đã chấm`}
@@ -550,7 +546,6 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
                       vote={round.votes[j.id]}
                       isRevealed={isRevealed}
                       revealStartTime={revealAt}
-                      light={p.light}
                     />
                   ))}
                 </div>
@@ -564,12 +559,12 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           <span
             className={`rounded-lg px-5 py-1.5 font-condensed text-[26px] font-black uppercase leading-none tracking-wider ${
               revealed.pending
-                ? p.statusTag
+                ? 'bg-black/60 text-white/85 ring-1 ring-white/15'
                 : match.status === 'finished'
                 ? 'bg-emerald-500 text-zinc-950'
                 : hasTieBreakRound || isMatchTied
                   ? 'bg-amber-400 text-zinc-950'
-                  : p.statusTag
+                  : 'bg-black/60 text-white/85 ring-1 ring-white/15'
             }`}
           >
             {statusText}

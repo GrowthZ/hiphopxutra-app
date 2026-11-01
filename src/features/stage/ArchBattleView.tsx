@@ -222,7 +222,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
               {judges.map((j) => (
                 <span
                   key={j.id}
-                  className={`truncate rounded-md px-2 py-1.5 text-center font-condensed text-[30px] font-black uppercase leading-none ${p.chip}`}
+                  className="truncate rounded-md bg-black/55 px-2 py-1.5 text-center font-condensed text-[30px] font-black uppercase leading-none text-white ring-1 ring-white/10"
                 >
                   {j.judgeName || j.code}
                 </span>
@@ -234,11 +234,11 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                   // Tie-break not needed (yet): a dim placeholder row
                   return (
                     <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
-                      <div className={`flex items-center rounded-xl px-4 ${p.chip}`}>
-                        <span className={`whitespace-nowrap font-condensed text-[32px] font-black uppercase leading-none ${p.tieText}`}>Tie-break</span>
+                      <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
+                        <span className="whitespace-nowrap font-condensed text-[32px] font-black uppercase leading-none text-amber-300">Tie-break</span>
                       </div>
                       {judges.map((j) => (
-                        <span key={j.id} className={`rounded-xl ${p.emptyPill}`} />
+                        <span key={j.id} className="rounded-xl bg-white/10" />
                       ))}
                     </div>
                   );
@@ -254,10 +254,10 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                   >
                     <div
                       className={`flex items-center justify-between gap-2 rounded-xl px-4 ${
-                        tie ? 'bg-amber-500/25 ring-2 ring-amber-400' : live ? p.chipLive : p.chip
+                        tie ? 'bg-amber-500/25 ring-2 ring-amber-400' : live ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
                       }`}
                     >
-                      <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${tie ? `text-[32px] ${p.tieText}` : 'text-[38px]'}`}>
+                      <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${tie ? 'text-[32px] text-amber-300' : 'text-[38px]'}`}>
                         {roundLabel(round)}
                       </span>
                       {open && round.winner && revealed.settled(round.roundNumber) && (
@@ -272,7 +272,6 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                         vote={round.votes[j.id]}
                         isRevealed={open}
                         revealStartTime={revealStartTimes[round.roundNumber]}
-                        light={p.light}
                       />
                     ))}
                   </div>
@@ -283,7 +282,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
 
           {/* Bottom band (hidden by the seated judges): event name only */}
           <div style={box(0.05, 0.95, HIDDEN, 0)} className="flex items-center justify-center">
-            <p className={`font-condensed text-[72px] font-black uppercase tracking-[0.35em] ${p.footer}`}>HipHop Xứ Trà 2026 · Breaking U16</p>
+            <p className="font-condensed text-[72px] font-black uppercase tracking-[0.35em] text-white/15">HipHop Xứ Trà 2026 · Breaking U16</p>
           </div>
 
           {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}
