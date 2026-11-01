@@ -102,7 +102,8 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
   // opens it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
   const isTieBreak = (r: BattleRound) => Boolean(r.isTieBreak);
   const roundLabel = (r?: BattleRound) => (!r ? '' : isTieBreak(r) ? 'Tie-break' : `Round ${r.roundNumber}`);
-  const tieRound = revealed.pending ? undefined : match.rounds.find(isTieBreak);
+  // A tie-break opened by this very reveal waits for the regulation rows, then stays while its own pills turn.
+  const tieRound = revealed.regulationPending ? undefined : match.rounds.find(isTieBreak);
   const roundRows: (BattleRound | null)[] = [...regulationRounds(match), tieRound ?? null];
 
   // Announced result: the match winner once it's over, else the last revealed round until the next votes come in.

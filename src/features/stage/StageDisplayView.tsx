@@ -166,7 +166,8 @@ export function useRevealStartTimes(match?: BattleMatch, judges = 9): Record<num
 
 /**
  * What the LED may show of the result yet. A revealed row keeps its outcome back until its last pill has turned plus
- * the operator's winner delay; the winner, the scores and the tie-break row wait for every row (`pending`).
+ * the operator's winner delay; the winner and the scores wait for every row (`pending`). The tie-break row only waits
+ * for the regulation rows (`regulationPending`): it must be on screen while its own pills turn.
  */
 export function useRevealedResult(
   match: BattleMatch | undefined,
@@ -182,6 +183,7 @@ export function useRevealedResult(
   const openRounds = match ? match.rounds.filter(isRoundOpen) : [];
   const ends = openRounds.map((r) => settleAt(r.roundNumber));
   const holdUntil = Math.max(0, ...ends);
+  const regulationHoldUntil = Math.max(0, ...openRounds.filter((r) => !r.isTieBreak).map((r) => settleAt(r.roundNumber)));
   const nextEnd = Math.min(Infinity, ...ends.filter((t) => t > now));
 
   // Re-render as each row settles.
@@ -196,7 +198,8 @@ export function useRevealedResult(
   const pending = holdUntil > now;
   const wins = (side: 'red' | 'blue') =>
     !match ? 0 : pending ? openRounds.filter((r) => r.winner === side && settled(r.roundNumber)).length : side === 'red' ? match.roundWinsRed : match.roundWinsBlue;
-  return { settled, pending, holdUntil, wins };
+  const regulationPending = regulationHoldUntil > now;
+  return { settled, pending, regulationPending, holdUntil, wins };
 }
 
 /**
@@ -329,7 +332,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   // it, then lit while the regulation rows dim (docs/main-battle.md 2.5).
   const regularRounds = regulationRounds(match).length;
   const isTieBreakRound = (r: BattleMatch['rounds'][number]) => Boolean(r.isTieBreak);
-  const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak) && !revealed.pending;
+  const hasTieBreakRound = match.rounds.some((r) => r.isTieBreak) && !revealed.regulationPending;
   // A tie-break opened by this very reveal stays a dim placeholder until the regulation rows have turned.
   const roundRows: (BattleMatch['rounds'][number] | null)[] = [
     ...regulationRounds(match),
