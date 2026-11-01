@@ -281,8 +281,9 @@ const Ranking: React.FC<{ list: Dancer[]; locked: boolean; panels: Parameters<ty
                 <li className="bg-zinc-50 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-zinc-400">Dừng ở vòng loại</li>
               )}
               <li className="flex items-center gap-3 px-3 py-2.5">
-                <span className="w-7 shrink-0 text-center font-condensed text-lg font-black tabular-nums text-zinc-500">{done ? i + 1 : '–'}</span>
+                <span className="w-7 shrink-0 text-center font-condensed text-lg font-black tabular-nums text-zinc-500">{done && !d.withdrawn ? i + 1 : '–'}</span>
                 <span className="w-12 shrink-0 font-mono text-sm font-black text-zinc-700">{d.sbd}</span>
+                {d.withdrawn && <span className="shrink-0 rounded bg-zinc-200 px-1.5 text-[10px] font-black uppercase text-zinc-500">Bỏ cuộc</span>}
                 <span className="min-w-0 flex-1 truncate font-condensed text-lg font-black uppercase">{stripBreakerPrefix(d.name)}</span>
                 <span className="shrink-0 rounded bg-zinc-100 px-1.5 text-[10px] font-black text-zinc-500">{panelOfDancer(d, panels)}</span>
                 {done ? (

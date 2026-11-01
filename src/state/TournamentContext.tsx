@@ -103,6 +103,8 @@ interface TournamentContextType {
   lockTop32: (category: CategoryType) => void;
   publishPrelim: (category: CategoryType) => PublishPrelimResult;
   setJudgesPick: (category: CategoryType, groupIds: string[], pickedIds: string[]) => void;
+  /** Bỏ cuộc: keeps the prelim score, leaves the ranking and the Top 32 (the next dancer moves up). */
+  setWithdrawn: (category: CategoryType, dancerId: string, withdrawn: boolean) => void;
 
   // Teams (Pro 2vs2)
   proTeams: Team2v2[];
@@ -517,6 +519,13 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     else setProDancers(mark);
   };
 
+  /** Bỏ cuộc after the prelim: the dancer keeps their score but leaves the ranking; the next one moves up. */
+  const setWithdrawn = (category: CategoryType, dancerId: string, withdrawn: boolean) => {
+    const mark = (list: Dancer[]) => list.map((d) => (d.id === dancerId ? { ...d, withdrawn } : d));
+    if (category === 'newbie_1v1') setNewbieDancers(mark);
+    else setProDancers(mark);
+  };
+
   const lockTop32 = (category: CategoryType) => {
     if (category === 'newbie_1v1') {
       setIsNewbieTop32Locked(true);
@@ -781,6 +790,7 @@ export const TournamentProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         lockTop32,
         publishPrelim,
         setJudgesPick,
+        setWithdrawn,
         proTeams,
         shuffleProTeams,
         saveProLineup,

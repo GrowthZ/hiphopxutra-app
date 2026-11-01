@@ -16,6 +16,8 @@ import {
   Camera,
   Eye,
   Zap,
+  Flag,
+  Undo2,
 } from 'lucide-react';
 import { exportToCSV, downloadCSV } from '../../services/googleSheets';
 import { DancerPhotoUploadModal } from '../dancers/DancerPhotoUploadModal';
@@ -46,6 +48,7 @@ export const PrelimView: React.FC = () => {
     isProTop32Locked,
     publishPrelim,
     setJudgesPick,
+    setWithdrawn,
     setActiveView,
     syncWithGoogleSheet,
     sheetConfig,
@@ -160,10 +163,21 @@ export const PrelimView: React.FC = () => {
     if (window.confirm(question)) publishPrelim(activeCategory);
   };
 
+  // Bỏ cuộc after passing the prelim: keeps the score, leaves the ranking; the next dancer moves into the Top 32.
+  const toggleWithdrawn = (d: Dancer) => {
+    const afterLock = isLocked
+      ? '\n\nTop 32 đã chốt: nhánh đấu / đội đã tạo không tự đổi, hãy thay người ở “Sự cố trận” hoặc bốc thăm lại.'
+      : '';
+    const question = d.withdrawn
+      ? `Huỷ bỏ cuộc cho ${d.sbd} · ${d.name}? Thí sinh quay lại bảng xếp hạng theo điểm.${afterLock}`
+      : `${d.sbd} · ${d.name} bỏ cuộc, không thi vòng sau?\nVẫn giữ điểm nhưng không xếp hạng, không vào Top 32: thí sinh kế tiếp được đôn lên.${afterLock}`;
+    if (window.confirm(question)) setWithdrawn(activeCategory, d.id, !d.withdrawn);
+  };
+
   // Display filtering: Sát ngưỡng Top 32 (Hạng 27 - 36) or Tất cả
   const displayedDancers =
     filterMode === 'cutoff'
-      ? currentDancers.filter((_, idx) => idx >= 26 && idx <= 35) // Around threshold Top 32
+      ? currentDancers.filter((d, idx) => (idx >= 26 && idx <= 35) || d.withdrawn) // Around threshold Top 32, plus who withdrew
       : currentDancers;
 
   // Export CSV
@@ -180,8 +194,8 @@ export const PrelimView: React.FC = () => {
       'Điểm TB (Số nguyên)',
       'Kết Quả',
     ];
-    const rows = currentDancers.map((d, index) => [
-      index + 1,
+    const rows = currentDancers.map((d) => [
+      d.prelimRank ?? '',
       d.sbd,
       panelOfDancer(d, prelimPanels) ?? '',
       d.name,
@@ -189,7 +203,7 @@ export const PrelimView: React.FC = () => {
       ...judgeIdsOf(d).flatMap((j) => [judgeById(j)?.code ?? j, Math.round(d.prelimScores[j] ?? 0)]),
       Math.round(d.prelimScoreTotal),
       Math.round(d.prelimScoreAvg),
-      d.isQualifiedTop32 ? 'Top 32' : 'Ngoài Top 32',
+      d.withdrawn ? 'Bỏ cuộc' : d.isQualifiedTop32 ? 'Top 32' : 'Ngoài Top 32',
     ]);
     const csvStr = exportToCSV([header, ...rows]);
     downloadCSV(`prelim_${activeCategory}_results.csv`, csvStr);
@@ -389,15 +403,17 @@ export const PrelimView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-zinc-200 font-medium">
                 {displayedDancers.map((dancer) => {
-                  const rank = dancer.prelimRank || 0;
-                  const isTop32 = rank <= 32;
+                  const rank = dancer.prelimRank ?? 0; // 0: withdrawn, no rank
+                  const isTop32 = Boolean(dancer.isQualifiedTop32);
                   const isThresholdItem = rank === 32 || rank === 33;
 
                   return (
                     <React.Fragment key={dancer.id}>
                       <tr
                         className={`hover:bg-zinc-50 transition-colors ${
-                          isThresholdItem
+                          dancer.withdrawn
+                            ? 'bg-zinc-100 text-zinc-400'
+                            : isThresholdItem
                             ? 'bg-amber-50/50'
                             : isTop32
                             ? 'bg-white'
@@ -406,7 +422,7 @@ export const PrelimView: React.FC = () => {
                       >
                         {/* Rank */}
                         <td className="py-2 px-3 text-center font-condensed font-black text-sm text-zinc-900 tabular-nums">
-                          {rank}
+                          {dancer.withdrawn ? '—' : rank}
                         </td>
 
                         {/* SBD */}
@@ -522,15 +538,35 @@ export const PrelimView: React.FC = () => {
 
                         {/* Result Tag */}
                         <td className="py-2 px-3 text-center">
-                          {isTop32 ? (
-                            <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider">
-                              Vào Top 32
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-500 border border-zinc-200 text-[10px] font-medium">
-                              Loại
-                            </span>
-                          )}
+                          <div className="flex flex-col items-center gap-1">
+                            {dancer.withdrawn ? (
+                              <span className="px-2 py-0.5 rounded bg-zinc-200 text-zinc-600 border border-zinc-300 text-[10px] font-bold uppercase tracking-wider">
+                                Bỏ cuộc
+                              </span>
+                            ) : isTop32 ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 text-[10px] font-bold uppercase tracking-wider">
+                                Vào Top 32
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-500 border border-zinc-200 text-[10px] font-medium">
+                                Loại
+                              </span>
+                            )}
+                            {(isTop32 || dancer.withdrawn) && (
+                              <button
+                                onClick={() => toggleWithdrawn(dancer)}
+                                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 transition-colors cursor-pointer"
+                                title={
+                                  dancer.withdrawn
+                                    ? 'Huỷ bỏ cuộc: thí sinh quay lại bảng xếp hạng theo điểm'
+                                    : 'Thí sinh bỏ cuộc, không thi vòng sau: giữ điểm nhưng không vào Top 32, người kế tiếp được đôn lên'
+                                }
+                              >
+                                {dancer.withdrawn ? <Undo2 className="w-3 h-3" /> : <Flag className="w-3 h-3" />}
+                                {dancer.withdrawn ? 'Huỷ bỏ cuộc' : 'Bỏ cuộc'}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
 

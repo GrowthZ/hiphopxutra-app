@@ -80,7 +80,7 @@ export const DancersListView: React.FC = () => {
       d.halfBodyUrl || '',
       Math.round(d.prelimScoreTotal),
       Math.round(d.prelimScoreAvg),
-      d.isQualifiedTop32 ? 'Có' : 'Không',
+      d.withdrawn ? 'Bỏ cuộc' : d.isQualifiedTop32 ? 'Có' : 'Không',
     ]);
     const csvStr = exportToCSV([header, ...rows]);
     downloadCSV(`danh_sach_thi_sinh_${activeCategory}.csv`, csvStr);
@@ -392,7 +392,7 @@ export const DancersListView: React.FC = () => {
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded bg-zinc-100 text-zinc-500 border border-zinc-200 text-[10px] font-medium">
-                          Loại
+                          {d.withdrawn ? 'Bỏ cuộc' : 'Loại'}
                         </span>
                       )}
                     </td>

@@ -96,3 +96,40 @@ describe('tie-break across the Top 32 cut-off', () => {
     expect(toPublicDancer(full, false, DEFAULT_PANELS).tieBreakScores).toEqual(all8(50));
   });
 });
+
+describe('withdrawn after the prelim (bỏ cuộc)', () => {
+  const panelA = (score: number) => ({ 'gk-1': score, 'gk-2': score, 'gk-3': score, 'gk-4': score });
+  // 33 dancers on distinct totals: P101 best, P165 (rank 33) just outside the Top 32.
+  const field = (withdrawn: string[]) =>
+    recalculateDancers(
+      Array.from({ length: 33 }, (_, i) => ({ ...dancer(`P${101 + 2 * i}`, panelA(90 - i)), withdrawn: withdrawn.includes(`P${101 + 2 * i}`) }))
+    );
+
+  test('keeps their score, loses their rank and Top 32 place; the next dancer moves up', () => {
+    const ranked = field(['P101']);
+    const gone = ranked.find((d) => d.sbd === 'P101')!;
+    expect(gone.prelimScoreTotal).toBe(360);
+    expect(gone.prelimRank).toBeUndefined();
+    expect(gone.isQualifiedTop32).toBe(false);
+    expect(ranked.at(-1)!.sbd).toBe('P101'); // listed last
+    expect(ranked[0]).toMatchObject({ sbd: 'P103', prelimRank: 1 });
+    expect(ranked.find((d) => d.sbd === 'P165')).toMatchObject({ prelimRank: 32, isQualifiedTop32: true });
+    expect(ranked.filter((d) => d.isQualifiedTop32)).toHaveLength(32);
+  });
+
+  test('a withdrawn dancer is left out of a tie at the cut-off', () => {
+    // P201 / P203 tied for place 32; P205, withdrawn on the same total, doesn't join the tie.
+    const ranked = recalculateDancers([
+      ...Array.from({ length: 31 }, (_, i) => dancer(`P${101 + 2 * i}`, panelA(90))),
+      dancer('P201', panelA(70)),
+      dancer('P203', panelA(70)),
+      { ...dancer('P205', panelA(70)), withdrawn: true },
+    ]);
+    expect(cutoffTie(ranked).map((d) => d.sbd)).toEqual(['P201', 'P203']);
+    expect(isCutoffUndecided(ranked)).toBe(true);
+    // Only 32 left in the running once one more withdraws: no cut-off to decide.
+    const fewer = recalculateDancers(ranked.map((d) => (d.sbd === 'P203' ? { ...d, withdrawn: true } : d)));
+    expect(isCutoffUndecided(fewer)).toBe(false);
+    expect(fewer.filter((d) => d.isQualifiedTop32)).toHaveLength(32);
+  });
+});

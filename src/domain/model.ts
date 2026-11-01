@@ -93,8 +93,12 @@ export function tieBreakTotalOf(d: Pick<Dancer, 'tieBreak' | 'tieBreakScores'>, 
   return scores.every((s): s is number => typeof s === 'number') ? scores.reduce((a, b) => a + b, 0) : undefined;
 }
 
+/** Dancers still in the running: a withdrawn dancer keeps their score but takes no place in the ranking. */
+const inRunning = (ranked: Dancer[]) => ranked.filter((d) => !d.withdrawn);
+
 /** Dancers sharing the last qualifier's total when that tie crosses the cut-off (rank `qualify` vs `qualify + 1`). */
-export function cutoffTie(ranked: Dancer[], qualify = 32): Dancer[] {
+export function cutoffTie(all: Dancer[], qualify = 32): Dancer[] {
+  const ranked = inRunning(all);
   const last = ranked[qualify - 1];
   const next = ranked[qualify];
   if (!last || !next || last.prelimScoreTotal !== next.prelimScoreTotal) return [];
@@ -105,7 +109,8 @@ export function cutoffTie(ranked: Dancer[], qualify = 32): Dancer[] {
  * The cut-off is still undecided: a tie across it that neither the tie-break nor (tie-break level too) the judges'
  * pick has separated yet.
  */
-export function isCutoffUndecided(ranked: Dancer[], qualify = 32): boolean {
+export function isCutoffUndecided(all: Dancer[], qualify = 32): boolean {
+  const ranked = inRunning(all);
   const last = ranked[qualify - 1];
   const next = ranked[qualify];
   if (!last || !next || last.prelimScoreTotal !== next.prelimScoreTotal) return false;
@@ -117,7 +122,8 @@ export function isCutoffUndecided(ranked: Dancer[], qualify = 32): boolean {
  * Tie-break done and still level across the cut-off: the dancers still sharing rank 32's score and tie-break total,
  * and how many Top 32 places they share. The judges confer and pick that many; an admin enters the pick.
  */
-export function cutoffStillTied(ranked: Dancer[], qualify = 32): { group: Dancer[]; places: number } {
+export function cutoffStillTied(all: Dancer[], qualify = 32): { group: Dancer[]; places: number } {
+  const ranked = inRunning(all);
   const last = ranked[qualify - 1];
   const next = ranked[qualify];
   if (!last || !next || last.tieBreakTotal === undefined || next.tieBreakTotal === undefined) return { group: [], places: 0 };
@@ -150,16 +156,21 @@ export function recalculateDancers(list: Dancer[], panels: PrelimPanels = DEFAUL
     };
   });
 
-  // Total score, then (same total) the tie-break total, then the judges' pick when the tie-break is level too, then SBD
+  // Withdrawn dancers last; then total score, then (same total) the tie-break total, then the judges' pick when the
+  // tie-break is level too, then SBD
   updated.sort(
     (a, b) =>
+      Number(Boolean(a.withdrawn)) - Number(Boolean(b.withdrawn)) ||
       b.prelimScoreTotal - a.prelimScoreTotal ||
       (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) ||
       Number(Boolean(b.judgesPick)) - Number(Boolean(a.judgesPick)) ||
       a.sbd.localeCompare(b.sbd)
   );
 
-  return updated.map((d, idx) => ({ ...d, prelimRank: idx + 1, isQualifiedTop32: idx < 32 }));
+  // A withdrawn dancer keeps their score but has no rank: the next one moves up into the Top 32.
+  return updated.map((d, idx) =>
+    d.withdrawn ? { ...d, prelimRank: undefined, isQualifiedTop32: false } : { ...d, prelimRank: idx + 1, isQualifiedTop32: idx < 32 }
+  );
 }
 
 const stubDancer = (id: string): Dancer => ({

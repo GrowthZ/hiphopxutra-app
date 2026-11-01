@@ -35,10 +35,11 @@ const CHEERS = [
 
 export const isScored = (d: Dancer, judges: number) => Object.keys(d.prelimScores ?? {}).length >= judges;
 
-/** Public ranking: fully scored dancers by total (then tie-break); those still being scored go last, by SBD. */
+/** Public ranking: fully scored dancers by total (then tie-break); those still being scored go last, by SBD; withdrawn dancers after everyone. */
 export const rankForDisplay = (list: Dancer[], judges: number) =>
   [...list].sort(
     (a, b) =>
+      Number(Boolean(a.withdrawn)) - Number(Boolean(b.withdrawn)) ||
       Number(isScored(b, judges)) - Number(isScored(a, judges)) ||
       b.prelimScoreTotal - a.prelimScoreTotal ||
       (b.tieBreakTotal ?? -1) - (a.tieBreakTotal ?? -1) || // tie across the cut-off: settled by all 8 judges
@@ -57,13 +58,13 @@ export const GenderBadge: React.FC<{ dancer: Dancer }> = ({ dancer }) =>
   );
 
 const RankBadge: React.FC<{ rank: number; scored: boolean }> = ({ rank, scored }) =>
-  scored && rank <= 3 ? (
+  scored && rank >= 1 && rank <= 3 ? (
     <span className="flex w-8 shrink-0 justify-center">
       <RankEmblem rank={rank} className={rank === 1 ? 'h-11' : 'h-9'} />
     </span>
   ) : (
     <span className="flex h-8 w-8 shrink-0 items-center justify-center text-xs font-black tabular-nums text-zinc-500">
-      {!scored ? '–' : rank > RANKED_UNTIL ? `${RANKED_UNTIL}+` : rank}
+      {!scored || rank === 0 ? '–' : rank > RANKED_UNTIL ? `${RANKED_UNTIL}+` : rank}
     </span>
   );
 
@@ -128,11 +129,14 @@ export const PrelimGuestView: React.FC = () => {
 
   const visible = useMemo(() => {
     if (waiting) return [];
-    const withRank = ranked.map((d, i) => ({ dancer: d, rank: i + 1 }));
+    // Withdrawn dancers (bỏ cuộc) keep their score but have no rank (0) and come last.
+    const withRank = ranked.map((d, i) => ({ dancer: d, rank: d.withdrawn ? 0 : i + 1 }));
+    const inRace = withRank.filter((r) => r.rank > 0);
     // Below rank 40: one group, shuffled, so the order gives nothing away.
     const shown = [
-      ...withRank.slice(0, RANKED_UNTIL),
-      ...withRank.slice(RANKED_UNTIL).sort((a, b) => hashOf(a.dancer.id) - hashOf(b.dancer.id)),
+      ...inRace.slice(0, RANKED_UNTIL),
+      ...inRace.slice(RANKED_UNTIL).sort((a, b) => hashOf(a.dancer.id) - hashOf(b.dancer.id)),
+      ...withRank.filter((r) => r.rank === 0),
     ];
     const pool = locked ? shown : shown.slice(0, LIVE_LIMIT);
     const q = query.trim().toLowerCase();
@@ -154,7 +158,7 @@ export const PrelimGuestView: React.FC = () => {
     if (locked || index < LIVE_LIMIT) setSelected(ranked[index]);
   }, [linkedSbd, ranked, locked, waiting, activeCategory, newbieDancers, proDancers, setActiveCategory]);
 
-  const podium = waiting ? [] : ranked.slice(0, 3).filter((d) => isScored(d, judgeCount));
+  const podium = waiting ? [] : ranked.filter((d) => !d.withdrawn).slice(0, 3).filter((d) => isScored(d, judgeCount));
   const scopes: [Scope, string][] = locked
     ? [['top10', 'Top 10'], ['top32', 'Top 32'], ['all', `Tất cả (${ranked.length})`]]
     : [];
@@ -290,7 +294,7 @@ export const PrelimGuestView: React.FC = () => {
           {visible.length === 0 && <li className="px-4 py-8 text-center text-sm text-zinc-500">Không tìm thấy thí sinh.</li>}
           {visible.map(({ dancer: d, rank }, i) => {
             const scored = isScored(d, judgeCount);
-            const podium = scored && rank <= 3 ? METALS[rank - 1] : null;
+            const podium = scored && rank >= 1 && rank <= 3 ? METALS[rank - 1] : null;
             const unranked = rank > RANKED_UNTIL;
             return (
               <React.Fragment key={d.id}>
@@ -306,6 +310,11 @@ export const PrelimGuestView: React.FC = () => {
                     Hạng {RANKED_UNTIL}+ · không xếp thứ tự
                   </li>
                 )}
+                {d.withdrawn && !query && (i === 0 || !visible[i - 1].dancer.withdrawn) && (
+                  <li className="bg-zinc-50 px-4 py-1.5 text-center text-[11px] font-bold uppercase tracking-wide text-zinc-400">
+                    Bỏ cuộc · không xếp hạng
+                  </li>
+                )}
                 <li className={`border-t border-zinc-100 first:border-t-0 ${podium?.row ?? ''}`}>
                   <button
                     onClick={() => setSelected(d)}
@@ -319,11 +328,12 @@ export const PrelimGuestView: React.FC = () => {
                       <span className="block truncate font-condensed text-lg font-black uppercase leading-tight">{stripBreakerPrefix(d.name)}</span>
                       <span className="flex items-center gap-1.5 text-xs text-zinc-500">
                         {d.sbd && <span className="font-mono">{d.sbd}</span>}
-                        {locked && rank <= QUALIFY && (
+                        {locked && rank >= 1 && rank <= QUALIFY && (
                           <span className="flex items-center gap-0.5 whitespace-nowrap font-bold text-emerald-600">
                             <Check className="h-3 w-3" /> Vào Battle
                           </span>
                         )}
+                        {d.withdrawn && <span className="whitespace-nowrap font-bold text-zinc-400">Bỏ cuộc</span>}
                       </span>
                     </span>
                     <GenderBadge dancer={d} />
@@ -347,7 +357,7 @@ export const PrelimGuestView: React.FC = () => {
       {selected && (
         <DancerSheet
           dancer={selected}
-          rank={ranked.findIndex((d) => d.id === selected.id) + 1}
+          rank={selected.withdrawn ? 0 : ranked.findIndex((d) => d.id === selected.id) + 1}
           cheer={CHEERS[hashOf(selected.id) % CHEERS.length]}
           judges={prelimJudgeIdsFor(selected, prelimPanels).map((id) => ({ id, code: judges.find((j) => j.id === id)?.code ?? id }))}
           locked={locked}
@@ -371,10 +381,12 @@ const DancerSheet: React.FC<{
 }> = ({ dancer, rank, cheer, judges, locked, categoryLabel, onClose }) => {
   const scored = isScored(dancer, PANEL_SIZE);
   const unranked = scored && rank > RANKED_UNTIL;
-  const medal = scored && rank <= 3 ? METALS[rank - 1] : null;
-  const qualified = locked && scored && rank <= QUALIFY;
+  const medal = scored && rank >= 1 && rank <= 3 ? METALS[rank - 1] : null;
+  const qualified = locked && scored && rank >= 1 && rank <= QUALIFY;
   const name = stripBreakerPrefix(dancer.name);
-  const rankLabel = !scored
+  const rankLabel = dancer.withdrawn
+    ? 'Bỏ cuộc'
+    : !scored
     ? 'Đang chấm'
     : unranked
       ? `Top ${RANKED_UNTIL}+`

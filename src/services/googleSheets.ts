@@ -88,17 +88,17 @@ export async function syncAllTournamentData(
     const prelimHeader = ['Hạng', 'SBD', 'Tên Thí Sinh', 'CLB / Đội', ...judgeHeaders, 'Tổng Điểm', 'Điểm TB', 'Kết Quả'];
 
     const formatPrelimRows = (dancers: Dancer[]) => {
-      return dancers.map((d, index) => {
+      return dancers.map((d) => {
         const jScores = judges.map((j) => d.prelimScores[j.id] ?? '');
         return [
-          index + 1,
+          d.prelimRank ?? '',
           d.sbd,
           d.name,
           d.crew || '',
           ...jScores,
           d.prelimScoreTotal,
           d.prelimScoreAvg,
-          d.isQualifiedTop32 ? 'Top 32' : 'Ngoài Top 32',
+          d.withdrawn ? 'Bỏ cuộc' : d.isQualifiedTop32 ? 'Top 32' : 'Ngoài Top 32',
         ];
       });
     };

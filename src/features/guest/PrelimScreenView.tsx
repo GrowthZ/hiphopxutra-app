@@ -236,7 +236,7 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
 
   const locked = category === 'newbie_1v1' ? isNewbieTop32Locked : isProTop32Locked;
   const ranked = lists[category];
-  const scored = ranked.filter((d) => isScored(d, judgeCount));
+  const scored = ranked.filter((d) => isScored(d, judgeCount) && !d.withdrawn); // bỏ cuộc: off the board
   // Provisional ranks stay off screen until enough dancers are scored; the official top 32 always shows.
   const waiting = !locked && scored.length < MIN_SCORED_TO_SHOW;
   const shown = waiting ? [] : scored.slice(0, locked ? QUALIFY : LIVE_LIMIT);
@@ -247,6 +247,7 @@ export const PrelimScreenView: React.FC<{ theme?: Theme }> = ({ theme: start = '
   // While judging, a score is only public inside the top 10.
   const freshCategoryScored = fresh ? lists[fresh.category].filter((d) => isScored(d, judgeCount)).length : 0;
   const freshPublic =
+    !freshDancer?.withdrawn &&
     freshRank > 0 && (freshLocked ? freshRank <= QUALIFY : freshRank <= LIVE_LIMIT && freshCategoryScored >= MIN_SCORED_TO_SHOW);
 
   const guestUrl = `${window.location.origin}${VIEW_PATHS.prelim_guest}`;

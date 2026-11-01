@@ -73,15 +73,8 @@ export const PrelimResultsView: React.FC = () => {
     return viewScope;
   }, [viewScope, isLocked, ongoingTopLimit]);
 
-  // Sorted dancers by total prelim score descending
-  const sortedDancers = useMemo(() => {
-    return [...currentDancers].sort((a, b) => {
-      if (b.prelimScoreTotal !== a.prelimScoreTotal) {
-        return b.prelimScoreTotal - a.prelimScoreTotal;
-      }
-      return a.sbd.localeCompare(b.sbd);
-    });
-  }, [currentDancers]);
+  // The official ranking (already sorted, tie-break included); withdrawn dancers (bỏ cuộc) are off the board.
+  const sortedDancers = useMemo(() => currentDancers.filter((d) => !d.withdrawn), [currentDancers]);
 
   // Filtered by search if any
   const searchedDancers = useMemo(() => {
