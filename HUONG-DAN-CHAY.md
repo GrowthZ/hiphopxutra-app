@@ -82,6 +82,12 @@ Mặc định theo bản vẽ: 20 cột × 12 hàng cabinet 500 mm, 128 px mỗi
 
 Ví dụ: `/led?khung=vom&che=2&lech=1792&luoi=1`. Cảnh **Màn chờ** và **Bảng xếp hạng Prelim** vẫn là bố cục 16:9.
 
+**Khớp pixel**: vòm luôn vẽ theo pixel thật của màn hình, kể cả khi Windows đặt Display scaling 125%/150% hay trình duyệt
+đang zoom, nên không còn bị phóng to hay lệch khỏi khung LED. Chỉ cần: trình duyệt **toàn màn hình** (bấm 1 lần vào
+màn hình) và khung HDMI đủ rộng (≥ `lech` + 2560 px, cao ≥ 1536 px). Kiểm tra bằng `&luoi=1`: góc dưới bên trái hiện
+kích thước màn hình thật và mức scaling; **xanh "khớp 1:1"** là đúng, **đỏ "đang thu nhỏ"** là chưa toàn màn hình hoặc
+độ phân giải HDMI nhỏ hơn mức vòm cần.
+
 **Viền màn vòm** chọn ở `/admin/led`: **Nền đầy đủ** (mặc định, vẽ kín 2560×1536, màn LED tự cắt theo bậc) hoặc **Viền vòm cong** (vẽ trong một đường vòm cong nằm gọn trong các bậc, góc bậc để đen). Đổi là màn LED đổi ngay, không cần tải lại.
 
 **Sơ đồ knockout** (cảnh mới ở `/admin/led`): hiện giữa các trận, chọn hạng mục và giao diện **Tối / Sáng**. Trên màn vòm cây nhánh nằm trong vùng các bậc cho phép, trên phần bàn giám khảo che; logo và ô Vô địch ở tháp giữa. Người thắng đi tiếp tự cập nhật.
