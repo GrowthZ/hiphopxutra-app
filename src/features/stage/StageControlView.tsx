@@ -1,12 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ExternalLink, MonitorOff, Power, Sun, Moon, Swords, Trophy, Image, DoorOpen, PartyPopper, Network, Upload, Trash2, Loader2 } from 'lucide-react';
+import { ExternalLink, MonitorOff, Power, Sun, SunMedium, Moon, Swords, Trophy, Image, DoorOpen, PartyPopper, Network, Upload, Trash2, Loader2 } from 'lucide-react';
 import { uploadPhoto } from '../../services/media';
 import { useTournament } from '../../state/TournamentContext';
 import { useStageController, DEFAULT_SCREEN_ID } from '../../state/useStage';
 import { VIEW_PATHS } from '../../app/routes';
-import { StageSceneType } from '../../domain/types';
+import { StageSceneType, StageState } from '../../domain/types';
 
 const LED_WIDTH = 1920;
+
+/** Main battle backdrop: navy, near-black, or white. */
+const BATTLE_THEMES: [StageState['theme'], string, typeof Sun][] = [
+  ['daylight', 'Ban ngày', Sun],
+  ['night', 'Ban đêm', Moon],
+  ['light', 'Nền sáng', SunMedium],
+];
 
 /** Live preview: the real /led page in an iframe, scaled down — identical to what the venue sees.
  *  `arch`: the stepped-arch wall layout with its cabinet grid (/led?khung=vom&luoi=1). */
@@ -125,17 +132,18 @@ export const StageControlView: React.FC = () => {
 
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex rounded border border-zinc-300 bg-white p-0.5" role="group" aria-label="Chế độ hiển thị">
-            {(['daylight', 'night'] as const).map((theme) => (
+            {BATTLE_THEMES.map(([theme, label, Icon]) => (
               <button
                 key={theme}
                 onClick={() => setTheme(theme)}
                 aria-pressed={state.theme === theme}
+                title="Nền màn battle chính"
                 className={`flex items-center gap-1.5 rounded px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer focus-visible:outline-2 focus-visible:outline-amber-500 ${
                   state.theme === theme ? 'bg-zinc-900 text-white' : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
-                {theme === 'daylight' ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5" />}
-                {theme === 'daylight' ? 'Ban ngày' : 'Ban đêm'}
+                <Icon className="w-3.5 h-3.5" />
+                {label}
               </button>
             ))}
           </div>

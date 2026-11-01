@@ -7,6 +7,7 @@ import { getDancerHalfBodyUrl, getTeamPhotoUrl, stripBreakerPrefix } from '../..
 import { TeamPhoto } from '../../shared/TeamPhoto';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
 import { ArchFrame } from './ArchFrame';
+import { BattleTheme, battlePalette } from './battleTheme';
 import { JudgeBallotCard, useRevealedResult, useRevealStartTimes, useTeamEntrance } from './StageDisplayView';
 import {
   ArchEdge,
@@ -51,14 +52,15 @@ const sideSub = (match: BattleMatch, side: BattleSide) => {
 /**
  * `winnerDelay`: seconds between the last pill turning and the result lighting up (set on the battle console).
  * `edge` (set at /admin/led): the full picture, cut by the wall itself (default), or drawn inside a smooth dome.
- * `theme` (set at /admin/led): daylight or night backdrop, as on the 16:9 screen.
+ * `theme` (set at /admin/led): daylight, night or light backdrop, as on the 16:9 screen.
  */
-export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; theme?: 'daylight' | 'night' }> = ({
+export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; theme?: BattleTheme }> = ({
   winnerDelay,
   edge = 'full',
   theme = 'daylight',
 }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
+  const p = battlePalette(theme);
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
   // "Ra sân" (or a new match): both corners slide in again, as on the 16:9 screen
   const { entranceKey, isEntranceActive } = useTeamEntrance(match);
@@ -69,7 +71,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
   if (!match) return <div className="fixed inset-0 bg-black" />;
 
   const photo = (side: BattleSide, color: 'red' | 'blue') => {
-    const shadow = `drop-shadow-[0_12px_30px_rgba(0,0,0,0.85)] ${color === 'red' ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.35)]' : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.35)]'}`;
+    const shadow = `${p.photoShadow} ${color === 'red' ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.35)]' : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.35)]'}`;
     return match.category === 'pro_2v2' ? (
       <TeamPhoto
         photoUrl={side.teamPhotoUrl}
@@ -131,14 +133,10 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
   return (
     <ArchFrame edge={edge}>
           {/* Backdrop */}
-          <div
-            className={`absolute inset-0 bg-gradient-to-b ${
-              theme === 'daylight' ? 'from-[#1a2a6c] via-[#13205a] to-[#0a1238]' : 'from-[#120a24] via-[#0b1030] to-[#05060f]'
-            }`}
-          />
-          <div className="absolute -left-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-red-600/25 blur-[140px]" />
-          <div className="absolute -right-[10%] top-[20%] h-[90%] w-[60%] rounded-full bg-blue-600/25 blur-[140px]" />
-          <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_56px)]" />
+          <div className={`absolute inset-0 bg-gradient-to-b ${p.backdrop}`} />
+          <div className={`absolute -left-[10%] top-[20%] h-[90%] w-[60%] rounded-full blur-[140px] ${p.glow[0]}`} />
+          <div className={`absolute -right-[10%] top-[20%] h-[90%] w-[60%] rounded-full blur-[140px] ${p.glow[1]}`} />
+          <div className={`absolute inset-0 [background:repeating-linear-gradient(115deg,currentColor_0_2px,transparent_2px_56px)] ${p.stripes}`} />
 
           {/* Arch top: logo in the tower (kept off the top edge), category · stage · match on the step below */}
           <div style={box(0.36, 0.64, 0.95, 0.865)} className="flex items-center justify-center">
@@ -168,13 +166,13 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
           </div>
 
           {/* From the name bars down: fade to dark so the vote colours read clearly over the photos */}
-          <div style={box(0, 1, BAR.top, 0)} className="bg-gradient-to-b from-transparent via-[#05060f]/80 via-35% to-[#05060f]/95" />
+          <div style={box(0, 1, BAR.top, 0)} className={`bg-gradient-to-b from-transparent ${p.fade}`} />
 
           {/* Centre: VS and the round being danced; after a result, who won it (the scores below tell by how much) */}
           <div style={box(0.36, 0.64, 0.79, BAR.top + 0.125)} className="flex flex-col items-center justify-center gap-3">
             {winner ? (
               <>
-                <span className="font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                <span className={`font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] ${p.caption}`}>
                   {match.status === 'finished' ? 'Chung cuộc' : roundLabel(lastOpen)}
                 </span>
                 <span
@@ -188,7 +186,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
               </>
             ) : tiePending ? (
               <>
-                <span className="font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+                <span className={`font-condensed text-[56px] font-black uppercase leading-none tracking-[0.2em] ${p.caption}`}>
                   Hòa {match.roundWinsRed}–{match.roundWinsBlue}
                 </span>
                 <span className="led-pop whitespace-nowrap rounded-full bg-amber-400 px-9 py-3 font-condensed text-[64px] font-black uppercase leading-none text-zinc-950 shadow-[0_0_60px_rgba(251,191,36,0.9)]">
@@ -197,7 +195,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
               </>
             ) : (
               <>
-                <span className="font-condensed text-[150px] font-black italic leading-none text-white drop-shadow-[0_0_40px_rgba(251,191,36,0.6)]">VS</span>
+                <span className={`font-condensed text-[150px] font-black italic leading-none ${p.vs}`}>VS</span>
                 {(revealed.pending || current) && (
                   <span className="whitespace-nowrap rounded-full bg-amber-400 px-7 py-2 font-condensed text-[44px] font-black uppercase leading-none text-zinc-950">
                     {revealed.pending ? 'Công bố kết quả' : roundLabel(current)}
@@ -224,7 +222,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
               {judges.map((j) => (
                 <span
                   key={j.id}
-                  className="truncate rounded-md bg-black/55 px-2 py-1.5 text-center font-condensed text-[30px] font-black uppercase leading-none text-white ring-1 ring-white/10"
+                  className={`truncate rounded-md px-2 py-1.5 text-center font-condensed text-[30px] font-black uppercase leading-none ${p.chip}`}
                 >
                   {j.judgeName || j.code}
                 </span>
@@ -236,11 +234,11 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                   // Tie-break not needed (yet): a dim placeholder row
                   return (
                     <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
-                      <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
-                        <span className="whitespace-nowrap font-condensed text-[32px] font-black uppercase leading-none text-amber-300">Tie-break</span>
+                      <div className={`flex items-center rounded-xl px-4 ${p.chip}`}>
+                        <span className={`whitespace-nowrap font-condensed text-[32px] font-black uppercase leading-none ${p.tieText}`}>Tie-break</span>
                       </div>
                       {judges.map((j) => (
-                        <span key={j.id} className="rounded-xl bg-white/10" />
+                        <span key={j.id} className={`rounded-xl ${p.emptyPill}`} />
                       ))}
                     </div>
                   );
@@ -256,10 +254,10 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                   >
                     <div
                       className={`flex items-center justify-between gap-2 rounded-xl px-4 ${
-                        tie ? 'bg-amber-500/25 ring-2 ring-amber-400' : live ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
+                        tie ? 'bg-amber-500/25 ring-2 ring-amber-400' : live ? p.chipLive : p.chip
                       }`}
                     >
-                      <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${tie ? 'text-[32px] text-amber-300' : 'text-[38px]'}`}>
+                      <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${tie ? `text-[32px] ${p.tieText}` : 'text-[38px]'}`}>
                         {roundLabel(round)}
                       </span>
                       {open && round.winner && revealed.settled(round.roundNumber) && (
@@ -274,6 +272,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
                         vote={round.votes[j.id]}
                         isRevealed={open}
                         revealStartTime={revealStartTimes[round.roundNumber]}
+                        light={p.light}
                       />
                     ))}
                   </div>
@@ -284,7 +283,7 @@ export const ArchBattleView: React.FC<{ winnerDelay?: number; edge?: ArchEdge; t
 
           {/* Bottom band (hidden by the seated judges): event name only */}
           <div style={box(0.05, 0.95, HIDDEN, 0)} className="flex items-center justify-center">
-            <p className="font-condensed text-[72px] font-black uppercase tracking-[0.35em] text-white/15">HipHop Xứ Trà 2026 · Breaking U16</p>
+            <p className={`font-condensed text-[72px] font-black uppercase tracking-[0.35em] ${p.footer}`}>HipHop Xứ Trà 2026 · Breaking U16</p>
           </div>
 
           {/* Fanfare and confetti for the match winner; the result itself is shown in place above */}

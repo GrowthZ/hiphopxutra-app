@@ -31,7 +31,7 @@ export interface StageState {
   id: string; // screenId
   scene: StageSceneType;
   category: CategoryType; // category for the prelim leaderboard and knockout bracket scenes
-  theme: 'daylight' | 'night';
+  theme: 'daylight' | 'night' | 'light'; // main battle backdrop: navy, near-black, or white (light)
   blackout: boolean; // overrides scene with the idle/logo screen
   winnerDelay?: number; // seconds between the last ballot flipping over and the result lighting up (default 0.5)
   archEdge?: 'full' | 'dome'; // arch LED: full picture cut by the wall itself (default), or a smooth dome inside it

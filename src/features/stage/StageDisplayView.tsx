@@ -8,6 +8,7 @@ import { isRoundOpen } from '../../domain/model';
 import { regulationRounds } from '../../domain/battle';
 import { AutomatedVictoryDisplay } from './AutomatedVictoryDisplay';
 import { DEFAULT_WINNER_DELAY, FLIP_MS, FLIP_STEP_MS, roundOffset, rowFlipMs } from '../../domain/reveal';
+import { BattleTheme, battlePalette } from './battleTheme';
 
 // Main battle on the 16:9 LED (/led). Drawn on a fixed 1920×1080 canvas and scaled to the window, so the HDMI
 // output is pixel-exact and the /admin/led preview is the same picture, smaller.
@@ -25,10 +26,12 @@ interface JudgeBallotCardProps {
   vote?: 'red' | 'blue' | 'hidden' | null;
   isRevealed: boolean;
   revealStartTime?: number;
+  /** Light backdrop: outline the white waiting pill so it doesn't melt into the background. */
+  light?: boolean;
 }
 
 /** One judge's pill in a round row: white while waiting, green once voted, flips to red / blue on reveal. */
-export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, judgeIndex, vote, isRevealed, revealStartTime }) => {
+export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, judgeIndex, vote, isRevealed, revealStartTime, light }) => {
   const [hasFlipped, setHasFlipped] = useState<boolean>(() => {
     if (!isRevealed) return false;
     if (!revealStartTime) return true;
@@ -84,7 +87,9 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
             ? 'bg-gradient-to-b from-red-500 to-red-700 shadow-[0_0_24px_rgba(239,68,68,0.85)] ring-2 ring-red-300/70'
             : vote === 'blue'
               ? 'bg-gradient-to-b from-blue-500 to-blue-700 shadow-[0_0_24px_rgba(59,130,246,0.85)] ring-2 ring-blue-300/70'
-              : 'bg-white/10 text-white/40'
+              : light
+                ? 'bg-zinc-200 text-zinc-400'
+                : 'bg-white/10 text-white/40'
         }`}
       >
         {vote === 'red' ? 'Đỏ' : vote === 'blue' ? 'Xanh' : '—'}
@@ -101,7 +106,7 @@ export const JudgeBallotCard: React.FC<JudgeBallotCardProps> = ({ judgeCode, jud
   }
 
   return (
-    <div role="img" aria-label={`${judgeCode}: chờ phiếu`} className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)]`}>
+    <div role="img" aria-label={`${judgeCode}: chờ phiếu`} className={`${base} bg-gradient-to-b from-white to-zinc-200 text-[20px] text-zinc-400 shadow-[inset_0_-3px_0_rgba(0,0,0,0.12)] ${light ? 'ring-1 ring-zinc-300' : ''}`}>
       {judgeCode.replace('GK ', '')}
     </div>
   );
@@ -249,7 +254,7 @@ export function useTeamEntrance(match?: BattleMatch) {
 
 interface StageDisplayViewProps {
   /** Set by /admin/led. */
-  theme?: 'daylight' | 'night';
+  theme?: BattleTheme;
   /** Seconds between the last pill turning and the result lighting up (set on the battle console). */
   winnerDelay?: number;
 }
@@ -281,6 +286,7 @@ const judgeShortName = (name: string, code: string) => {
 
 export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'daylight', winnerDelay }) => {
   const { matches, activeMatchId, judges, storageConfig } = useTournament();
+  const p = battlePalette(theme);
   const match = matches.find((m) => m.id === activeMatchId) || matches[0];
 
   // Fixed 1920×1080 picture, scaled to fit and centred (letterboxed on other aspect ratios).
@@ -347,7 +353,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
   const photoBox = match.category === 'pro_2v2' ? 'bottom-[360px] w-[860px]' : 'bottom-0 w-[720px]';
 
   const photo = (side: BattleSide, color: 'red' | 'blue') => {
-    const shadow = `drop-shadow-[0_14px_30px_rgba(0,0,0,0.85)] ${
+    const shadow = `${p.photoShadow} ${
       color === 'red' ? 'drop-shadow-[0_0_40px_rgba(239,68,68,0.35)]' : 'drop-shadow-[0_0_40px_rgba(59,130,246,0.35)]'
     }`;
     return match.category === 'pro_2v2' ? (
@@ -384,14 +390,10 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
         style={{ width: W, height: H, left: fit.left, top: fit.top, transform: `scale(${fit.scale})` }}
       >
         {/* Backdrop */}
-        <div
-          className={`absolute inset-0 ${
-            theme === 'daylight' ? 'bg-gradient-to-b from-[#1a2a6c] via-[#13205a] to-[#0a1238]' : 'bg-gradient-to-b from-[#120a24] via-[#0b1030] to-[#05060f]'
-          }`}
-        />
-        <div className="absolute -left-[12%] top-[8%] h-[80%] w-[55%] rounded-full bg-red-600/25 blur-[140px]" />
-        <div className="absolute -right-[12%] top-[8%] h-[80%] w-[55%] rounded-full bg-blue-600/25 blur-[140px]" />
-        <div className="absolute inset-0 opacity-[0.06] [background:repeating-linear-gradient(115deg,#fff_0_2px,transparent_2px_64px)]" />
+        <div className={`absolute inset-0 bg-gradient-to-b ${p.backdrop}`} />
+        <div className={`absolute -left-[12%] top-[8%] h-[80%] w-[55%] rounded-full blur-[140px] ${p.glow[0]}`} />
+        <div className={`absolute -right-[12%] top-[8%] h-[80%] w-[55%] rounded-full blur-[140px] ${p.glow[1]}`} />
+        <div className={`absolute inset-0 [background:repeating-linear-gradient(115deg,currentColor_0_2px,transparent_2px_64px)] ${p.stripes}`} />
 
         {/* Top: category · logo · stage */}
         <div className="absolute inset-x-[40px] top-[22px] flex h-[130px] items-center gap-6">
@@ -431,7 +433,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
 
         {/* From the name bars down: fade to dark so the vote colours read clearly over the photos */}
         <div
-          className="absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent via-[#05060f]/80 via-35% to-[#05060f]/95"
+          className={`absolute inset-x-0 bottom-0 bg-gradient-to-b from-transparent ${p.fade}`}
           style={{ top: BAR_TOP }}
         />
 
@@ -439,7 +441,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
         <div className="absolute left-[660px] right-[660px] top-[170px] flex h-[180px] flex-col items-center justify-center gap-3">
           {announcedWinner ? (
             <>
-              <span className="font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+              <span className={`font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] ${p.caption}`}>
                 {match.status === 'finished' ? 'Chung cuộc' : roundLabel(announcedRound)}
               </span>
               <span
@@ -453,7 +455,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
             </>
           ) : tiePending ? (
             <>
-              <span className="font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] text-white/80">
+              <span className={`font-condensed text-[44px] font-black uppercase leading-none tracking-[0.2em] ${p.caption}`}>
                 Hòa {match.roundWinsRed}–{match.roundWinsBlue}
               </span>
               <span className="led-pop whitespace-nowrap rounded-full bg-amber-400 px-8 py-2.5 font-condensed text-[52px] font-black uppercase leading-none text-zinc-950 shadow-[0_0_50px_rgba(251,191,36,0.9)]">
@@ -462,7 +464,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
             </>
           ) : (
             <>
-              <span className="font-condensed text-[120px] font-black italic leading-none text-white drop-shadow-[0_0_30px_rgba(251,191,36,0.6)]">
+              <span className={`font-condensed text-[120px] font-black italic leading-none ${p.vs}`}>
                 VS
               </span>
               {(revealed.pending || currentRound) && (
@@ -491,7 +493,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
             {judges.map((j) => (
               <span
                 key={j.id}
-                className="truncate rounded-md bg-black/55 px-2 py-1.5 text-center font-condensed text-[26px] font-black uppercase leading-none text-white ring-1 ring-white/10"
+                className={`truncate rounded-md px-2 py-1.5 text-center font-condensed text-[26px] font-black uppercase leading-none ${p.chip}`}
               >
                 {j.judgeName || judgeShortName(j.name, j.code)}
               </span>
@@ -503,11 +505,11 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
               if (!round) {
                 return (
                   <div key="tie-break" className="grid gap-x-3 opacity-30" style={{ gridTemplateColumns: cols, height: rowH }}>
-                    <div className="flex items-center rounded-xl bg-black/55 px-4 ring-1 ring-white/10">
-                      <span className="whitespace-nowrap font-condensed text-[28px] font-black uppercase leading-none text-amber-300">Tie-break</span>
+                    <div className={`flex items-center rounded-xl px-4 ${p.chip}`}>
+                      <span className={`whitespace-nowrap font-condensed text-[28px] font-black uppercase leading-none ${p.tieText}`}>Tie-break</span>
                     </div>
                     {judges.map((j) => (
-                      <span key={j.id} className="rounded-xl bg-white/10" />
+                      <span key={j.id} className={`rounded-xl ${p.emptyPill}`} />
                     ))}
                   </div>
                 );
@@ -526,15 +528,15 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
                 >
                   <div
                     className={`flex items-center justify-between gap-2 rounded-xl px-3 ${
-                      isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? 'bg-black/60 ring-2 ring-amber-400/80' : 'bg-black/55 ring-1 ring-white/10'
+                      isTieBreak ? 'bg-amber-500/25 ring-2 ring-amber-400' : isCurrent ? p.chipLive : p.chip
                     }`}
                   >
-                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? 'text-[24px] text-amber-300' : 'text-[28px] text-white'}`}>
+                    <span className={`whitespace-nowrap font-condensed font-black uppercase leading-none ${isTieBreak ? `text-[24px] ${p.tieText}` : 'text-[28px]'}`}>
                       {roundLabel(round)}
                     </span>
                     <span
                       className={`whitespace-nowrap text-[13px] font-black uppercase leading-none ${
-                        isRevealed && !flipping ? (round.winner === 'red' ? 'text-red-400' : 'text-blue-400') : 'text-emerald-300'
+                        isRevealed && !flipping ? (round.winner === 'red' ? p.wonText[0] : p.wonText[1]) : p.votedText
                       }`}
                     >
                       {isRevealed ? (flipping ? 'Đang lật phiếu…' : round.winner === 'red' ? 'Đỏ thắng' : 'Xanh thắng') : `${votes}/${judges.length} đã chấm`}
@@ -548,6 +550,7 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
                       vote={round.votes[j.id]}
                       isRevealed={isRevealed}
                       revealStartTime={revealAt}
+                      light={p.light}
                     />
                   ))}
                 </div>
@@ -561,12 +564,12 @@ export const StageDisplayView: React.FC<StageDisplayViewProps> = ({ theme = 'day
           <span
             className={`rounded-lg px-5 py-1.5 font-condensed text-[26px] font-black uppercase leading-none tracking-wider ${
               revealed.pending
-                ? 'bg-black/60 text-white/85 ring-1 ring-white/15'
+                ? p.statusTag
                 : match.status === 'finished'
                 ? 'bg-emerald-500 text-zinc-950'
                 : hasTieBreakRound || isMatchTied
                   ? 'bg-amber-400 text-zinc-950'
-                  : 'bg-black/60 text-white/85 ring-1 ring-white/15'
+                  : p.statusTag
             }`}
           >
             {statusText}
