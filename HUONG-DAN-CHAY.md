@@ -206,6 +206,7 @@ và đọc qua `import.meta.env.VITE_...` — lưu ý mọi biến `VITE_` sẽ 
 | Mở `/led` hay `/admin` trên host bị 404 | Thiếu rewrite về `index.html` (xem Cách B) |
 | Tải ảnh báo "Chưa cấu hình VITE_MEDIA_URL" | Làm mục 0b, rồi chạy lại `bun run dev` / build lại |
 | Tải ảnh báo "Chỉ admin được tải ảnh lên" | Đăng nhập bằng email có trong `admins`; email Google phải đã xác minh |
+| Tải ảnh báo "Firestore đã hết hạn mức đọc trong ngày" | Gói Spark hết 50.000 lượt đọc/ngày: nâng gói Blaze, hoặc chờ reset (0h giờ Mỹ Thái Bình Dương, khoảng 14–15h giờ VN) |
 | Ảnh không hiện, console báo CORS | Kiểm tra `VITE_MEDIA_URL` đúng link Worker (không có `/` ở cuối cũng được) |
 | Cổng 3000 đang bị dùng | Tắt app đang chiếm cổng, hoặc `bunx vite --port=3001 --host=0.0.0.0` |
 | Điện thoại không vào được link LAN | Cùng mạng chưa? Mở cổng 3000 trong Windows Firewall |

@@ -22,6 +22,13 @@ const CORS = {
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, 'Content-Type': 'application/json' } });
 
+class FirestoreUnavailable extends Error {
+  constructor(status) {
+    super(`Firestore ${status}`);
+    this.status = status;
+  }
+}
+
 // token -> { role, expiry }; per isolate, so a burst of uploads checks Firestore once
 const staffTokens = new Map();
 
@@ -54,6 +61,8 @@ async function staffRole(token, env) {
     `${base}/v1/projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/events/${env.EVENT_ID}/admins/${encodeURIComponent(email)}`,
     { headers: { Authorization: `Bearer ${token}` } }
   );
+  // Firestore itself failing (daily read quota used up, outage) says nothing about the caller: report it as such.
+  if (res.status === 429 || res.status >= 500) throw new FirestoreUnavailable(res.status);
   if (!res.ok) return null;
   const { fields } = await res.json();
   const stored = fields?.role?.stringValue;
@@ -76,7 +85,18 @@ async function upload(request, env, key) {
   if (request.headers.get('Content-Type') !== TYPES[ext]) return json(415, { error: 'Chỉ nhận ảnh WebP, JPEG hoặc PNG.' });
 
   const token = (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
-  const role = token ? await staffRole(token, env) : null;
+  let role = null;
+  try {
+    role = token ? await staffRole(token, env) : null;
+  } catch (err) {
+    if (!(err instanceof FirestoreUnavailable)) throw err;
+    return json(503, {
+      error:
+        err.status === 429
+          ? 'Firestore đã hết hạn mức đọc trong ngày nên chưa kiểm tra được quyền tải ảnh. Nâng gói Blaze hoặc chờ hạn mức reset (14–15h giờ VN).'
+          : 'Firestore đang lỗi nên chưa kiểm tra được quyền tải ảnh. Thử lại sau ít phút.',
+    });
+  }
   if (!role || (role === 'editor' && !key.startsWith('dancers/'))) return json(403, { error: 'Chỉ admin được tải ảnh lên.' });
 
   const body = await request.arrayBuffer();
